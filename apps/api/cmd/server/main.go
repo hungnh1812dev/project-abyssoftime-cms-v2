@@ -12,6 +12,7 @@ import (
 	"project-abyssoftime-cms-v2/api/internal/infrastructure/mongodb"
 	"project-abyssoftime-cms-v2/api/internal/usecase/auth"
 	contenttype "project-abyssoftime-cms-v2/api/internal/usecase/content_type"
+	docuc "project-abyssoftime-cms-v2/api/internal/usecase/document"
 )
 
 func main() {
@@ -33,14 +34,18 @@ func main() {
 	// repositories
 	userRepo := mongodb.NewUserRepository(db)
 	ctRepo := mongodb.NewContentTypeRepository(db)
+	docRepo := mongodb.NewDocumentRepository(db)
+	mediaRepo := mongodb.NewMediaAssetRepository(db)
 
 	// usecases
 	authUC := auth.New(userRepo)
 	ctUC := contenttype.New(ctRepo)
+	documentUC := docuc.New(docRepo, mediaRepo)
 
 	// handlers
 	authHandler := deliveryhandler.NewAuthHandler(authUC)
 	ctHandler := deliveryhandler.NewContentTypeHandler(ctUC)
+	docHandler := deliveryhandler.NewDocumentHandler(documentUC)
 
 	mux := http.NewServeMux()
 
@@ -63,6 +68,17 @@ func main() {
 	mux.Handle("GET /api/content-types/{id}", adminOnly(ctHandler.GetByID))
 	mux.Handle("PUT /api/content-types/{id}", adminOnly(ctHandler.Update))
 	mux.Handle("DELETE /api/content-types/{id}", adminOnly(ctHandler.Delete))
+
+	authRequired := func(h http.HandlerFunc) http.Handler {
+		return middleware.Auth(http.HandlerFunc(h))
+	}
+	mux.Handle("GET /api/documents", authRequired(docHandler.List))
+	mux.Handle("GET /api/documents/{id}", authRequired(docHandler.GetByID))
+	mux.Handle("POST /api/documents", adminOnly(docHandler.Create))
+	mux.Handle("PUT /api/documents/{id}", adminOnly(docHandler.Update))
+	mux.Handle("DELETE /api/documents/{id}", adminOnly(docHandler.Delete))
+	mux.Handle("POST /api/documents/{id}/publish", adminOnly(docHandler.Publish))
+	mux.Handle("POST /api/documents/{id}/unpublish", adminOnly(docHandler.Unpublish))
 
 	port := os.Getenv("PORT")
 	if port == "" {
