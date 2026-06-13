@@ -9,10 +9,12 @@ import (
 
 	deliveryhandler "project-abyssoftime-cms-v2/api/internal/delivery/http/handler"
 	"project-abyssoftime-cms-v2/api/internal/delivery/http/middleware"
+	cloudinaryadapter "project-abyssoftime-cms-v2/api/internal/infrastructure/cloudinary"
 	"project-abyssoftime-cms-v2/api/internal/infrastructure/mongodb"
 	"project-abyssoftime-cms-v2/api/internal/usecase/auth"
 	contenttype "project-abyssoftime-cms-v2/api/internal/usecase/content_type"
 	docuc "project-abyssoftime-cms-v2/api/internal/usecase/document"
+	mediauc "project-abyssoftime-cms-v2/api/internal/usecase/media"
 )
 
 func main() {
@@ -37,15 +39,27 @@ func main() {
 	docRepo := mongodb.NewDocumentRepository(db)
 	mediaRepo := mongodb.NewMediaAssetRepository(db)
 
+	// storage adapter
+	storage, err := cloudinaryadapter.NewCloudinaryAdapter(
+		os.Getenv("CLOUDINARY_CLOUD_NAME"),
+		os.Getenv("CLOUDINARY_API_KEY"),
+		os.Getenv("CLOUDINARY_API_SECRET"),
+	)
+	if err != nil {
+		log.Fatalf("cloudinary init: %v", err)
+	}
+
 	// usecases
 	authUC := auth.New(userRepo)
 	ctUC := contenttype.New(ctRepo)
 	documentUC := docuc.New(docRepo, mediaRepo)
+	mediaUC := mediauc.New(mediaRepo, storage)
 
 	// handlers
 	authHandler := deliveryhandler.NewAuthHandler(authUC)
 	ctHandler := deliveryhandler.NewContentTypeHandler(ctUC)
 	docHandler := deliveryhandler.NewDocumentHandler(documentUC)
+	mediaHandler := deliveryhandler.NewMediaHandler(mediaUC)
 
 	mux := http.NewServeMux()
 
@@ -79,6 +93,8 @@ func main() {
 	mux.Handle("DELETE /api/documents/{id}", adminOnly(docHandler.Delete))
 	mux.Handle("POST /api/documents/{id}/publish", adminOnly(docHandler.Publish))
 	mux.Handle("POST /api/documents/{id}/unpublish", adminOnly(docHandler.Unpublish))
+
+	mux.Handle("POST /api/media/upload", adminOnly(mediaHandler.Upload))
 
 	port := os.Getenv("PORT")
 	if port == "" {
