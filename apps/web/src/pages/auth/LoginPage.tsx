@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useMutation } from '@tanstack/react-query'
 import { useNavigate, Link } from 'react-router-dom'
-import { api, setAccessToken } from '@/lib/api'
+import { api } from '@/lib/api'
+import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -18,6 +19,7 @@ interface LoginResponse {
 
 export function LoginPage() {
   const navigate = useNavigate()
+  const { login } = useAuth()
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   const {
@@ -30,7 +32,7 @@ export function LoginPage() {
     mutationFn: (data: LoginFields) =>
       api.post<LoginResponse>('/auth/login', data).then((r) => r.data),
     onSuccess: (data) => {
-      setAccessToken(data.accessToken)
+      login(data.accessToken)
       navigate('/admin')
     },
     onError: () => {

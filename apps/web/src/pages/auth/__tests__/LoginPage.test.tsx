@@ -4,12 +4,22 @@ import userEvent from '@testing-library/user-event'
 import MockAdapter from 'axios-mock-adapter'
 import { api, getAccessToken, setAccessToken } from '@/lib/api'
 import { renderWithProviders } from '@/test-utils'
+import { AuthProvider } from '@/context/AuthContext'
 import { LoginPage } from '@/pages/auth/LoginPage'
+
+function makeToken(payload: Record<string, unknown>) {
+  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
+  const body = btoa(JSON.stringify(payload))
+  return `${header}.${body}.fakesig`
+}
+
+const ADMIN_TOKEN = makeToken({ userId: 'u1', role: 'admin', exp: 9999999999 })
 
 let mock: MockAdapter
 
 beforeEach(() => {
   mock = new MockAdapter(api)
+  mock.onPost('/auth/refresh').reply(401) // not logged in at page load
   setAccessToken(null)
 })
 
@@ -18,18 +28,27 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
+function renderLogin() {
+  return renderWithProviders(
+    <AuthProvider>
+      <LoginPage />
+    </AuthProvider>,
+  )
+}
+
 describe('LoginPage', () => {
-  it('renders email and password fields with a submit button', () => {
-    renderWithProviders(<LoginPage />)
-    expect(screen.getByLabelText(/email/i)).toBeInTheDocument()
+  it('renders email and password fields with a submit button', async () => {
+    renderLogin()
+    await waitFor(() => expect(screen.getByLabelText(/email/i)).toBeInTheDocument())
     expect(screen.getByLabelText(/password/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument()
   })
 
   it('shows validation error for invalid email', async () => {
     const user = userEvent.setup()
-    renderWithProviders(<LoginPage />)
+    renderLogin()
 
+    await waitFor(() => expect(screen.getByLabelText(/email/i)).toBeInTheDocument())
     await user.type(screen.getByLabelText(/email/i), 'not-an-email')
     await user.type(screen.getByLabelText(/password/i), 'password123')
     await user.click(screen.getByRole('button', { name: /sign in/i }))
@@ -41,8 +60,9 @@ describe('LoginPage', () => {
 
   it('shows validation error for password shorter than 8 characters', async () => {
     const user = userEvent.setup()
-    renderWithProviders(<LoginPage />)
+    renderLogin()
 
+    await waitFor(() => expect(screen.getByLabelText(/email/i)).toBeInTheDocument())
     await user.type(screen.getByLabelText(/email/i), 'user@example.com')
     await user.type(screen.getByLabelText(/password/i), 'short')
     await user.click(screen.getByRole('button', { name: /sign in/i }))
@@ -54,23 +74,25 @@ describe('LoginPage', () => {
 
   it('calls POST /auth/login and stores token on success', async () => {
     const user = userEvent.setup()
-    mock.onPost('/auth/login').reply(200, { accessToken: 'tok-123' })
-    renderWithProviders(<LoginPage />)
+    mock.onPost('/auth/login').reply(200, { accessToken: ADMIN_TOKEN })
+    renderLogin()
 
+    await waitFor(() => expect(screen.getByLabelText(/email/i)).toBeInTheDocument())
     await user.type(screen.getByLabelText(/email/i), 'user@example.com')
     await user.type(screen.getByLabelText(/password/i), 'password123')
     await user.click(screen.getByRole('button', { name: /sign in/i }))
 
     await waitFor(() => {
-      expect(getAccessToken()).toBe('tok-123')
+      expect(getAccessToken()).toBe(ADMIN_TOKEN)
     })
   })
 
   it('shows error message when login fails', async () => {
     const user = userEvent.setup()
     mock.onPost('/auth/login').reply(401, { message: 'Invalid credentials' })
-    renderWithProviders(<LoginPage />)
+    renderLogin()
 
+    await waitFor(() => expect(screen.getByLabelText(/email/i)).toBeInTheDocument())
     await user.type(screen.getByLabelText(/email/i), 'user@example.com')
     await user.type(screen.getByLabelText(/password/i), 'password123')
     await user.click(screen.getByRole('button', { name: /sign in/i }))
