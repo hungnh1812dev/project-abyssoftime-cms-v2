@@ -12,9 +12,9 @@
 - [x] T1.2 JWT package (GenerateAccessToken, GenerateRefreshToken, ValidateToken)
 - [x] T1.3 Auth usecase (Register, Login, RefreshToken, Logout) + tests ≥ 80% coverage
 - [x] T1.4 Auth HTTP handlers + JWT middleware (HttpOnly cookie for refresh token)
-- [ ] T1.5 FE: Axios API client with JWT interceptors + 401 auto-refresh
-- [ ] T1.6 FE: Login + Register pages (react-hook-form, useMutation)
-- [ ] T1.7 FE: Auth context + ProtectedRoute + AdminRoute guards
+- [x] T1.5 FE: Axios API client with JWT interceptors + 401 auto-refresh
+- [x] T1.6 FE: Login + Register pages (react-hook-form, useMutation)
+- [x] T1.7 FE: Auth context + ProtectedRoute + AdminRoute guards
 - [ ] ✅ Checkpoint 1: Register → Login → admin shell; refresh token survives tab close; 401 on unauth requests
 
 ## Phase 2 — Form System
