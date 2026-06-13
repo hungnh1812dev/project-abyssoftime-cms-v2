@@ -1,11 +1,11 @@
 # Todo — personal-cms (project-abyssoftime-cms-v2)
 
 ## Phase 0 — Foundation
-- [ ] T0.1 Monorepo scaffold (dir tree, go mod init, npm create vite, SPEC.md copy)
-- [ ] T0.2 Domain layer — entities (User, Document, ContentType, MediaAsset) + repository interfaces
-- [ ] T0.3 Infrastructure base — MongoDB client, pkg/errors, pkg/jwt stubs, /health endpoint
-- [ ] T0.4 Frontend base — Vite + React Router + TanStack Query + Shadcn + api.ts + queryClient.ts
-- [ ] ✅ Checkpoint 0: /health → 200, React app loads, go vet + npm lint pass
+- [x] T0.1 Monorepo scaffold (dir tree, go mod init, npm create vite, SPEC.md copy)
+- [x] T0.2 Domain layer — entities (User, Document, ContentType, MediaAsset) + repository interfaces
+- [x] T0.3 Infrastructure base — MongoDB client, pkg/errors, pkg/jwt stubs, /health endpoint
+- [x] T0.4 Frontend base — Vite + React Router + TanStack Query + Shadcn + api.ts + queryClient.ts
+- [x] ✅ Checkpoint 0: /health → 200, React app loads, go vet + npm build pass
 
 ## Phase 1 — Auth
 - [ ] T1.1 User MongoDB repository (Create, FindByEmail, FindById) + unit tests
