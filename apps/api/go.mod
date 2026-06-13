@@ -3,8 +3,12 @@ module project-abyssoftime-cms-v2/api
 go 1.26.4
 
 require (
+	github.com/cloudinary/cloudinary-go/v2 v2.16.0 // indirect
+	github.com/creasty/defaults v1.7.0 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
+	github.com/google/uuid v1.5.0 // indirect
+	github.com/gorilla/schema v1.4.1 // indirect
 	github.com/klauspost/compress v1.16.7 // indirect
 	github.com/montanaflynn/stats v0.7.1 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
