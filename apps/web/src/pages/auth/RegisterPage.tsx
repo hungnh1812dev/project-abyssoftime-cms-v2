@@ -2,21 +2,17 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useMutation } from '@tanstack/react-query'
 import { useNavigate, Link } from 'react-router-dom'
-import { api, setAccessToken } from '@/lib/api'
+import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
-interface LoginFields {
+interface RegisterFields {
   email: string
   password: string
 }
 
-interface LoginResponse {
-  accessToken: string
-}
-
-export function LoginPage() {
+export function RegisterPage() {
   const navigate = useNavigate()
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
@@ -24,17 +20,16 @@ export function LoginPage() {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<LoginFields>()
+  } = useForm<RegisterFields>()
 
   const mutation = useMutation({
-    mutationFn: (data: LoginFields) =>
-      api.post<LoginResponse>('/auth/login', data).then((r) => r.data),
-    onSuccess: (data) => {
-      setAccessToken(data.accessToken)
-      navigate('/admin')
+    mutationFn: (data: RegisterFields) =>
+      api.post('/auth/register', data).then((r) => r.data),
+    onSuccess: () => {
+      navigate('/login')
     },
     onError: () => {
-      setErrorMsg('Invalid email or password.')
+      setErrorMsg('Registration failed. The email may already be in use.')
     },
   })
 
@@ -42,8 +37,8 @@ export function LoginPage() {
     <div className="flex min-h-screen items-center justify-center">
       <div className="w-full max-w-sm space-y-6 px-4">
         <div className="space-y-1 text-center">
-          <h1 className="text-2xl font-semibold">Sign in</h1>
-          <p className="text-muted-foreground text-sm">Enter your credentials to continue</p>
+          <h1 className="text-2xl font-semibold">Create account</h1>
+          <p className="text-muted-foreground text-sm">Sign up to get started</p>
         </div>
 
         {errorMsg && (
@@ -73,7 +68,7 @@ export function LoginPage() {
             <Input
               id="password"
               type="password"
-              autoComplete="current-password"
+              autoComplete="new-password"
               aria-invalid={!!errors.password}
               {...register('password', {
                 required: 'Password is required',
@@ -84,14 +79,14 @@ export function LoginPage() {
           </div>
 
           <Button type="submit" className="w-full" disabled={mutation.isPending}>
-            {mutation.isPending ? 'Signing in…' : 'Sign in'}
+            {mutation.isPending ? 'Creating account…' : 'Create account'}
           </Button>
         </form>
 
         <p className="text-muted-foreground text-center text-sm">
-          Don&apos;t have an account?{' '}
-          <Link to="/register" className="text-primary underline-offset-4 hover:underline">
-            Create account
+          Already have an account?{' '}
+          <Link to="/login" className="text-primary underline-offset-4 hover:underline">
+            Sign in
           </Link>
         </p>
       </div>
