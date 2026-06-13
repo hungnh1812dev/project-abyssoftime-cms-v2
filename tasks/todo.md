@@ -8,8 +8,8 @@
 - [x] ✅ Checkpoint 0: /health → 200, React app loads, go vet + npm build pass
 
 ## Phase 1 — Auth
-- [ ] T1.1 User MongoDB repository (Create, FindByEmail, FindById) + unit tests
-- [ ] T1.2 JWT package (GenerateAccessToken, GenerateRefreshToken, ValidateToken)
+- [x] T1.1 User MongoDB repository (Create, FindByEmail, FindById) + unit tests
+- [x] T1.2 JWT package (GenerateAccessToken, GenerateRefreshToken, ValidateToken)
 - [ ] T1.3 Auth usecase (Register, Login, RefreshToken, Logout) + tests ≥ 80% coverage
 - [ ] T1.4 Auth HTTP handlers + JWT middleware (HttpOnly cookie for refresh token)
 - [ ] T1.5 FE: Axios API client with JWT interceptors + 401 auto-refresh
