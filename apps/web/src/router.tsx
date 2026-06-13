@@ -5,6 +5,7 @@ import { AdminLayout } from '@/pages/admin/layout/AdminLayout'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { FormTestPanel } from '@/pages/FormTestPanel'
 import { ContentTypePanelPage } from '@/pages/admin/panels/ContentTypePanelPage'
+import { CollectionDetailPage } from '@/pages/admin/panels/CollectionDetailPage'
 
 export function AppRouter() {
   return (
@@ -29,6 +30,7 @@ export function AppRouter() {
       >
         <Route index element={<p className="text-muted-foreground">Select a panel from the sidebar.</p>} />
         <Route path="content-types/:slug" element={<ContentTypePanelPage />} />
+        <Route path="content-types/:slug/:id" element={<CollectionDetailPage />} />
       </Route>
       <Route path="/form-test" element={<FormTestPanel />} />
       <Route path="*" element={<Navigate to="/admin" replace />} />

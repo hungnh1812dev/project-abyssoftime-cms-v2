@@ -1,10 +1,9 @@
 import { useParams } from 'react-router-dom'
 import { useContentTypes } from '@/hooks/useContentTypes'
-import { SingleTypePanel } from './SingleTypePanel'
-import { CollectionListPage } from './CollectionListPage'
+import { CollectionDetailPanel } from './CollectionDetailPanel'
 
-export function ContentTypePanelPage() {
-  const { slug } = useParams<{ slug: string }>()
+export function CollectionDetailPage() {
+  const { slug, id } = useParams<{ slug: string; id: string }>()
   const { data: contentTypes = [], isLoading } = useContentTypes()
 
   if (isLoading) {
@@ -17,9 +16,9 @@ export function ContentTypePanelPage() {
     return <p className="text-muted-foreground">Content type "{slug}" not found.</p>
   }
 
-  if (ct.Kind === 'single') {
-    return <SingleTypePanel contentType={ct} />
+  if (!id) {
+    return <p className="text-muted-foreground">No document ID provided.</p>
   }
 
-  return <CollectionListPage contentType={ct} />
+  return <CollectionDetailPanel contentType={ct} documentId={id} />
 }
