@@ -8,8 +8,10 @@ import (
 	"os"
 
 	deliveryhandler "project-abyssoftime-cms-v2/api/internal/delivery/http/handler"
+	"project-abyssoftime-cms-v2/api/internal/delivery/http/middleware"
 	"project-abyssoftime-cms-v2/api/internal/infrastructure/mongodb"
 	"project-abyssoftime-cms-v2/api/internal/usecase/auth"
+	contenttype "project-abyssoftime-cms-v2/api/internal/usecase/content_type"
 )
 
 func main() {
@@ -30,12 +32,15 @@ func main() {
 
 	// repositories
 	userRepo := mongodb.NewUserRepository(db)
+	ctRepo := mongodb.NewContentTypeRepository(db)
 
 	// usecases
 	authUC := auth.New(userRepo)
+	ctUC := contenttype.New(ctRepo)
 
 	// handlers
 	authHandler := deliveryhandler.NewAuthHandler(authUC)
+	ctHandler := deliveryhandler.NewContentTypeHandler(ctUC)
 
 	mux := http.NewServeMux()
 
@@ -49,6 +54,15 @@ func main() {
 	mux.HandleFunc("POST /auth/login", authHandler.Login)
 	mux.HandleFunc("POST /auth/refresh", authHandler.Refresh)
 	mux.HandleFunc("POST /auth/logout", authHandler.Logout)
+
+	adminOnly := func(h http.HandlerFunc) http.Handler {
+		return middleware.Auth(middleware.RequireRole("admin", h))
+	}
+	mux.Handle("GET /api/content-types", adminOnly(ctHandler.List))
+	mux.Handle("POST /api/content-types", adminOnly(ctHandler.Create))
+	mux.Handle("GET /api/content-types/{id}", adminOnly(ctHandler.GetByID))
+	mux.Handle("PUT /api/content-types/{id}", adminOnly(ctHandler.Update))
+	mux.Handle("DELETE /api/content-types/{id}", adminOnly(ctHandler.Delete))
 
 	port := os.Getenv("PORT")
 	if port == "" {
