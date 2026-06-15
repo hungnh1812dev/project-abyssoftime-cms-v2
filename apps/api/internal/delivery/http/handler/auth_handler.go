@@ -135,6 +135,8 @@ func writeErr(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusNotFound, err.Error())
 	case pkgerrors.Is(err, pkgerrors.ErrBadRequest):
 		writeError(w, http.StatusBadRequest, err.Error())
+	case pkgerrors.Is(err, pkgerrors.ErrValidation):
+		writeError(w, http.StatusUnprocessableEntity, err.Error())
 	default:
 		writeError(w, http.StatusInternalServerError, "internal server error")
 	}
