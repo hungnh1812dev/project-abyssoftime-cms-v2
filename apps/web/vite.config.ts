@@ -12,8 +12,8 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': { target: 'http://api:8080', changeOrigin: true },
-      '/auth': { target: 'http://api:8080', changeOrigin: true },
+      '/api': { target: process.env.VITE_API_URL ?? 'http://localhost:8080', changeOrigin: true },
+      '/auth': { target: process.env.VITE_API_URL ?? 'http://localhost:8080', changeOrigin: true },
     },
   },
   test: {
