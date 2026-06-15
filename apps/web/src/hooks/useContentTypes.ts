@@ -1,6 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import type { AxiosError } from 'axios'
+import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import type { ContentType } from '@/types/cms'
+
+function onMutationError(err: unknown) {
+  const msg = (err as AxiosError<{ error: string }>).response?.data?.error ?? 'Something went wrong'
+  toast.error(msg)
+}
 
 const KEYS = {
   all: ['content-types'] as const,
@@ -28,6 +35,7 @@ export function useCreateContentType() {
     mutationFn: (body: { name: string; slug: string; kind: string }) =>
       api.post<ContentType>('/api/content-types', body).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.all }),
+    onError: onMutationError,
   })
 }
 
@@ -37,6 +45,7 @@ export function useUpdateContentType() {
     mutationFn: ({ id, ...body }: { id: string; name: string; slug: string; kind: string }) =>
       api.put<ContentType>(`/api/content-types/${id}`, body).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.all }),
+    onError: onMutationError,
   })
 }
 
@@ -45,5 +54,6 @@ export function useDeleteContentType() {
   return useMutation({
     mutationFn: (id: string) => api.delete(`/api/content-types/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.all }),
+    onError: onMutationError,
   })
 }

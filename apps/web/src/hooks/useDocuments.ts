@@ -1,6 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import type { AxiosError } from 'axios'
+import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import type { Document } from '@/types/cms'
+
+function onMutationError(err: unknown) {
+  const msg = (err as AxiosError<{ error: string }>).response?.data?.error ?? 'Something went wrong'
+  toast.error(msg)
+}
 
 const KEYS = {
   list: (contentTypeId: string) => ['documents', contentTypeId] as const,
@@ -32,6 +39,7 @@ export function useCreateDocument() {
     mutationFn: (body: { contentTypeId: string; data: Record<string, unknown> }) =>
       api.post<Document>('/api/documents', body).then((r) => r.data),
     onSuccess: (data) => qc.invalidateQueries({ queryKey: KEYS.list(data.ContentTypeID) }),
+    onError: onMutationError,
   })
 }
 
@@ -50,6 +58,7 @@ export function useUpdateDocument() {
       qc.invalidateQueries({ queryKey: KEYS.list(data.ContentTypeID) })
       qc.invalidateQueries({ queryKey: KEYS.detail(data.ID) })
     },
+    onError: onMutationError,
   })
 }
 
@@ -60,6 +69,7 @@ export function useDeleteDocument() {
       api.delete(`/api/documents/${id}`),
     onSuccess: (_, { contentTypeId }) =>
       qc.invalidateQueries({ queryKey: KEYS.list(contentTypeId) }),
+    onError: onMutationError,
   })
 }
 
@@ -72,6 +82,7 @@ export function usePublishDocument() {
       qc.invalidateQueries({ queryKey: KEYS.detail(id) })
       qc.invalidateQueries({ queryKey: KEYS.list(contentTypeId) })
     },
+    onError: onMutationError,
   })
 }
 
@@ -84,5 +95,6 @@ export function useUnpublishDocument() {
       qc.invalidateQueries({ queryKey: KEYS.detail(id) })
       qc.invalidateQueries({ queryKey: KEYS.list(contentTypeId) })
     },
+    onError: onMutationError,
   })
 }
