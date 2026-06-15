@@ -33,6 +33,11 @@ func main() {
 
 	db := mongodb.Database(mongoClient)
 
+	if err := mongodb.EnsureIndexes(ctx, db); err != nil {
+		log.Fatalf("ensure indexes: %v", err)
+	}
+	log.Println("indexes ensured")
+
 	// repositories
 	userRepo := mongodb.NewUserRepository(db)
 	ctRepo := mongodb.NewContentTypeRepository(db)
