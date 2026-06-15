@@ -1,11 +1,29 @@
+import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { LoginPage } from '@/pages/auth/LoginPage'
 import { RegisterPage } from '@/pages/auth/RegisterPage'
 import { AdminLayout } from '@/pages/admin/layout/AdminLayout'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
-import { FormTestPanel } from '@/pages/FormTestPanel'
-import { ContentTypePanelPage } from '@/pages/admin/panels/ContentTypePanelPage'
-import { CollectionDetailPage } from '@/pages/admin/panels/CollectionDetailPage'
+
+const FormTestPanel = lazy(() =>
+  import('@/pages/FormTestPanel').then((m) => ({ default: m.FormTestPanel })),
+)
+
+const ContentTypePanelPage = lazy(() =>
+  import('@/pages/admin/panels/ContentTypePanelPage').then((m) => ({
+    default: m.ContentTypePanelPage,
+  })),
+)
+
+const CollectionDetailPage = lazy(() =>
+  import('@/pages/admin/panels/CollectionDetailPage').then((m) => ({
+    default: m.CollectionDetailPage,
+  })),
+)
+
+function PanelFallback() {
+  return <div className="text-muted-foreground p-4">Loading…</div>
+}
 
 export function AppRouter() {
   return (
@@ -29,10 +47,31 @@ export function AppRouter() {
         }
       >
         <Route index element={<p className="text-muted-foreground">Select a panel from the sidebar.</p>} />
-        <Route path="content-types/:slug" element={<ContentTypePanelPage />} />
-        <Route path="content-types/:slug/:id" element={<CollectionDetailPage />} />
+        <Route
+          path="content-types/:slug"
+          element={
+            <Suspense fallback={<PanelFallback />}>
+              <ContentTypePanelPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="content-types/:slug/:id"
+          element={
+            <Suspense fallback={<PanelFallback />}>
+              <CollectionDetailPage />
+            </Suspense>
+          }
+        />
       </Route>
-      <Route path="/form-test" element={<FormTestPanel />} />
+      <Route
+        path="/form-test"
+        element={
+          <Suspense fallback={<PanelFallback />}>
+            <FormTestPanel />
+          </Suspense>
+        }
+      />
       <Route path="*" element={<Navigate to="/admin" replace />} />
     </Routes>
   )
