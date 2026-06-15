@@ -10,6 +10,12 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  server: {
+    proxy: {
+      '/api': { target: 'http://api:8080', changeOrigin: true },
+      '/auth': { target: 'http://api:8080', changeOrigin: true },
+    },
+  },
   test: {
     environment: 'jsdom',
     globals: true,

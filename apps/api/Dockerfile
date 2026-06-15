@@ -19,3 +19,13 @@ COPY --from=builder /app/server /server
 
 EXPOSE 8080
 ENTRYPOINT ["/server"]
+
+# ── Dev stage (docker-compose.dev.yml only) ──────────────────────────────────
+FROM golang:1.24-alpine AS dev
+
+WORKDIR /app
+
+COPY go.mod go.sum ./
+RUN go mod download && go install github.com/air-verse/air@latest
+
+EXPOSE 8080
