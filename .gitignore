@@ -22,9 +22,10 @@ dist/
 apps/web/.env
 apps/web/.env.local
 
-# Environment (never commit)
+# Environment (never commit real values — .env.example is safe to commit)
 .env
 .env.*
+!.env.example
 
 # Editor
 .idea/
