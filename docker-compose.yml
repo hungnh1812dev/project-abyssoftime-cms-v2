@@ -14,6 +14,7 @@ services:
     build:
       context: ./apps/api
       dockerfile: Dockerfile
+      target: runner
     restart: unless-stopped
     depends_on:
       mongodb:

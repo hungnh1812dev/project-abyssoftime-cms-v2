@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ── Build stage ──────────────────────────────────────────────────────────────
-FROM golang:1.24-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 WORKDIR /src
 
@@ -21,7 +21,7 @@ EXPOSE 8080
 ENTRYPOINT ["/server"]
 
 # ── Dev stage (docker-compose.dev.yml only) ──────────────────────────────────
-FROM golang:1.24-alpine AS dev
+FROM golang:1.26-alpine AS dev
 
 WORKDIR /app
 
