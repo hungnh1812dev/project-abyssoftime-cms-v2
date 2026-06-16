@@ -33,6 +33,26 @@ func TestDocumentRepository_Delete_NotFound(t *testing.T) {
 	t.Skip("integration test: requires live MongoDB — run with -tags integration")
 }
 
+func TestDocumentRepository_UpsertDraft_ThenFindDraftByEntryID(t *testing.T) {
+	t.Skip("integration test: requires live MongoDB — run with -tags integration")
+}
+
+func TestDocumentRepository_FindPublishedByEntryID_NotFoundUntilPublished(t *testing.T) {
+	t.Skip("integration test: requires live MongoDB — run with -tags integration")
+}
+
+func TestDocumentRepository_FindEntryDraftsByContentType_OneRowPerEntry(t *testing.T) {
+	t.Skip("integration test: requires live MongoDB — run with -tags integration")
+}
+
+func TestDocumentRepository_DeleteByEntryID_RemovesDraftAndPublished(t *testing.T) {
+	t.Skip("integration test: requires live MongoDB — run with -tags integration")
+}
+
+func TestDocumentRepository_DeleteByContentType_RemovesAllEntries(t *testing.T) {
+	t.Skip("integration test: requires live MongoDB — run with -tags integration")
+}
+
 var documentRepoTests = []struct {
 	name          string
 	contentTypeID string
