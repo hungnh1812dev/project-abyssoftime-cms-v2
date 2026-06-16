@@ -73,8 +73,8 @@ func TestDocumentHandler_List(t *testing.T) {
 	if len(out) != 1 {
 		t.Errorf("List() count = %d, want 1", len(out))
 	}
-	if out[0]["status"] != "draft" {
-		t.Errorf("List() status field = %v, want draft", out[0]["status"])
+	if out[0]["Status"] != "draft" {
+		t.Errorf("List() Status field = %v, want draft", out[0]["Status"])
 	}
 }
 

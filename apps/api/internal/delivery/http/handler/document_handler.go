@@ -34,17 +34,19 @@ type documentRequest struct {
 }
 
 // entrySummary is the admin-facing view of an entry: its draft data plus
-// the computed draft/modified/published status.
+// the computed draft/modified/published status. Field names intentionally
+// have no json tags, matching the rest of this API (entities marshal under
+// their literal Go field names, e.g. ContentType's ID/Slug/Kind).
 type entrySummary struct {
-	EntryID       string         `json:"entryId"`
-	ContentTypeID string         `json:"contentTypeId"`
-	Data          map[string]any `json:"data"`
-	Status        string         `json:"status"`
-	Locale        string         `json:"locale"`
-	CreatedAt     time.Time      `json:"createdAt"`
-	UpdatedAt     time.Time      `json:"updatedAt"`
-	CreatedBy     string         `json:"createdBy"`
-	UpdatedBy     string         `json:"updatedBy"`
+	EntryID       string
+	ContentTypeID string
+	Data          map[string]any
+	Status        string
+	Locale        string
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+	CreatedBy     string
+	UpdatedBy     string
 }
 
 func toSummary(doc *entity.Document, status string) entrySummary {

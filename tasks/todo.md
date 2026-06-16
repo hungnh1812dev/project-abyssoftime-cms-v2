@@ -9,8 +9,8 @@
 
 ## Phase B — Draft/Publish Remodel
 - [x] B1 Document entity + repository: `entryId`/`version` records, audit fields, mocks updated
-- [ ] B2 Document usecase: Save/Publish/Unpublish/computed Status/GetForEdit/GetPublished + tests
-- [ ] B3 Document handlers: entryId-addressed routes + public read path (confirm gating first) + tests
+- [x] B2 Document usecase: Save/Publish/Unpublish/computed Status/GetForEdit/GetPublished + tests
+- [x] B3 Document handlers: entryId-addressed routes + public read path (GET /api/public/documents/{id}, no auth) + tests
 - [ ] B4 FE: `useDocuments.ts` hooks updated to tri-state status + tests
 - [ ] B5 FE: panels (SingleTypePanel, CollectionDetailPanel, CollectionListPage) tri-state badge + tests
 - [ ] ✅ Checkpoint B: Save never affects public read; Publish syncs it; tri-state badge correct; full test suite passes
