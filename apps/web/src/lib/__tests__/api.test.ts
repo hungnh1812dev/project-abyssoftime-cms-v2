@@ -13,6 +13,23 @@ afterEach(() => {
   mock.restore()
 })
 
+describe('api baseURL — no prefix added to explicit paths', () => {
+  it('auth request full URL must be /auth/register, not /api/auth/register', async () => {
+    let capturedFullUrl: string | undefined
+
+    mock.onAny().reply((config) => {
+      // Reproduce what axios does in the browser: merge baseURL + url
+      const base = (config.baseURL ?? '').replace(/\/$/, '')
+      const path = (config.url ?? '').replace(/^\//, '')
+      capturedFullUrl = base ? `${base}/${path}` : `/${path}`
+      return [201, {}]
+    })
+
+    await api.post('/auth/register', { email: 'a@b.com', password: '12345678' })
+    expect(capturedFullUrl).toBe('/auth/register')
+  })
+})
+
 describe('api request interceptor', () => {
   it('attaches Authorization header when access token is set', async () => {
     setAccessToken('test-token')

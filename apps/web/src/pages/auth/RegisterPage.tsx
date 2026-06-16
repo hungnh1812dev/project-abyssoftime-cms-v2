@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { useNavigate, Link } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
@@ -15,6 +15,15 @@ interface RegisterFields {
 export function RegisterPage() {
   const navigate = useNavigate()
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+
+  const { data: setupData, isLoading: setupLoading } = useQuery({
+    queryKey: ['auth-setup'],
+    queryFn: () =>
+      api.get<{ adminExists: boolean }>('/auth/setup').then((r) => r.data),
+    retry: false,
+  })
+
+  const adminExists = setupData?.adminExists ?? false
 
   const {
     register,
@@ -33,12 +42,26 @@ export function RegisterPage() {
     },
   })
 
+  if (setupLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-muted-foreground text-sm">Loading…</p>
+      </div>
+    )
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center">
       <div className="w-full max-w-sm space-y-6 px-4">
         <div className="space-y-1 text-center">
-          <h1 className="text-2xl font-semibold">Create account</h1>
-          <p className="text-muted-foreground text-sm">Sign up to get started</p>
+          <h1 className="text-2xl font-semibold">
+            {adminExists ? 'Create guest account' : 'Set up admin account'}
+          </h1>
+          <p className="text-muted-foreground text-sm">
+            {adminExists
+              ? 'Register a guest account to access the CMS'
+              : 'No admin account exists yet — the first account will be an admin'}
+          </p>
         </div>
 
         {errorMsg && (
@@ -79,7 +102,11 @@ export function RegisterPage() {
           </div>
 
           <Button type="submit" className="w-full" disabled={mutation.isPending}>
-            {mutation.isPending ? 'Creating account…' : 'Create account'}
+            {mutation.isPending
+              ? 'Creating account…'
+              : adminExists
+                ? 'Create guest account'
+                : 'Create admin account'}
           </Button>
         </form>
 

@@ -46,21 +46,41 @@ func TestRegister(t *testing.T) {
 		setupRepo  func(*repomock.UserRepository)
 		wantErr    error
 		wantUserID bool
+		wantRole   entity.Role
 	}{
 		{
-			name:     "success — creates user and returns it",
+			name:     "first registration — assigned admin role",
 			email:    "new@example.com",
 			password: "secret123",
 			setupRepo: func(r *repomock.UserRepository) {
 				r.FindByEmailFn = func(_ context.Context, _ string) (*entity.User, error) {
 					return nil, pkgerrors.ErrNotFound
 				}
+				r.CountAdminsFn = func(_ context.Context) (int64, error) { return 0, nil }
 				r.CreateFn = func(_ context.Context, u *entity.User) error {
 					u.ID = "gen-id-1"
 					return nil
 				}
 			},
 			wantUserID: true,
+			wantRole:   entity.RoleAdmin,
+		},
+		{
+			name:     "subsequent registration — assigned guest role",
+			email:    "guest@example.com",
+			password: "secret123",
+			setupRepo: func(r *repomock.UserRepository) {
+				r.FindByEmailFn = func(_ context.Context, _ string) (*entity.User, error) {
+					return nil, pkgerrors.ErrNotFound
+				}
+				r.CountAdminsFn = func(_ context.Context) (int64, error) { return 1, nil }
+				r.CreateFn = func(_ context.Context, u *entity.User) error {
+					u.ID = "gen-id-2"
+					return nil
+				}
+			},
+			wantUserID: true,
+			wantRole:   entity.RoleGuest,
 		},
 		{
 			name:     "conflict — email already registered",
@@ -85,6 +105,20 @@ func TestRegister(t *testing.T) {
 			wantErr: errors.New("db down"),
 		},
 		{
+			name:     "CountAdmins returns error",
+			email:    "z@example.com",
+			password: "secret123",
+			setupRepo: func(r *repomock.UserRepository) {
+				r.FindByEmailFn = func(_ context.Context, _ string) (*entity.User, error) {
+					return nil, pkgerrors.ErrNotFound
+				}
+				r.CountAdminsFn = func(_ context.Context) (int64, error) {
+					return 0, errors.New("db down")
+				}
+			},
+			wantErr: errors.New("db down"),
+		},
+		{
 			name:     "repo Create returns error",
 			email:    "y@example.com",
 			password: "secret123",
@@ -92,6 +126,7 @@ func TestRegister(t *testing.T) {
 				r.FindByEmailFn = func(_ context.Context, _ string) (*entity.User, error) {
 					return nil, pkgerrors.ErrNotFound
 				}
+				r.CountAdminsFn = func(_ context.Context) (int64, error) { return 0, nil }
 				r.CreateFn = func(_ context.Context, _ *entity.User) error {
 					return errors.New("insert failed")
 				}
@@ -120,9 +155,11 @@ func TestRegister(t *testing.T) {
 			if tc.wantUserID && user == nil {
 				t.Fatal("expected non-nil user")
 			}
-			// password must be hashed, not stored in plain text
 			if user != nil && user.PasswordHash == tc.password {
 				t.Error("PasswordHash must not equal plain-text password")
+			}
+			if user != nil && tc.wantRole != "" && user.Role != tc.wantRole {
+				t.Errorf("expected role %q, got %q", tc.wantRole, user.Role)
 			}
 		})
 	}
@@ -289,5 +326,65 @@ func TestLogout(t *testing.T) {
 
 	if err := uc.Logout(ctx, "any-user-id"); err != nil {
 		t.Fatalf("Logout returned unexpected error: %v", err)
+	}
+}
+
+// ---- SetupStatus -----------------------------------------------------------
+
+func TestSetupStatus(t *testing.T) {
+	ctx := context.Background()
+
+	tests := []struct {
+		name        string
+		setupRepo   func(*repomock.UserRepository)
+		wantExists  bool
+		wantErr     bool
+	}{
+		{
+			name: "no admins — adminExists false",
+			setupRepo: func(r *repomock.UserRepository) {
+				r.CountAdminsFn = func(_ context.Context) (int64, error) { return 0, nil }
+			},
+			wantExists: false,
+		},
+		{
+			name: "admin exists — adminExists true",
+			setupRepo: func(r *repomock.UserRepository) {
+				r.CountAdminsFn = func(_ context.Context) (int64, error) { return 1, nil }
+			},
+			wantExists: true,
+		},
+		{
+			name: "repo error propagated",
+			setupRepo: func(r *repomock.UserRepository) {
+				r.CountAdminsFn = func(_ context.Context) (int64, error) {
+					return 0, errors.New("db down")
+				}
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := &repomock.UserRepository{}
+			tc.setupRepo(repo)
+
+			uc := auth.New(repo)
+			exists, err := uc.SetupStatus(ctx)
+
+			if tc.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if exists != tc.wantExists {
+				t.Errorf("expected adminExists=%v, got %v", tc.wantExists, exists)
+			}
+		})
 	}
 }

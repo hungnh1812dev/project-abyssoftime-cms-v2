@@ -60,3 +60,7 @@ func (r *userRepository) FindByID(ctx context.Context, id string) (*entity.User,
 	}
 	return &user, nil
 }
+
+func (r *userRepository) CountAdmins(ctx context.Context) (int64, error) {
+	return r.col.CountDocuments(ctx, bson.M{"role": string(entity.RoleAdmin)})
+}

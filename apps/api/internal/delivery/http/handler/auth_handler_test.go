@@ -16,10 +16,11 @@ import (
 // ---- mock usecase ----------------------------------------------------------
 
 type mockAuthUC struct {
-	registerFn     func(ctx context.Context, email, password string) (*entity.User, error)
-	loginFn        func(ctx context.Context, email, password string) (string, string, error)
-	refreshTokenFn func(ctx context.Context, refreshToken string) (string, error)
-	logoutFn       func(ctx context.Context, userID string) error
+	registerFn      func(ctx context.Context, email, password string) (*entity.User, error)
+	loginFn         func(ctx context.Context, email, password string) (string, string, error)
+	refreshTokenFn  func(ctx context.Context, refreshToken string) (string, error)
+	logoutFn        func(ctx context.Context, userID string) error
+	setupStatusFn   func(ctx context.Context) (bool, error)
 }
 
 func (m *mockAuthUC) Register(ctx context.Context, email, password string) (*entity.User, error) {
@@ -33,6 +34,12 @@ func (m *mockAuthUC) RefreshToken(ctx context.Context, rt string) (string, error
 }
 func (m *mockAuthUC) Logout(ctx context.Context, userID string) error {
 	return m.logoutFn(ctx, userID)
+}
+func (m *mockAuthUC) SetupStatus(ctx context.Context) (bool, error) {
+	if m.setupStatusFn != nil {
+		return m.setupStatusFn(ctx)
+	}
+	return false, nil
 }
 
 // ---- helpers ---------------------------------------------------------------
@@ -259,6 +266,54 @@ func TestRefreshHandler(t *testing.T) {
 				if out["accessToken"] == nil {
 					t.Errorf("response missing accessToken: %v", out)
 				}
+			}
+		})
+	}
+}
+
+// ---- SetupStatus -----------------------------------------------------------
+
+func TestSetupStatusHandler(t *testing.T) {
+	tests := []struct {
+		name       string
+		uc         *mockAuthUC
+		wantStatus int
+		wantExists bool
+	}{
+		{
+			name: "no admin — adminExists false",
+			uc: &mockAuthUC{
+				setupStatusFn: func(_ context.Context) (bool, error) { return false, nil },
+			},
+			wantStatus: http.StatusOK,
+			wantExists: false,
+		},
+		{
+			name: "admin exists — adminExists true",
+			uc: &mockAuthUC{
+				setupStatusFn: func(_ context.Context) (bool, error) { return true, nil },
+			},
+			wantStatus: http.StatusOK,
+			wantExists: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			h := handler.NewAuthHandler(tc.uc)
+
+			r := httptest.NewRequest(http.MethodGet, "/auth/setup", nil)
+			w := httptest.NewRecorder()
+
+			h.SetupStatus(w, r)
+
+			if w.Code != tc.wantStatus {
+				t.Errorf("status = %d, want %d; body: %s", w.Code, tc.wantStatus, w.Body.String())
+			}
+			out := decodeBody(t, w)
+			got, _ := out["adminExists"].(bool)
+			if got != tc.wantExists {
+				t.Errorf("adminExists = %v, want %v", got, tc.wantExists)
 			}
 		})
 	}

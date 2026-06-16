@@ -19,6 +19,7 @@ type authUseCase interface {
 	Login(ctx context.Context, email, password string) (accessToken, refreshToken string, err error)
 	RefreshToken(ctx context.Context, refreshToken string) (string, error)
 	Logout(ctx context.Context, userID string) error
+	SetupStatus(ctx context.Context) (bool, error)
 }
 
 type AuthHandler struct {
@@ -97,6 +98,17 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"accessToken": access,
+	})
+}
+
+func (h *AuthHandler) SetupStatus(w http.ResponseWriter, r *http.Request) {
+	adminExists, err := h.uc.SetupStatus(r.Context())
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"adminExists": adminExists,
 	})
 }
 

@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom'
 import { useContentTypes } from '@/hooks/useContentTypes'
 
 export function Sidebar() {
-  const { data: contentTypes = [] } = useContentTypes()
+  const { data: contentTypes } = useContentTypes()
 
   return (
     <aside className="w-64 border-r flex flex-col shrink-0">
@@ -10,7 +10,7 @@ export function Sidebar() {
         <span className="font-semibold text-sm">Abyssoftime CMS</span>
       </div>
       <nav className="flex-1 p-2 space-y-0.5">
-        {contentTypes.map((ct) => (
+        {(contentTypes ?? []).map((ct) => (
           <NavLink
             key={ct.ID}
             to={`/admin/content-types/${ct.Slug}`}

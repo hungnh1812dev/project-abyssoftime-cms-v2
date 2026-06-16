@@ -29,6 +29,15 @@ func (uc *UseCase) Register(ctx context.Context, email, password string) (*entit
 		return nil, pkgerrors.ErrConflict
 	}
 
+	role := entity.RoleGuest
+	adminCount, err := uc.repo.CountAdmins(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if adminCount == 0 {
+		role = entity.RoleAdmin
+	}
+
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, fmt.Errorf("hash password: %w", err)
@@ -37,12 +46,20 @@ func (uc *UseCase) Register(ctx context.Context, email, password string) (*entit
 	user := &entity.User{
 		Email:        email,
 		PasswordHash: string(hash),
-		Role:         entity.RoleGuest,
+		Role:         role,
 	}
 	if err := uc.repo.Create(ctx, user); err != nil {
 		return nil, err
 	}
 	return user, nil
+}
+
+func (uc *UseCase) SetupStatus(ctx context.Context) (bool, error) {
+	count, err := uc.repo.CountAdmins(ctx)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }
 
 func (uc *UseCase) Login(ctx context.Context, email, password string) (accessToken, refreshToken string, err error) {

@@ -74,6 +74,7 @@ func main() {
 		fmt.Fprint(w, `{"status":"ok"}`)
 	})
 
+	mux.HandleFunc("GET /auth/setup", authHandler.SetupStatus)
 	mux.HandleFunc("POST /auth/register", authHandler.Register)
 	mux.HandleFunc("POST /auth/login", authHandler.Login)
 	mux.HandleFunc("POST /auth/refresh", authHandler.Refresh)
