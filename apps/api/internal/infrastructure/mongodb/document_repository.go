@@ -23,21 +23,33 @@ func NewDocumentRepository(db *mongo.Database) repository.DocumentRepository {
 	return &documentRepository{col: db.Collection("documents")}
 }
 
-func (r *documentRepository) findByEntryAndVersion(ctx context.Context, entryID string, version entity.DocumentVersion) (*entity.Document, error) {
+// versionFilter scopes a query to one physical record: a given entry's
+// draft or published variant in a given locale.
+func versionFilter(entryID string, version entity.DocumentVersion, locale string) bson.M {
+	return bson.M{"entryId": entryID, "version": version, "locale": locale}
+}
+
+// entryLocaleFilter scopes a query to every physical record (draft and
+// published) of one entry in one locale.
+func entryLocaleFilter(entryID, locale string) bson.M {
+	return bson.M{"entryId": entryID, "locale": locale}
+}
+
+func (r *documentRepository) findByEntryAndVersion(ctx context.Context, entryID, locale string, version entity.DocumentVersion) (*entity.Document, error) {
 	var doc entity.Document
-	err := r.col.FindOne(ctx, bson.M{"entryId": entryID, "version": version}).Decode(&doc)
+	err := r.col.FindOne(ctx, versionFilter(entryID, version, locale)).Decode(&doc)
 	if err == mongo.ErrNoDocuments {
 		return nil, pkgerrors.ErrNotFound
 	}
 	return &doc, err
 }
 
-func (r *documentRepository) FindDraftByEntryID(ctx context.Context, entryID string) (*entity.Document, error) {
-	return r.findByEntryAndVersion(ctx, entryID, entity.VersionDraft)
+func (r *documentRepository) FindDraftByEntryID(ctx context.Context, entryID, locale string) (*entity.Document, error) {
+	return r.findByEntryAndVersion(ctx, entryID, locale, entity.VersionDraft)
 }
 
-func (r *documentRepository) FindPublishedByEntryID(ctx context.Context, entryID string) (*entity.Document, error) {
-	return r.findByEntryAndVersion(ctx, entryID, entity.VersionPublished)
+func (r *documentRepository) FindPublishedByEntryID(ctx context.Context, entryID, locale string) (*entity.Document, error) {
+	return r.findByEntryAndVersion(ctx, entryID, locale, entity.VersionPublished)
 }
 
 func (r *documentRepository) upsertVersion(ctx context.Context, doc *entity.Document, version entity.DocumentVersion) error {
@@ -47,7 +59,7 @@ func (r *documentRepository) upsertVersion(ctx context.Context, doc *entity.Docu
 	}
 	_, err := r.col.ReplaceOne(
 		ctx,
-		bson.M{"entryId": doc.EntryID, "version": version},
+		versionFilter(doc.EntryID, version, doc.Locale),
 		doc,
 		options.Replace().SetUpsert(true),
 	)
@@ -76,13 +88,13 @@ func (r *documentRepository) FindEntryDraftsByContentType(ctx context.Context, c
 	return results, nil
 }
 
-func (r *documentRepository) DeleteByEntryID(ctx context.Context, entryID string) error {
-	_, err := r.col.DeleteMany(ctx, bson.M{"entryId": entryID})
+func (r *documentRepository) DeleteByEntryID(ctx context.Context, entryID, locale string) error {
+	_, err := r.col.DeleteMany(ctx, entryLocaleFilter(entryID, locale))
 	return err
 }
 
-func (r *documentRepository) DeletePublishedByEntryID(ctx context.Context, entryID string) error {
-	_, err := r.col.DeleteOne(ctx, bson.M{"entryId": entryID, "version": entity.VersionPublished})
+func (r *documentRepository) DeletePublishedByEntryID(ctx context.Context, entryID, locale string) error {
+	_, err := r.col.DeleteOne(ctx, versionFilter(entryID, entity.VersionPublished, locale))
 	return err
 }
 

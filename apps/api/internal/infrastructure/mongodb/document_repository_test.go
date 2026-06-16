@@ -15,6 +15,10 @@ func TestDocumentRepository_UpsertDraft_ThenFindDraftByEntryID(t *testing.T) {
 	t.Skip("integration test: requires live MongoDB — run with -tags integration")
 }
 
+func TestDocumentRepository_UpsertDraft_DifferentLocales_AreIsolated(t *testing.T) {
+	t.Skip("integration test: requires live MongoDB — run with -tags integration")
+}
+
 func TestDocumentRepository_FindPublishedByEntryID_NotFoundUntilPublished(t *testing.T) {
 	t.Skip("integration test: requires live MongoDB — run with -tags integration")
 }

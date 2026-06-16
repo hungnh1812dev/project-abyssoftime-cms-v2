@@ -12,11 +12,11 @@ import (
 
 type documentUseCase interface {
 	Save(ctx context.Context, doc *entity.Document, userID string) (*entity.Document, error)
-	GetForEdit(ctx context.Context, entryID string) (*entity.Document, string, error)
-	GetPublished(ctx context.Context, entryID string) (*entity.Document, error)
+	GetForEdit(ctx context.Context, entryID, locale string) (*entity.Document, string, error)
+	GetPublished(ctx context.Context, entryID, locale string) (*entity.Document, error)
 	GetAll(ctx context.Context, contentTypeID string) ([]*entity.Document, error)
-	Publish(ctx context.Context, entryID, userID string) error
-	Unpublish(ctx context.Context, entryID string) error
+	Publish(ctx context.Context, entryID, locale, userID string) error
+	Unpublish(ctx context.Context, entryID, locale string) error
 	Delete(ctx context.Context, entryID string) error
 }
 
@@ -74,7 +74,7 @@ func (h *DocumentHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	summaries := make([]entrySummary, 0, len(drafts))
 	for _, draft := range drafts {
-		_, status, err := h.uc.GetForEdit(r.Context(), draft.EntryID)
+		_, status, err := h.uc.GetForEdit(r.Context(), draft.EntryID, "")
 		if err != nil {
 			writeErr(w, err)
 			return
@@ -102,7 +102,7 @@ func (h *DocumentHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 // GetByID returns the draft + computed status for the admin edit screen.
 func (h *DocumentHandler) GetByID(w http.ResponseWriter, r *http.Request) {
-	draft, status, err := h.uc.GetForEdit(r.Context(), r.PathValue("id"))
+	draft, status, err := h.uc.GetForEdit(r.Context(), r.PathValue("id"), "")
 	if err != nil {
 		writeErr(w, err)
 		return
@@ -114,7 +114,7 @@ func (h *DocumentHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 // read path. Returns 404 if the entry has never been published, however
 // recent its draft.
 func (h *DocumentHandler) GetPublic(w http.ResponseWriter, r *http.Request) {
-	doc, err := h.uc.GetPublished(r.Context(), r.PathValue("id"))
+	doc, err := h.uc.GetPublished(r.Context(), r.PathValue("id"), "")
 	if err != nil {
 		writeErr(w, err)
 		return
@@ -139,7 +139,7 @@ func (h *DocumentHandler) Update(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err)
 		return
 	}
-	_, status, err := h.uc.GetForEdit(r.Context(), saved.EntryID)
+	_, status, err := h.uc.GetForEdit(r.Context(), saved.EntryID, "")
 	if err != nil {
 		writeErr(w, err)
 		return
@@ -156,7 +156,7 @@ func (h *DocumentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *DocumentHandler) Publish(w http.ResponseWriter, r *http.Request) {
-	if err := h.uc.Publish(r.Context(), r.PathValue("id"), middleware.UserID(r.Context())); err != nil {
+	if err := h.uc.Publish(r.Context(), r.PathValue("id"), "", middleware.UserID(r.Context())); err != nil {
 		writeErr(w, err)
 		return
 	}
@@ -164,7 +164,7 @@ func (h *DocumentHandler) Publish(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *DocumentHandler) Unpublish(w http.ResponseWriter, r *http.Request) {
-	if err := h.uc.Unpublish(r.Context(), r.PathValue("id")); err != nil {
+	if err := h.uc.Unpublish(r.Context(), r.PathValue("id"), ""); err != nil {
 		writeErr(w, err)
 		return
 	}

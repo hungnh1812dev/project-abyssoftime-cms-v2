@@ -17,22 +17,22 @@ import (
 
 type mockDocumentUC struct {
 	saveFn         func(ctx context.Context, doc *entity.Document, userID string) (*entity.Document, error)
-	getForEditFn   func(ctx context.Context, entryID string) (*entity.Document, string, error)
-	getPublishedFn func(ctx context.Context, entryID string) (*entity.Document, error)
+	getForEditFn   func(ctx context.Context, entryID, locale string) (*entity.Document, string, error)
+	getPublishedFn func(ctx context.Context, entryID, locale string) (*entity.Document, error)
 	getAllFn       func(ctx context.Context, contentTypeID string) ([]*entity.Document, error)
 	deleteFn       func(ctx context.Context, entryID string) error
-	publishFn      func(ctx context.Context, entryID, userID string) error
-	unpublishFn    func(ctx context.Context, entryID string) error
+	publishFn      func(ctx context.Context, entryID, locale, userID string) error
+	unpublishFn    func(ctx context.Context, entryID, locale string) error
 }
 
 func (m *mockDocumentUC) Save(ctx context.Context, doc *entity.Document, userID string) (*entity.Document, error) {
 	return m.saveFn(ctx, doc, userID)
 }
-func (m *mockDocumentUC) GetForEdit(ctx context.Context, entryID string) (*entity.Document, string, error) {
-	return m.getForEditFn(ctx, entryID)
+func (m *mockDocumentUC) GetForEdit(ctx context.Context, entryID, locale string) (*entity.Document, string, error) {
+	return m.getForEditFn(ctx, entryID, locale)
 }
-func (m *mockDocumentUC) GetPublished(ctx context.Context, entryID string) (*entity.Document, error) {
-	return m.getPublishedFn(ctx, entryID)
+func (m *mockDocumentUC) GetPublished(ctx context.Context, entryID, locale string) (*entity.Document, error) {
+	return m.getPublishedFn(ctx, entryID, locale)
 }
 func (m *mockDocumentUC) GetAll(ctx context.Context, contentTypeID string) ([]*entity.Document, error) {
 	return m.getAllFn(ctx, contentTypeID)
@@ -40,11 +40,11 @@ func (m *mockDocumentUC) GetAll(ctx context.Context, contentTypeID string) ([]*e
 func (m *mockDocumentUC) Delete(ctx context.Context, entryID string) error {
 	return m.deleteFn(ctx, entryID)
 }
-func (m *mockDocumentUC) Publish(ctx context.Context, entryID, userID string) error {
-	return m.publishFn(ctx, entryID, userID)
+func (m *mockDocumentUC) Publish(ctx context.Context, entryID, locale, userID string) error {
+	return m.publishFn(ctx, entryID, locale, userID)
 }
-func (m *mockDocumentUC) Unpublish(ctx context.Context, entryID string) error {
-	return m.unpublishFn(ctx, entryID)
+func (m *mockDocumentUC) Unpublish(ctx context.Context, entryID, locale string) error {
+	return m.unpublishFn(ctx, entryID, locale)
 }
 
 // ---- List ------------------------------------------------------------------
@@ -54,7 +54,7 @@ func TestDocumentHandler_List(t *testing.T) {
 	uc.getAllFn = func(_ context.Context, contentTypeID string) ([]*entity.Document, error) {
 		return []*entity.Document{{EntryID: "1", ContentTypeID: contentTypeID}}, nil
 	}
-	uc.getForEditFn = func(_ context.Context, entryID string) (*entity.Document, string, error) {
+	uc.getForEditFn = func(_ context.Context, entryID, _ string) (*entity.Document, string, error) {
 		return &entity.Document{EntryID: entryID}, "draft", nil
 	}
 	h := handler.NewDocumentHandler(uc)
@@ -138,7 +138,7 @@ func TestDocumentHandler_GetByID(t *testing.T) {
 			name: "200 found",
 			id:   "abc",
 			setupUC: func(m *mockDocumentUC) {
-				m.getForEditFn = func(_ context.Context, entryID string) (*entity.Document, string, error) {
+				m.getForEditFn = func(_ context.Context, entryID, _ string) (*entity.Document, string, error) {
 					return &entity.Document{EntryID: entryID}, "draft", nil
 				}
 			},
@@ -148,7 +148,7 @@ func TestDocumentHandler_GetByID(t *testing.T) {
 			name: "404 not found",
 			id:   "missing",
 			setupUC: func(m *mockDocumentUC) {
-				m.getForEditFn = func(_ context.Context, _ string) (*entity.Document, string, error) {
+				m.getForEditFn = func(_ context.Context, _, _ string) (*entity.Document, string, error) {
 					return nil, "", pkgerrors.ErrNotFound
 				}
 			},
@@ -185,7 +185,7 @@ func TestDocumentHandler_GetPublic(t *testing.T) {
 		{
 			name: "200 when published",
 			setupUC: func(m *mockDocumentUC) {
-				m.getPublishedFn = func(_ context.Context, entryID string) (*entity.Document, error) {
+				m.getPublishedFn = func(_ context.Context, entryID, _ string) (*entity.Document, error) {
 					return &entity.Document{EntryID: entryID}, nil
 				}
 			},
@@ -194,7 +194,7 @@ func TestDocumentHandler_GetPublic(t *testing.T) {
 		{
 			name: "404 when never published",
 			setupUC: func(m *mockDocumentUC) {
-				m.getPublishedFn = func(_ context.Context, _ string) (*entity.Document, error) {
+				m.getPublishedFn = func(_ context.Context, _, _ string) (*entity.Document, error) {
 					return nil, pkgerrors.ErrNotFound
 				}
 			},
@@ -227,7 +227,7 @@ func TestDocumentHandler_Update(t *testing.T) {
 	uc.saveFn = func(_ context.Context, doc *entity.Document, _ string) (*entity.Document, error) {
 		return doc, nil
 	}
-	uc.getForEditFn = func(_ context.Context, entryID string) (*entity.Document, string, error) {
+	uc.getForEditFn = func(_ context.Context, entryID, _ string) (*entity.Document, string, error) {
 		return &entity.Document{EntryID: entryID}, "modified", nil
 	}
 	h := handler.NewDocumentHandler(uc)
@@ -266,7 +266,7 @@ func TestDocumentHandler_Delete(t *testing.T) {
 
 func TestDocumentHandler_Publish(t *testing.T) {
 	uc := &mockDocumentUC{}
-	uc.publishFn = func(_ context.Context, _, _ string) error { return nil }
+	uc.publishFn = func(_ context.Context, _, _, _ string) error { return nil }
 	h := handler.NewDocumentHandler(uc)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/documents/abc/publish", nil)
@@ -281,7 +281,7 @@ func TestDocumentHandler_Publish(t *testing.T) {
 
 func TestDocumentHandler_Unpublish(t *testing.T) {
 	uc := &mockDocumentUC{}
-	uc.unpublishFn = func(_ context.Context, _ string) error { return nil }
+	uc.unpublishFn = func(_ context.Context, _, _ string) error { return nil }
 	h := handler.NewDocumentHandler(uc)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/documents/abc/unpublish", nil)

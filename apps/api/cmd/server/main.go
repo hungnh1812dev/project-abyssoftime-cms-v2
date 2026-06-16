@@ -77,7 +77,7 @@ func main() {
 	// usecases
 	authUC := auth.New(userRepo)
 	ctUC := contenttype.New(ctRepo)
-	documentUC := docuc.New(docRepo, mediaRepo)
+	documentUC := docuc.New(docRepo, mediaRepo, cfg.SupportedLocales)
 	mediaUC := mediauc.New(mediaRepo, storage)
 
 	// content-type schema-as-code sync: JSON definitions are the source of
