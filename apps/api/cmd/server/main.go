@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 
+	"project-abyssoftime-cms-v2/api/internal/config"
 	deliveryhandler "project-abyssoftime-cms-v2/api/internal/delivery/http/handler"
 	"project-abyssoftime-cms-v2/api/internal/delivery/http/middleware"
 	"project-abyssoftime-cms-v2/api/internal/domain/repository"
@@ -17,30 +17,18 @@ import (
 	contenttype "project-abyssoftime-cms-v2/api/internal/usecase/content_type"
 	docuc "project-abyssoftime-cms-v2/api/internal/usecase/document"
 	mediauc "project-abyssoftime-cms-v2/api/internal/usecase/media"
+	pkgjwt "project-abyssoftime-cms-v2/api/pkg/jwt"
 )
 
-// resolveStorageProvider validates and defaults the STORAGE_PROVIDER env
-// var. Pure function — kept separate from adapter construction so it's
-// unit-testable without touching AWS or Cloudinary.
-func resolveStorageProvider(envValue string) (string, error) {
-	if envValue == "" {
-		return "cloudinary", nil
-	}
-	if envValue != "s3" && envValue != "cloudinary" {
-		return "", fmt.Errorf("unknown STORAGE_PROVIDER %q (want %q or %q)", envValue, "s3", "cloudinary")
-	}
-	return envValue, nil
-}
-
-func newStorageAdapter(ctx context.Context, provider string) (repository.StorageAdapter, error) {
-	switch provider {
+func newStorageAdapter(ctx context.Context, cfg *config.Config) (repository.StorageAdapter, error) {
+	switch cfg.StorageProvider {
 	case "s3":
-		return s3adapter.New(ctx, os.Getenv("S3_BUCKET"), os.Getenv("S3_REGION"))
+		return s3adapter.New(ctx, cfg.S3Bucket, cfg.S3Region)
 	default:
 		return cloudinaryadapter.NewCloudinaryAdapter(
-			os.Getenv("CLOUDINARY_CLOUD_NAME"),
-			os.Getenv("CLOUDINARY_API_KEY"),
-			os.Getenv("CLOUDINARY_API_SECRET"),
+			cfg.CloudinaryCloudName,
+			cfg.CloudinaryAPIKey,
+			cfg.CloudinaryAPISecret,
 		)
 	}
 }
@@ -48,7 +36,14 @@ func newStorageAdapter(ctx context.Context, provider string) (repository.Storage
 func main() {
 	ctx := context.Background()
 
-	mongoClient, err := mongodb.NewClient(ctx)
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("load config: %v", err)
+	}
+
+	pkgjwt.SetSecret(cfg.JWTSecret)
+
+	mongoClient, err := mongodb.NewClient(ctx, cfg.MongoDBURI)
 	if err != nil {
 		log.Fatalf("mongodb connect: %v", err)
 	}
@@ -59,7 +54,7 @@ func main() {
 	}()
 	log.Println("connected to mongodb")
 
-	db := mongodb.Database(mongoClient)
+	db := mongodb.Database(mongoClient, cfg.MongoDBDB)
 
 	if err := mongodb.EnsureIndexes(ctx, db); err != nil {
 		log.Fatalf("ensure indexes: %v", err)
@@ -72,16 +67,12 @@ func main() {
 	docRepo := mongodb.NewDocumentRepository(db)
 	mediaRepo := mongodb.NewMediaAssetRepository(db)
 
-	// storage adapter: env-selected, S3 or Cloudinary, behind the same interface
-	storageProvider, err := resolveStorageProvider(os.Getenv("STORAGE_PROVIDER"))
+	// storage adapter: config-selected, S3 or Cloudinary, behind the same interface
+	storage, err := newStorageAdapter(ctx, cfg)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("%s init: %v", cfg.StorageProvider, err)
 	}
-	storage, err := newStorageAdapter(ctx, storageProvider)
-	if err != nil {
-		log.Fatalf("%s init: %v", storageProvider, err)
-	}
-	log.Printf("storage provider: %s", storageProvider)
+	log.Printf("storage provider: %s", cfg.StorageProvider)
 
 	// usecases
 	authUC := auth.New(userRepo)
@@ -91,10 +82,7 @@ func main() {
 
 	// content-type schema-as-code sync: JSON definitions are the source of
 	// truth, reconciled into Mongo before the server starts accepting traffic.
-	defsDir := os.Getenv("CONTENT_TYPES_DIR")
-	if defsDir == "" {
-		defsDir = "content-types"
-	}
+	defsDir := cfg.ContentTypesDir
 	defs, err := contenttype.LoadDefinitions(defsDir)
 	if err != nil {
 		log.Fatalf("load content-type definitions: %v", err)
@@ -146,11 +134,7 @@ func main() {
 
 	mux.Handle("POST /api/media/upload", adminOnly(mediaHandler.Upload))
 
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-	addr := ":" + port
+	addr := ":" + cfg.Port
 	log.Printf("server listening on %s", addr)
 	if err := http.ListenAndServe(addr, mux); err != nil {
 		log.Fatal(err)
