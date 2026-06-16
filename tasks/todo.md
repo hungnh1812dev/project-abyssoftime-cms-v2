@@ -8,7 +8,7 @@
 - [x] ✅ Checkpoint A: boot syncs JSON defs → Mongo; no API/UI path to mutate ContentType structure
 
 ## Phase B — Draft/Publish Remodel
-- [ ] B1 Document entity + repository: `entryId`/`version` records, audit fields, mocks updated
+- [x] B1 Document entity + repository: `entryId`/`version` records, audit fields, mocks updated
 - [ ] B2 Document usecase: Save/Publish/Unpublish/computed Status/GetForEdit/GetPublished + tests
 - [ ] B3 Document handlers: entryId-addressed routes + public read path (confirm gating first) + tests
 - [ ] B4 FE: `useDocuments.ts` hooks updated to tri-state status + tests
