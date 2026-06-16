@@ -97,6 +97,7 @@ func main() {
 	ctHandler := deliveryhandler.NewContentTypeHandler(ctUC)
 	docHandler := deliveryhandler.NewDocumentHandler(documentUC)
 	mediaHandler := deliveryhandler.NewMediaHandler(mediaUC)
+	localeHandler := deliveryhandler.NewLocaleHandler(cfg.SupportedLocales)
 
 	mux := http.NewServeMux()
 
@@ -133,6 +134,8 @@ func main() {
 	mux.HandleFunc("GET /api/public/documents/{id}", docHandler.GetPublic)
 
 	mux.Handle("POST /api/media/upload", adminOnly(mediaHandler.Upload))
+
+	mux.HandleFunc("GET /api/locales", localeHandler.List)
 
 	addr := ":" + cfg.Port
 	log.Printf("server listening on %s", addr)

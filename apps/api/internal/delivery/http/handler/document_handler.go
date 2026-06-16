@@ -49,6 +49,12 @@ type entrySummary struct {
 	UpdatedBy     string
 }
 
+// localeParam reads the ?locale= query param; empty means "let the usecase
+// default to the first configured supported locale".
+func localeParam(r *http.Request) string {
+	return r.URL.Query().Get("locale")
+}
+
 func toSummary(doc *entity.Document, status string) entrySummary {
 	return entrySummary{
 		EntryID:       doc.EntryID,
@@ -72,9 +78,10 @@ func (h *DocumentHandler) List(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err)
 		return
 	}
+	locale := localeParam(r)
 	summaries := make([]entrySummary, 0, len(drafts))
 	for _, draft := range drafts {
-		_, status, err := h.uc.GetForEdit(r.Context(), draft.EntryID, "")
+		_, status, err := h.uc.GetForEdit(r.Context(), draft.EntryID, locale)
 		if err != nil {
 			writeErr(w, err)
 			return
@@ -91,7 +98,7 @@ func (h *DocumentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	doc := &entity.Document{ContentTypeID: req.ContentTypeID, Data: req.Data}
+	doc := &entity.Document{ContentTypeID: req.ContentTypeID, Data: req.Data, Locale: localeParam(r)}
 	saved, err := h.uc.Save(r.Context(), doc, middleware.UserID(r.Context()))
 	if err != nil {
 		writeErr(w, err)
@@ -102,7 +109,7 @@ func (h *DocumentHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 // GetByID returns the draft + computed status for the admin edit screen.
 func (h *DocumentHandler) GetByID(w http.ResponseWriter, r *http.Request) {
-	draft, status, err := h.uc.GetForEdit(r.Context(), r.PathValue("id"), "")
+	draft, status, err := h.uc.GetForEdit(r.Context(), r.PathValue("id"), localeParam(r))
 	if err != nil {
 		writeErr(w, err)
 		return
@@ -114,7 +121,7 @@ func (h *DocumentHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 // read path. Returns 404 if the entry has never been published, however
 // recent its draft.
 func (h *DocumentHandler) GetPublic(w http.ResponseWriter, r *http.Request) {
-	doc, err := h.uc.GetPublished(r.Context(), r.PathValue("id"), "")
+	doc, err := h.uc.GetPublished(r.Context(), r.PathValue("id"), localeParam(r))
 	if err != nil {
 		writeErr(w, err)
 		return
@@ -133,13 +140,14 @@ func (h *DocumentHandler) Update(w http.ResponseWriter, r *http.Request) {
 		EntryID:       r.PathValue("id"),
 		ContentTypeID: req.ContentTypeID,
 		Data:          req.Data,
+		Locale:        localeParam(r),
 	}
 	saved, err := h.uc.Save(r.Context(), doc, middleware.UserID(r.Context()))
 	if err != nil {
 		writeErr(w, err)
 		return
 	}
-	_, status, err := h.uc.GetForEdit(r.Context(), saved.EntryID, "")
+	_, status, err := h.uc.GetForEdit(r.Context(), saved.EntryID, saved.Locale)
 	if err != nil {
 		writeErr(w, err)
 		return
@@ -156,7 +164,7 @@ func (h *DocumentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *DocumentHandler) Publish(w http.ResponseWriter, r *http.Request) {
-	if err := h.uc.Publish(r.Context(), r.PathValue("id"), "", middleware.UserID(r.Context())); err != nil {
+	if err := h.uc.Publish(r.Context(), r.PathValue("id"), localeParam(r), middleware.UserID(r.Context())); err != nil {
 		writeErr(w, err)
 		return
 	}
@@ -164,7 +172,7 @@ func (h *DocumentHandler) Publish(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *DocumentHandler) Unpublish(w http.ResponseWriter, r *http.Request) {
-	if err := h.uc.Unpublish(r.Context(), r.PathValue("id"), ""); err != nil {
+	if err := h.uc.Unpublish(r.Context(), r.PathValue("id"), localeParam(r)); err != nil {
 		writeErr(w, err)
 		return
 	}

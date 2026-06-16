@@ -174,6 +174,25 @@ func TestDocumentHandler_GetByID(t *testing.T) {
 	}
 }
 
+func TestDocumentHandler_GetByID_ForwardsLocaleQueryParam(t *testing.T) {
+	var gotLocale string
+	uc := &mockDocumentUC{}
+	uc.getForEditFn = func(_ context.Context, entryID, locale string) (*entity.Document, string, error) {
+		gotLocale = locale
+		return &entity.Document{EntryID: entryID}, "draft", nil
+	}
+	h := handler.NewDocumentHandler(uc)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/documents/abc?locale=vi", nil)
+	req.SetPathValue("id", "abc")
+	w := httptest.NewRecorder()
+	h.GetByID(w, req)
+
+	if gotLocale != "vi" {
+		t.Errorf("GetByID() forwarded locale = %q, want vi", gotLocale)
+	}
+}
+
 // ---- GetPublic (public/content read) ----------------------------------------
 
 func TestDocumentHandler_GetPublic(t *testing.T) {
@@ -220,6 +239,25 @@ func TestDocumentHandler_GetPublic(t *testing.T) {
 	}
 }
 
+func TestDocumentHandler_GetPublic_ForwardsLocaleQueryParam(t *testing.T) {
+	var gotLocale string
+	uc := &mockDocumentUC{}
+	uc.getPublishedFn = func(_ context.Context, entryID, locale string) (*entity.Document, error) {
+		gotLocale = locale
+		return &entity.Document{EntryID: entryID}, nil
+	}
+	h := handler.NewDocumentHandler(uc)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/public/documents/abc?locale=vi", nil)
+	req.SetPathValue("id", "abc")
+	w := httptest.NewRecorder()
+	h.GetPublic(w, req)
+
+	if gotLocale != "vi" {
+		t.Errorf("GetPublic() forwarded locale = %q, want vi", gotLocale)
+	}
+}
+
 // ---- Update ----------------------------------------------------------------
 
 func TestDocumentHandler_Update(t *testing.T) {
@@ -242,6 +280,31 @@ func TestDocumentHandler_Update(t *testing.T) {
 
 	if w.Code != http.StatusOK {
 		t.Errorf("Update() status = %d, want 200", w.Code)
+	}
+}
+
+func TestDocumentHandler_Update_ForwardsLocaleQueryParamToSavedDoc(t *testing.T) {
+	var savedLocale string
+	uc := &mockDocumentUC{}
+	uc.saveFn = func(_ context.Context, doc *entity.Document, _ string) (*entity.Document, error) {
+		savedLocale = doc.Locale
+		return doc, nil
+	}
+	uc.getForEditFn = func(_ context.Context, entryID, _ string) (*entity.Document, string, error) {
+		return &entity.Document{EntryID: entryID}, "modified", nil
+	}
+	h := handler.NewDocumentHandler(uc)
+
+	body := map[string]any{"data": map[string]any{"title": "Updated"}}
+	var buf bytes.Buffer
+	_ = json.NewEncoder(&buf).Encode(body)
+	req := httptest.NewRequest(http.MethodPut, "/api/documents/abc?locale=vi", &buf)
+	req.SetPathValue("id", "abc")
+	w := httptest.NewRecorder()
+	h.Update(w, req)
+
+	if savedLocale != "vi" {
+		t.Errorf("Update() saved doc.Locale = %q, want vi", savedLocale)
 	}
 }
 
@@ -279,6 +342,25 @@ func TestDocumentHandler_Publish(t *testing.T) {
 	}
 }
 
+func TestDocumentHandler_Publish_ForwardsLocaleQueryParam(t *testing.T) {
+	var gotLocale string
+	uc := &mockDocumentUC{}
+	uc.publishFn = func(_ context.Context, _, locale, _ string) error {
+		gotLocale = locale
+		return nil
+	}
+	h := handler.NewDocumentHandler(uc)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/documents/abc/publish?locale=vi", nil)
+	req.SetPathValue("id", "abc")
+	w := httptest.NewRecorder()
+	h.Publish(w, req)
+
+	if gotLocale != "vi" {
+		t.Errorf("Publish() forwarded locale = %q, want vi", gotLocale)
+	}
+}
+
 func TestDocumentHandler_Unpublish(t *testing.T) {
 	uc := &mockDocumentUC{}
 	uc.unpublishFn = func(_ context.Context, _, _ string) error { return nil }
@@ -291,5 +373,24 @@ func TestDocumentHandler_Unpublish(t *testing.T) {
 
 	if w.Code != http.StatusOK {
 		t.Errorf("Unpublish() status = %d, want 200", w.Code)
+	}
+}
+
+func TestDocumentHandler_Unpublish_ForwardsLocaleQueryParam(t *testing.T) {
+	var gotLocale string
+	uc := &mockDocumentUC{}
+	uc.unpublishFn = func(_ context.Context, _, locale string) error {
+		gotLocale = locale
+		return nil
+	}
+	h := handler.NewDocumentHandler(uc)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/documents/abc/unpublish?locale=vi", nil)
+	req.SetPathValue("id", "abc")
+	w := httptest.NewRecorder()
+	h.Unpublish(w, req)
+
+	if gotLocale != "vi" {
+		t.Errorf("Unpublish() forwarded locale = %q, want vi", gotLocale)
 	}
 }
