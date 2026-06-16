@@ -9,13 +9,41 @@ import (
 
 	deliveryhandler "project-abyssoftime-cms-v2/api/internal/delivery/http/handler"
 	"project-abyssoftime-cms-v2/api/internal/delivery/http/middleware"
+	"project-abyssoftime-cms-v2/api/internal/domain/repository"
 	cloudinaryadapter "project-abyssoftime-cms-v2/api/internal/infrastructure/cloudinary"
 	"project-abyssoftime-cms-v2/api/internal/infrastructure/mongodb"
+	s3adapter "project-abyssoftime-cms-v2/api/internal/infrastructure/s3"
 	"project-abyssoftime-cms-v2/api/internal/usecase/auth"
 	contenttype "project-abyssoftime-cms-v2/api/internal/usecase/content_type"
 	docuc "project-abyssoftime-cms-v2/api/internal/usecase/document"
 	mediauc "project-abyssoftime-cms-v2/api/internal/usecase/media"
 )
+
+// resolveStorageProvider validates and defaults the STORAGE_PROVIDER env
+// var. Pure function — kept separate from adapter construction so it's
+// unit-testable without touching AWS or Cloudinary.
+func resolveStorageProvider(envValue string) (string, error) {
+	if envValue == "" {
+		return "cloudinary", nil
+	}
+	if envValue != "s3" && envValue != "cloudinary" {
+		return "", fmt.Errorf("unknown STORAGE_PROVIDER %q (want %q or %q)", envValue, "s3", "cloudinary")
+	}
+	return envValue, nil
+}
+
+func newStorageAdapter(ctx context.Context, provider string) (repository.StorageAdapter, error) {
+	switch provider {
+	case "s3":
+		return s3adapter.New(ctx, os.Getenv("S3_BUCKET"), os.Getenv("S3_REGION"))
+	default:
+		return cloudinaryadapter.NewCloudinaryAdapter(
+			os.Getenv("CLOUDINARY_CLOUD_NAME"),
+			os.Getenv("CLOUDINARY_API_KEY"),
+			os.Getenv("CLOUDINARY_API_SECRET"),
+		)
+	}
+}
 
 func main() {
 	ctx := context.Background()
@@ -44,15 +72,16 @@ func main() {
 	docRepo := mongodb.NewDocumentRepository(db)
 	mediaRepo := mongodb.NewMediaAssetRepository(db)
 
-	// storage adapter
-	storage, err := cloudinaryadapter.NewCloudinaryAdapter(
-		os.Getenv("CLOUDINARY_CLOUD_NAME"),
-		os.Getenv("CLOUDINARY_API_KEY"),
-		os.Getenv("CLOUDINARY_API_SECRET"),
-	)
+	// storage adapter: env-selected, S3 or Cloudinary, behind the same interface
+	storageProvider, err := resolveStorageProvider(os.Getenv("STORAGE_PROVIDER"))
 	if err != nil {
-		log.Fatalf("cloudinary init: %v", err)
+		log.Fatal(err)
 	}
+	storage, err := newStorageAdapter(ctx, storageProvider)
+	if err != nil {
+		log.Fatalf("%s init: %v", storageProvider, err)
+	}
+	log.Printf("storage provider: %s", storageProvider)
 
 	// usecases
 	authUC := auth.New(userRepo)
