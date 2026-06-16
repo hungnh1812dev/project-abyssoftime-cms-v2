@@ -4,8 +4,8 @@
 - [x] A1 JSON schema loader (`content-types/*.json` → `ContentTypeDefinition`) + fixture tests
 - [x] A2 Sync usecase (create/update/delete reconciliation + cascade) + tests
 - [x] A3 Wire Sync into `cmd/server/main.go` startup
-- [ ] A4 Remove ContentType Create/Update/Delete (handlers, routes, unused FE hooks, stale tests)
-- [ ] ✅ Checkpoint A: boot syncs JSON defs → Mongo; no API/UI path to mutate ContentType structure
+- [x] A4 Remove ContentType Create/Update/Delete (handlers, routes, unused FE hooks, stale tests)
+- [x] ✅ Checkpoint A: boot syncs JSON defs → Mongo; no API/UI path to mutate ContentType structure
 
 ## Phase B — Draft/Publish Remodel
 - [ ] B1 Document entity + repository: `entryId`/`version` records, audit fields, mocks updated
