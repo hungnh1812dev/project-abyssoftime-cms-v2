@@ -1,7 +1,7 @@
 # Todo — personal-cms (project-abyssoftime-cms-v2)
 
 ## Phase A — Schema-as-Code
-- [ ] A1 JSON schema loader (`content-types/*.json` → `ContentTypeDefinition`) + fixture tests
+- [x] A1 JSON schema loader (`content-types/*.json` → `ContentTypeDefinition`) + fixture tests
 - [ ] A2 Sync usecase (create/update/delete reconciliation + cascade) + tests
 - [ ] A3 Wire Sync into `cmd/server/main.go` startup
 - [ ] A4 Remove ContentType Create/Update/Delete (handlers, routes, unused FE hooks, stale tests)
