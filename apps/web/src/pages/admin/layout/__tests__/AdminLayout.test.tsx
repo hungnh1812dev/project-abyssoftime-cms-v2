@@ -61,6 +61,39 @@ describe('Sidebar', () => {
     renderWithProviders(<Sidebar />, { initialEntries: ['/admin'] })
     await waitFor(() => expect(screen.queryByRole('link')).toBeNull())
   })
+
+  it('groups content types into Single Types and Collection Types sections', async () => {
+    mock.onGet('/api/content-types').reply(200, contentTypes)
+    renderWithProviders(<Sidebar />, { initialEntries: ['/admin'] })
+
+    await waitFor(() => expect(screen.getByText('Blog')).toBeInTheDocument())
+
+    const singleHeading = screen.getByText('Single Types')
+    const collectionHeading = screen.getByText('Collection Types')
+    const aboutLink = screen.getByRole('link', { name: 'About' })
+    const blogLink = screen.getByRole('link', { name: 'Blog' })
+
+    // "About" (single) appears after the Single Types heading and before
+    // the Collection Types heading; "Blog" (collection) appears after it.
+    expect(
+      singleHeading.compareDocumentPosition(aboutLink) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    expect(
+      aboutLink.compareDocumentPosition(collectionHeading) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    expect(
+      collectionHeading.compareDocumentPosition(blogLink) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+  })
+
+  it('omits a section heading when no content type of that kind exists', async () => {
+    mock.onGet('/api/content-types').reply(200, [contentTypes[0]]) // collection only
+    renderWithProviders(<Sidebar />, { initialEntries: ['/admin'] })
+
+    await waitFor(() => expect(screen.getByText('Blog')).toBeInTheDocument())
+    expect(screen.queryByText('Single Types')).not.toBeInTheDocument()
+    expect(screen.getByText('Collection Types')).toBeInTheDocument()
+  })
 })
 
 describe('TopBar', () => {
