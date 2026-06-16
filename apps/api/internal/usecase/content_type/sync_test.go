@@ -1,0 +1,150 @@
+package content_type_test
+
+import (
+	"context"
+	"testing"
+
+	"project-abyssoftime-cms-v2/api/internal/domain/entity"
+	repomock "project-abyssoftime-cms-v2/api/internal/domain/repository/mock"
+	contenttype "project-abyssoftime-cms-v2/api/internal/usecase/content_type"
+	pkgerrors "project-abyssoftime-cms-v2/api/pkg/errors"
+)
+
+// fakeEntryDeleter is a minimal test double for content_type.EntryDeleter.
+type fakeEntryDeleter struct {
+	getAllFn func(ctx context.Context, contentTypeID string) ([]*entity.Document, error)
+	deleteFn func(ctx context.Context, id string) error
+	deleted  []string
+}
+
+func (f *fakeEntryDeleter) GetAll(ctx context.Context, contentTypeID string) ([]*entity.Document, error) {
+	return f.getAllFn(ctx, contentTypeID)
+}
+
+func (f *fakeEntryDeleter) Delete(ctx context.Context, id string) error {
+	f.deleted = append(f.deleted, id)
+	return f.deleteFn(ctx, id)
+}
+
+func TestSync_CreatesNewDefinitions(t *testing.T) {
+	repo := &repomock.ContentTypeRepository{}
+	repo.FindAllFn = func(_ context.Context) ([]*entity.ContentType, error) { return nil, nil }
+	repo.FindBySlugFn = func(_ context.Context, _ string) (*entity.ContentType, error) {
+		return nil, pkgerrors.ErrNotFound
+	}
+	var created []*entity.ContentType
+	repo.CreateFn = func(_ context.Context, ct *entity.ContentType) error {
+		created = append(created, ct)
+		return nil
+	}
+
+	entries := &fakeEntryDeleter{}
+	syncer := contenttype.NewSyncer(contenttype.New(repo), entries)
+
+	defs := []contenttype.ContentTypeDefinition{
+		{Slug: "homepage", Name: "Homepage", Kind: "single"},
+		{Slug: "blog-post", Name: "Blog Post", Kind: "collection"},
+	}
+	if err := syncer.Sync(ctx, defs); err != nil {
+		t.Fatalf("Sync() error = %v", err)
+	}
+	if len(created) != 2 {
+		t.Fatalf("Sync() created %d content types, want 2", len(created))
+	}
+}
+
+func TestSync_UpdatesChangedDefinitions(t *testing.T) {
+	existing := &entity.ContentType{ID: "ct-1", Slug: "homepage", Name: "Old Name", Kind: entity.KindSingle}
+
+	repo := &repomock.ContentTypeRepository{}
+	repo.FindAllFn = func(_ context.Context) ([]*entity.ContentType, error) {
+		return []*entity.ContentType{existing}, nil
+	}
+	repo.FindBySlugFn = func(_ context.Context, slug string) (*entity.ContentType, error) {
+		if slug == existing.Slug {
+			return existing, nil
+		}
+		return nil, pkgerrors.ErrNotFound
+	}
+	var updated *entity.ContentType
+	repo.UpdateFn = func(_ context.Context, ct *entity.ContentType) error {
+		updated = ct
+		return nil
+	}
+
+	entries := &fakeEntryDeleter{}
+	syncer := contenttype.NewSyncer(contenttype.New(repo), entries)
+
+	defs := []contenttype.ContentTypeDefinition{
+		{Slug: "homepage", Name: "New Name", Kind: "single"},
+	}
+	if err := syncer.Sync(ctx, defs); err != nil {
+		t.Fatalf("Sync() error = %v", err)
+	}
+	if updated == nil || updated.Name != "New Name" {
+		t.Fatalf("Sync() did not update content type, got %+v", updated)
+	}
+}
+
+func TestSync_UnchangedDefinition_NoOp(t *testing.T) {
+	existing := &entity.ContentType{ID: "ct-1", Slug: "homepage", Name: "Homepage", Kind: entity.KindSingle}
+
+	repo := &repomock.ContentTypeRepository{}
+	repo.FindAllFn = func(_ context.Context) ([]*entity.ContentType, error) {
+		return []*entity.ContentType{existing}, nil
+	}
+	repo.FindBySlugFn = func(_ context.Context, slug string) (*entity.ContentType, error) {
+		return existing, nil
+	}
+	repo.UpdateFn = func(_ context.Context, _ *entity.ContentType) error {
+		t.Error("Update should not be called for an unchanged definition")
+		return nil
+	}
+	repo.CreateFn = func(_ context.Context, _ *entity.ContentType) error {
+		t.Error("Create should not be called for an existing definition")
+		return nil
+	}
+
+	entries := &fakeEntryDeleter{}
+	syncer := contenttype.NewSyncer(contenttype.New(repo), entries)
+
+	defs := []contenttype.ContentTypeDefinition{
+		{Slug: "homepage", Name: "Homepage", Kind: "single"},
+	}
+	if err := syncer.Sync(ctx, defs); err != nil {
+		t.Fatalf("Sync() error = %v", err)
+	}
+}
+
+func TestSync_RemovesMissingDefinitions_CascadesEntries(t *testing.T) {
+	stale := &entity.ContentType{ID: "ct-stale", Slug: "old-type", Name: "Old Type", Kind: entity.KindCollection}
+
+	repo := &repomock.ContentTypeRepository{}
+	repo.FindAllFn = func(_ context.Context) ([]*entity.ContentType, error) {
+		return []*entity.ContentType{stale}, nil
+	}
+	var deletedContentTypeID string
+	repo.DeleteFn = func(_ context.Context, id string) error {
+		deletedContentTypeID = id
+		return nil
+	}
+
+	entries := &fakeEntryDeleter{
+		getAllFn: func(_ context.Context, contentTypeID string) ([]*entity.Document, error) {
+			return []*entity.Document{{ID: "doc-1", ContentTypeID: contentTypeID}, {ID: "doc-2", ContentTypeID: contentTypeID}}, nil
+		},
+		deleteFn: func(_ context.Context, _ string) error { return nil },
+	}
+	syncer := contenttype.NewSyncer(contenttype.New(repo), entries)
+
+	// No definitions at all → "old-type" is no longer defined anywhere.
+	if err := syncer.Sync(ctx, nil); err != nil {
+		t.Fatalf("Sync() error = %v", err)
+	}
+	if deletedContentTypeID != "ct-stale" {
+		t.Errorf("Sync() deleted content type = %q, want ct-stale", deletedContentTypeID)
+	}
+	if len(entries.deleted) != 2 {
+		t.Fatalf("Sync() cascaded to %d entries, want 2", len(entries.deleted))
+	}
+}
