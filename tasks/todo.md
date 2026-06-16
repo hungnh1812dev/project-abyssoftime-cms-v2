@@ -16,9 +16,9 @@
 - [x] ✅ Checkpoint B: Save never affects public read; Publish syncs it; tri-state badge correct; full test suite passes
 
 ## Phase C — Content-Type Kind UX
-- [ ] C1 Single-type auto-singleton creation wired into Sync + test
-- [ ] C2 Sidebar grouped by kind (Single Types / Collection Types) + test
-- [ ] ✅ Checkpoint C: new single-type definition auto-creates its singleton; sidebar visually grouped
+- [x] C1 Single-type auto-singleton creation wired into Sync + test
+- [x] C2 Sidebar grouped by kind (Single Types / Collection Types) + test
+- [x] ✅ Checkpoint C: new single-type definition auto-creates its singleton; sidebar visually grouped
 
 ## Phase D — Storage: S3 Adapter
 - [ ] D1 S3 adapter implementing `StorageAdapter` + test
