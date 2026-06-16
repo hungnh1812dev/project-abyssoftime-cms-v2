@@ -10,18 +10,28 @@ import (
 	pkgerrors "project-abyssoftime-cms-v2/api/pkg/errors"
 )
 
-// fakeEntryDeleter is a minimal test double for content_type.EntryDeleter.
-type fakeEntryDeleter struct {
+// fakeEntryManager is a minimal test double for content_type.EntryManager.
+type fakeEntryManager struct {
+	saveFn   func(ctx context.Context, doc *entity.Document, userID string) (*entity.Document, error)
 	getAllFn func(ctx context.Context, contentTypeID string) ([]*entity.Document, error)
 	deleteFn func(ctx context.Context, id string) error
+	saved    []*entity.Document
 	deleted  []string
 }
 
-func (f *fakeEntryDeleter) GetAll(ctx context.Context, contentTypeID string) ([]*entity.Document, error) {
+func (f *fakeEntryManager) Save(ctx context.Context, doc *entity.Document, userID string) (*entity.Document, error) {
+	f.saved = append(f.saved, doc)
+	if f.saveFn != nil {
+		return f.saveFn(ctx, doc, userID)
+	}
+	return doc, nil
+}
+
+func (f *fakeEntryManager) GetAll(ctx context.Context, contentTypeID string) ([]*entity.Document, error) {
 	return f.getAllFn(ctx, contentTypeID)
 }
 
-func (f *fakeEntryDeleter) Delete(ctx context.Context, id string) error {
+func (f *fakeEntryManager) Delete(ctx context.Context, id string) error {
 	f.deleted = append(f.deleted, id)
 	return f.deleteFn(ctx, id)
 }
@@ -34,11 +44,12 @@ func TestSync_CreatesNewDefinitions(t *testing.T) {
 	}
 	var created []*entity.ContentType
 	repo.CreateFn = func(_ context.Context, ct *entity.ContentType) error {
+		ct.ID = "ct-" + ct.Slug
 		created = append(created, ct)
 		return nil
 	}
 
-	entries := &fakeEntryDeleter{}
+	entries := &fakeEntryManager{}
 	syncer := contenttype.NewSyncer(contenttype.New(repo), entries)
 
 	defs := []contenttype.ContentTypeDefinition{
@@ -50,6 +61,59 @@ func TestSync_CreatesNewDefinitions(t *testing.T) {
 	}
 	if len(created) != 2 {
 		t.Fatalf("Sync() created %d content types, want 2", len(created))
+	}
+}
+
+func TestSync_CreatesSingletonEntryForNewSingleType(t *testing.T) {
+	repo := &repomock.ContentTypeRepository{}
+	repo.FindAllFn = func(_ context.Context) ([]*entity.ContentType, error) { return nil, nil }
+	repo.FindBySlugFn = func(_ context.Context, _ string) (*entity.ContentType, error) {
+		return nil, pkgerrors.ErrNotFound
+	}
+	repo.CreateFn = func(_ context.Context, ct *entity.ContentType) error {
+		ct.ID = "ct-homepage"
+		return nil
+	}
+
+	entries := &fakeEntryManager{}
+	syncer := contenttype.NewSyncer(contenttype.New(repo), entries)
+
+	defs := []contenttype.ContentTypeDefinition{
+		{Slug: "homepage", Name: "Homepage", Kind: "single"},
+	}
+	if err := syncer.Sync(ctx, defs); err != nil {
+		t.Fatalf("Sync() error = %v", err)
+	}
+	if len(entries.saved) != 1 {
+		t.Fatalf("Sync() saved %d singleton entries, want 1", len(entries.saved))
+	}
+	if entries.saved[0].EntryID != "ct-homepage" {
+		t.Errorf("Sync() singleton EntryID = %q, want ct-homepage (= contentTypeID)", entries.saved[0].EntryID)
+	}
+}
+
+func TestSync_DoesNotCreateSingletonForNewCollectionType(t *testing.T) {
+	repo := &repomock.ContentTypeRepository{}
+	repo.FindAllFn = func(_ context.Context) ([]*entity.ContentType, error) { return nil, nil }
+	repo.FindBySlugFn = func(_ context.Context, _ string) (*entity.ContentType, error) {
+		return nil, pkgerrors.ErrNotFound
+	}
+	repo.CreateFn = func(_ context.Context, ct *entity.ContentType) error {
+		ct.ID = "ct-blog"
+		return nil
+	}
+
+	entries := &fakeEntryManager{}
+	syncer := contenttype.NewSyncer(contenttype.New(repo), entries)
+
+	defs := []contenttype.ContentTypeDefinition{
+		{Slug: "blog-post", Name: "Blog Post", Kind: "collection"},
+	}
+	if err := syncer.Sync(ctx, defs); err != nil {
+		t.Fatalf("Sync() error = %v", err)
+	}
+	if len(entries.saved) != 0 {
+		t.Errorf("Sync() saved %d entries for a collection type, want 0", len(entries.saved))
 	}
 }
 
@@ -72,7 +136,7 @@ func TestSync_UpdatesChangedDefinitions(t *testing.T) {
 		return nil
 	}
 
-	entries := &fakeEntryDeleter{}
+	entries := &fakeEntryManager{}
 	syncer := contenttype.NewSyncer(contenttype.New(repo), entries)
 
 	defs := []contenttype.ContentTypeDefinition{
@@ -83,6 +147,9 @@ func TestSync_UpdatesChangedDefinitions(t *testing.T) {
 	}
 	if updated == nil || updated.Name != "New Name" {
 		t.Fatalf("Sync() did not update content type, got %+v", updated)
+	}
+	if len(entries.saved) != 0 {
+		t.Errorf("Sync() should not create a singleton when updating an already-existing content type, saved %d", len(entries.saved))
 	}
 }
 
@@ -105,7 +172,7 @@ func TestSync_UnchangedDefinition_NoOp(t *testing.T) {
 		return nil
 	}
 
-	entries := &fakeEntryDeleter{}
+	entries := &fakeEntryManager{}
 	syncer := contenttype.NewSyncer(contenttype.New(repo), entries)
 
 	defs := []contenttype.ContentTypeDefinition{
@@ -129,7 +196,7 @@ func TestSync_RemovesMissingDefinitions_CascadesEntries(t *testing.T) {
 		return nil
 	}
 
-	entries := &fakeEntryDeleter{
+	entries := &fakeEntryManager{
 		getAllFn: func(_ context.Context, contentTypeID string) ([]*entity.Document, error) {
 			// EntryID, not ID (the record's own Mongo _id), is what Delete must receive.
 			return []*entity.Document{
