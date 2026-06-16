@@ -1,0 +1,11 @@
+{
+  "slug": "articles",
+  "name": "Articles",
+  "kind": "collection",
+  "fields": [
+    { "name": "title", "type": "text" },
+    { "name": "slug", "type": "text" },
+    { "name": "excerpt", "type": "text" },
+    { "name": "body", "type": "richtext" }
+  ]
+}

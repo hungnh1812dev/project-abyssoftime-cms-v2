@@ -60,6 +60,21 @@ func main() {
 	documentUC := docuc.New(docRepo, mediaRepo)
 	mediaUC := mediauc.New(mediaRepo, storage)
 
+	// content-type schema-as-code sync: JSON definitions are the source of
+	// truth, reconciled into Mongo before the server starts accepting traffic.
+	defsDir := os.Getenv("CONTENT_TYPES_DIR")
+	if defsDir == "" {
+		defsDir = "content-types"
+	}
+	defs, err := contenttype.LoadDefinitions(defsDir)
+	if err != nil {
+		log.Fatalf("load content-type definitions: %v", err)
+	}
+	if err := contenttype.NewSyncer(ctUC, documentUC).Sync(ctx, defs); err != nil {
+		log.Fatalf("sync content types: %v", err)
+	}
+	log.Printf("synced %d content-type definitions from %s", len(defs), defsDir)
+
 	// handlers
 	authHandler := deliveryhandler.NewAuthHandler(authUC)
 	ctHandler := deliveryhandler.NewContentTypeHandler(ctUC)
