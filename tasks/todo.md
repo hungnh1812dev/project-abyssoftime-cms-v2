@@ -21,9 +21,9 @@
 - [x] ✅ Checkpoint C: new single-type definition auto-creates its singleton; sidebar visually grouped
 
 ## Phase D — Storage: S3 Adapter
-- [ ] D1 S3 adapter implementing `StorageAdapter` + test
-- [ ] D2 Config-driven adapter selection (env var) in `cmd/server/main.go` + test
-- [ ] ✅ Checkpoint D (Final): both adapters pass tests, selectable via env var; full suite green; manual smoke test passes
+- [x] D1 S3 adapter implementing `StorageAdapter` + test
+- [x] D2 Config-driven adapter selection (env var) in `cmd/server/main.go` + test
+- [x] ✅ Checkpoint D (Final): both adapters pass tests, selectable via env var (verified live, both providers boot); full suite green; full E2E verified live against running server (register/promote test admin → draft save → public 404 → publish → public 200 synced → new draft save → status "modified" while public read still serves old data) → test artifacts cleaned up
 
 ## Follow-up
 - [ ] `/spec` pass to record the kept "Unpublish" behavior in SPEC.md
