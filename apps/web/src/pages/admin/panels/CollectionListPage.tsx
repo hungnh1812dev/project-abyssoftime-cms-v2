@@ -15,7 +15,7 @@ export function CollectionListPage({ contentType }: Props) {
 
   async function handleCreate() {
     const newDoc = await createDoc({ contentTypeId: contentType.ID, data: {} })
-    navigate(`/admin/content-types/${contentType.Slug}/${newDoc.ID}`)
+    navigate(`/admin/content-types/${contentType.Slug}/${newDoc.EntryID}`)
   }
 
   if (isLoading) {
@@ -42,14 +42,14 @@ export function CollectionListPage({ contentType }: Props) {
           </thead>
           <tbody>
             {docs.map((doc) => {
-              const preview = String(Object.values(doc.Data)[0] ?? doc.ID)
+              const preview = String(Object.values(doc.Data)[0] ?? doc.EntryID)
               return (
-                <tr key={doc.ID} className="border-b">
+                <tr key={doc.EntryID} className="border-b">
                   <td className="py-2 pr-4">{preview}</td>
                   <td className="py-2 pr-4 capitalize">{doc.Status}</td>
                   <td className="py-2 flex gap-2">
                     <Link
-                      to={`/admin/content-types/${contentType.Slug}/${doc.ID}`}
+                      to={`/admin/content-types/${contentType.Slug}/${doc.EntryID}`}
                       className="text-primary underline-offset-4 hover:underline"
                     >
                       Edit
@@ -58,7 +58,7 @@ export function CollectionListPage({ contentType }: Props) {
                       variant="destructive"
                       size="sm"
                       onClick={() =>
-                        deleteDoc({ id: doc.ID, contentTypeId: contentType.ID })
+                        deleteDoc({ id: doc.EntryID, contentTypeId: contentType.ID })
                       }
                     >
                       Delete

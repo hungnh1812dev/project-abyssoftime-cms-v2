@@ -18,13 +18,15 @@ const ct: ContentType = {
 }
 
 const doc: Document = {
-  ID: 'doc-1',
-  DocumentID: 'doc-doc-1',
+  EntryID: 'doc-1',
   ContentTypeID: 'ct-1',
   Status: 'draft',
   Data: { title: 'First Post', body: 'Some content' },
+  Locale: 'en',
   CreatedAt: '',
   UpdatedAt: '',
+  CreatedBy: '',
+  UpdatedBy: '',
 }
 
 let mock: MockAdapter
@@ -96,5 +98,17 @@ describe('CollectionDetailPanel', () => {
     await waitFor(() =>
       expect(mock.history.post.some((r) => r.url?.includes('/publish'))).toBe(true),
     )
+  })
+
+  it('shows both Publish and Unpublish buttons when status is modified', async () => {
+    const modified: Document = { ...doc, Status: 'modified' }
+    mock.onGet('/api/documents/doc-1').reply(200, modified)
+
+    renderWithProviders(<CollectionDetailPanel contentType={ct} documentId="doc-1" />)
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^publish$/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /unpublish/i })).toBeInTheDocument()
+    })
   })
 })

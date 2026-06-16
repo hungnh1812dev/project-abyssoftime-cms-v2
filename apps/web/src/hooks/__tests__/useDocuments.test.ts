@@ -36,13 +36,15 @@ function createWrapper() {
 }
 
 const doc: Document = {
-  ID: '1',
-  DocumentID: 'doc-1',
+  EntryID: '1',
   ContentTypeID: 'ct-1',
   Status: 'draft',
   Data: { title: 'Hello' },
+  Locale: 'en',
   CreatedAt: '2024-01-01T00:00:00Z',
   UpdatedAt: '2024-01-01T00:00:00Z',
+  CreatedBy: 'user-1',
+  UpdatedBy: 'user-1',
 }
 
 describe('useDocuments', () => {

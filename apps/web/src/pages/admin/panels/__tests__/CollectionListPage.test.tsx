@@ -18,23 +18,27 @@ const ct: ContentType = {
 }
 
 const doc1: Document = {
-  ID: 'doc-1',
-  DocumentID: 'doc-doc-1',
+  EntryID: 'doc-1',
   ContentTypeID: 'ct-1',
   Status: 'draft',
   Data: { title: 'First Post' },
+  Locale: 'en',
   CreatedAt: '',
   UpdatedAt: '',
+  CreatedBy: '',
+  UpdatedBy: '',
 }
 
 const doc2: Document = {
-  ID: 'doc-2',
-  DocumentID: 'doc-doc-2',
+  EntryID: 'doc-2',
   ContentTypeID: 'ct-1',
   Status: 'published',
   Data: { title: 'Second Post' },
+  Locale: 'en',
   CreatedAt: '',
   UpdatedAt: '',
+  CreatedBy: '',
+  UpdatedBy: '',
 }
 
 let mock: MockAdapter
@@ -109,7 +113,7 @@ describe('CollectionListPage', () => {
   it('Add entry button posts to /api/documents', async () => {
     const user = userEvent.setup()
     mock.onGet('/api/documents').reply(200, [])
-    mock.onPost('/api/documents').reply(201, { ...doc1, ID: 'doc-new' })
+    mock.onPost('/api/documents').reply(201, { ...doc1, EntryID: 'doc-new' })
 
     renderWithProviders(<CollectionListPage contentType={ct} />, {
       initialEntries: ['/admin/content-types/blog-posts'],

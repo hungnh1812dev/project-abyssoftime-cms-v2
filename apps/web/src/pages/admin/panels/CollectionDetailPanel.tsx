@@ -33,9 +33,11 @@ export function CollectionDetailPanel({ contentType, documentId }: Props) {
   }
 
   const mutationFn = (data: Record<string, unknown>) =>
-    updateDoc({ id: doc.ID, contentTypeId: contentType.ID, data })
+    updateDoc({ id: doc.EntryID, contentTypeId: contentType.ID, data })
 
   const fieldKeys = Object.keys(doc.Data)
+  const canPublish = doc.Status !== 'published'
+  const canUnpublish = doc.Status !== 'draft'
 
   return (
     <div className="space-y-6">
@@ -52,17 +54,18 @@ export function CollectionDetailPanel({ contentType, documentId }: Props) {
           <span className="text-sm text-muted-foreground capitalize">{doc.Status}</span>
         </div>
         <div className="flex gap-2">
-          {doc.Status === 'draft' ? (
+          {canPublish && (
             <Button
-              onClick={() => publish.mutate({ id: doc.ID, contentTypeId: contentType.ID })}
+              onClick={() => publish.mutate({ id: doc.EntryID, contentTypeId: contentType.ID })}
               disabled={publish.isPending}
             >
               Publish
             </Button>
-          ) : (
+          )}
+          {canUnpublish && (
             <Button
               variant="outline"
-              onClick={() => unpublish.mutate({ id: doc.ID, contentTypeId: contentType.ID })}
+              onClick={() => unpublish.mutate({ id: doc.EntryID, contentTypeId: contentType.ID })}
               disabled={unpublish.isPending}
             >
               Unpublish
@@ -73,9 +76,9 @@ export function CollectionDetailPanel({ contentType, documentId }: Props) {
 
       <FormProvider
         query={{
-          queryKey: ['documents', 'detail', doc.ID, 'data'],
+          queryKey: ['documents', 'detail', doc.EntryID, 'data'],
           queryFn: () =>
-            api.get<Document>(`/api/documents/${doc.ID}`).then((r) => r.data.Data),
+            api.get<Document>(`/api/documents/${doc.EntryID}`).then((r) => r.data.Data),
         }}
         mutationFn={mutationFn}
       >

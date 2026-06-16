@@ -56,7 +56,7 @@ export function useUpdateDocument() {
     }) => api.put<Document>(`/api/documents/${id}`, body).then((r) => r.data),
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: KEYS.list(data.ContentTypeID) })
-      qc.invalidateQueries({ queryKey: KEYS.detail(data.ID) })
+      qc.invalidateQueries({ queryKey: KEYS.detail(data.EntryID) })
     },
     onError: onMutationError,
   })

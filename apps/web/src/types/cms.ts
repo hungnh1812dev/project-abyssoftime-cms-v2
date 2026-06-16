@@ -8,12 +8,16 @@ export interface ContentType {
   UpdatedAt: string
 }
 
+export type EntryStatus = 'draft' | 'modified' | 'published'
+
 export interface Document {
-  ID: string
-  DocumentID: string
+  EntryID: string
   ContentTypeID: string
-  Status: 'draft' | 'published'
   Data: Record<string, unknown>
+  Status: EntryStatus
+  Locale: string
   CreatedAt: string
   UpdatedAt: string
+  CreatedBy: string
+  UpdatedBy: string
 }

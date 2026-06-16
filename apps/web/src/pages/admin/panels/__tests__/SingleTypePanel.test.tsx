@@ -18,13 +18,15 @@ const ct: ContentType = {
 }
 
 const doc: Document = {
-  ID: 'doc-1',
-  DocumentID: 'doc-doc-1',
+  EntryID: 'doc-1',
   ContentTypeID: 'ct-1',
   Status: 'draft',
   Data: { title: 'Hello World', body: 'Some text' },
+  Locale: 'en',
   CreatedAt: '',
   UpdatedAt: '',
+  CreatedBy: '',
+  UpdatedBy: '',
 }
 
 let mock: MockAdapter
@@ -97,5 +99,18 @@ describe('SingleTypePanel', () => {
     renderWithProviders(<SingleTypePanel contentType={ct} />)
 
     await waitFor(() => expect(screen.getByText(/no document/i)).toBeInTheDocument())
+  })
+
+  it('shows both Publish and Unpublish buttons when status is modified', async () => {
+    const modified: Document = { ...doc, Status: 'modified' }
+    mock.onGet('/api/documents').reply(200, [modified])
+    mock.onGet('/api/documents/doc-1').reply(200, modified)
+
+    renderWithProviders(<SingleTypePanel contentType={ct} />)
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^publish$/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /unpublish/i })).toBeInTheDocument()
+    })
   })
 })

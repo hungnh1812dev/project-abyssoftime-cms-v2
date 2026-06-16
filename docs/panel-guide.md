@@ -108,7 +108,7 @@ export function SiteSettingsPanel({ contentType }: Props) {
   if (!doc) return <p className="text-muted-foreground">No document found.</p>
 
   const mutationFn = (data: Record<string, unknown>) =>
-    updateDoc({ id: doc.ID, contentTypeId: contentType.ID, data })
+    updateDoc({ id: doc.EntryID, contentTypeId: contentType.ID, data })
 
   // continue in Step 5
 }
@@ -129,6 +129,11 @@ import { api } from '@/lib/api'
 import type { Document } from '@/types/cms'
 
 // Inside the component, after resolving `doc` and `mutationFn`:
+// Status is tri-state: "draft" (never published), "modified" (draft has
+// unpublished changes), "published" (draft and published are in sync).
+const canPublish = doc.Status !== 'published'
+const canUnpublish = doc.Status !== 'draft'
+
 return (
   <div className="space-y-6">
     <div className="flex items-center justify-between">
@@ -137,17 +142,18 @@ return (
         <span className="text-sm text-muted-foreground capitalize">{doc.Status}</span>
       </div>
       <div className="flex gap-2">
-        {doc.Status === 'draft' ? (
+        {canPublish && (
           <Button
-            onClick={() => publish.mutate({ id: doc.ID, contentTypeId: contentType.ID })}
+            onClick={() => publish.mutate({ id: doc.EntryID, contentTypeId: contentType.ID })}
             disabled={publish.isPending}
           >
             Publish
           </Button>
-        ) : (
+        )}
+        {canUnpublish && (
           <Button
             variant="outline"
-            onClick={() => unpublish.mutate({ id: doc.ID, contentTypeId: contentType.ID })}
+            onClick={() => unpublish.mutate({ id: doc.EntryID, contentTypeId: contentType.ID })}
             disabled={unpublish.isPending}
           >
             Unpublish
@@ -158,9 +164,9 @@ return (
 
     <FormProvider
       query={{
-        queryKey: ['documents', 'detail', doc.ID, 'data'],
+        queryKey: ['documents', 'detail', doc.EntryID, 'data'],
         queryFn: () =>
-          api.get<Document>(`/api/documents/${doc.ID}`).then((r) => r.data.Data),
+          api.get<Document>(`/api/documents/${doc.EntryID}`).then((r) => r.data.Data),
       }}
       mutationFn={mutationFn}
     >
