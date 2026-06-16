@@ -8,7 +8,7 @@ This guide walks through creating a custom **"Site Settings"** single-type panel
 
 ## Overview of the 6 steps
 
-1. Create the content type via the CMS UI
+1. Define the content type as a JSON file (schema-as-code)
 2. Create the panel component file
 3. Fetch the document with a query hook
 4. Wire mutations for save / publish
@@ -17,26 +17,30 @@ This guide walks through creating a custom **"Site Settings"** single-type panel
 
 ---
 
-## Step 1 — Create the content type
+## Step 1 — Define the content type
 
-Navigate to **Admin → Content Types** in the running CMS and create:
+Content-type **structure** is defined as code, not through the UI or API — there is no "create content type" button or endpoint. Add a JSON file under `apps/api/content-types/`:
 
-| Field | Value |
-|-------|-------|
-| Name | `Site Settings` |
-| Slug | `site-settings` |
-| Kind | `single` |
-
-Alternatively, POST directly to the API:
-
-```sh
-curl -X POST http://localhost:8080/api/content-types \
-  -H "Authorization: Bearer <token>" \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Site Settings","slug":"site-settings","kind":"single"}'
+```json
+// apps/api/content-types/site-settings.json
+{
+  "slug": "site-settings",
+  "name": "Site Settings",
+  "kind": "single",
+  "fields": [
+    { "name": "siteName", "type": "text" },
+    { "name": "seo.title", "type": "text" },
+    { "name": "seo.description", "type": "text" },
+    { "name": "maintenanceMode", "type": "boolean" }
+  ]
+}
 ```
 
-The sidebar will show **Site Settings** immediately (it reads from `useContentTypes()`). Clicking it loads the generic panel. Steps 2–6 replace that with a custom one.
+Restart the API (`make dev-api`, or just save the file if running under `air`/hot-reload). On boot, `content_type.Sync` reads every file in this directory and reconciles it into MongoDB — creating the `ContentType` (and, for `kind: "single"`, its singleton entry) automatically.
+
+The sidebar will show **Site Settings** once synced (it reads from `useContentTypes()`). Clicking it loads the generic panel. Steps 2–6 replace that with a custom one.
+
+> Content **data** (the entries themselves) is unaffected by this — saving, publishing, and (for collection types) creating/deleting entries all still go through the normal UI and `/api/documents` endpoints. Only the type's structure is JSON-only.
 
 ---
 
