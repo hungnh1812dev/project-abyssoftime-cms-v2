@@ -88,6 +88,9 @@ export CLOUDINARY_API_SECRET=...
 # Install frontend dependencies (first time only)
 cd apps/web && npm install && cd ../..
 
+# Start MongoDB container (first time, or after a reboot)
+make mongo-start
+
 # Start API + web concurrently
 make dev
 ```
@@ -103,6 +106,8 @@ The API is at **http://localhost:8080**.
 
 | Command | What it does |
 |---------|--------------|
+| `make mongo-start` | Start (or resume) the `cms-mongo` container |
+| `make mongo-stop` | Stop the `cms-mongo` container |
 | `make dev` | API + web in parallel (Ctrl-C kills both) |
 | `make dev-api` | Go API only (`go run ./cmd/server`) |
 | `make dev-web` | Vite dev server only |
