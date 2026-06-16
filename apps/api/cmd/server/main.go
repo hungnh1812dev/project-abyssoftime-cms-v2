@@ -112,6 +112,9 @@ func main() {
 	mux.Handle("POST /api/documents/{id}/publish", adminOnly(docHandler.Publish))
 	mux.Handle("POST /api/documents/{id}/unpublish", adminOnly(docHandler.Unpublish))
 
+	// Public/content read path: no auth, resolves the published record only.
+	mux.HandleFunc("GET /api/public/documents/{id}", docHandler.GetPublic)
+
 	mux.Handle("POST /api/media/upload", adminOnly(mediaHandler.Upload))
 
 	port := os.Getenv("PORT")

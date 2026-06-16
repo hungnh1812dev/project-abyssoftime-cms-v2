@@ -131,7 +131,11 @@ func TestSync_RemovesMissingDefinitions_CascadesEntries(t *testing.T) {
 
 	entries := &fakeEntryDeleter{
 		getAllFn: func(_ context.Context, contentTypeID string) ([]*entity.Document, error) {
-			return []*entity.Document{{ID: "doc-1", ContentTypeID: contentTypeID}, {ID: "doc-2", ContentTypeID: contentTypeID}}, nil
+			// EntryID, not ID (the record's own Mongo _id), is what Delete must receive.
+			return []*entity.Document{
+				{ID: "rec-1", EntryID: "entry-1", ContentTypeID: contentTypeID},
+				{ID: "rec-2", EntryID: "entry-2", ContentTypeID: contentTypeID},
+			}, nil
 		},
 		deleteFn: func(_ context.Context, _ string) error { return nil },
 	}
@@ -146,5 +150,8 @@ func TestSync_RemovesMissingDefinitions_CascadesEntries(t *testing.T) {
 	}
 	if len(entries.deleted) != 2 {
 		t.Fatalf("Sync() cascaded to %d entries, want 2", len(entries.deleted))
+	}
+	if entries.deleted[0] != "entry-1" || entries.deleted[1] != "entry-2" {
+		t.Errorf("Sync() deleted entry IDs = %v, want [entry-1 entry-2] (must use EntryID, not ID)", entries.deleted)
 	}
 }

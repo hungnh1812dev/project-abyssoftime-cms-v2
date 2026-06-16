@@ -9,10 +9,11 @@ import (
 
 // EntryDeleter is the subset of the document usecase that Sync needs to
 // cascade-delete entries belonging to a content type removed from the
-// JSON definitions.
+// JSON definitions. GetAll returns each entry's draft record; Delete takes
+// an EntryID (not a single record's own Mongo _id).
 type EntryDeleter interface {
 	GetAll(ctx context.Context, contentTypeID string) ([]*entity.Document, error)
-	Delete(ctx context.Context, id string) error
+	Delete(ctx context.Context, entryID string) error
 }
 
 // Syncer reconciles content-type JSON definitions (the source of truth)
@@ -80,7 +81,7 @@ func (s *Syncer) removeContentType(ctx context.Context, ct *entity.ContentType) 
 		return err
 	}
 	for _, doc := range docs {
-		if err := s.entries.Delete(ctx, doc.ID); err != nil {
+		if err := s.entries.Delete(ctx, doc.EntryID); err != nil {
 			return err
 		}
 	}

@@ -16,35 +16,35 @@ import (
 // ---- mock usecase ----------------------------------------------------------
 
 type mockDocumentUC struct {
-	createFn    func(ctx context.Context, doc *entity.Document) error
-	getOneFn    func(ctx context.Context, id string) (*entity.Document, error)
-	getAllFn     func(ctx context.Context, contentTypeID string) ([]*entity.Document, error)
-	updateFn    func(ctx context.Context, doc *entity.Document) error
-	deleteFn    func(ctx context.Context, id string) error
-	publishFn   func(ctx context.Context, id string) error
-	unpublishFn func(ctx context.Context, id string) error
+	saveFn         func(ctx context.Context, doc *entity.Document, userID string) (*entity.Document, error)
+	getForEditFn   func(ctx context.Context, entryID string) (*entity.Document, string, error)
+	getPublishedFn func(ctx context.Context, entryID string) (*entity.Document, error)
+	getAllFn       func(ctx context.Context, contentTypeID string) ([]*entity.Document, error)
+	deleteFn       func(ctx context.Context, entryID string) error
+	publishFn      func(ctx context.Context, entryID, userID string) error
+	unpublishFn    func(ctx context.Context, entryID string) error
 }
 
-func (m *mockDocumentUC) Create(ctx context.Context, doc *entity.Document) error {
-	return m.createFn(ctx, doc)
+func (m *mockDocumentUC) Save(ctx context.Context, doc *entity.Document, userID string) (*entity.Document, error) {
+	return m.saveFn(ctx, doc, userID)
 }
-func (m *mockDocumentUC) GetOne(ctx context.Context, id string) (*entity.Document, error) {
-	return m.getOneFn(ctx, id)
+func (m *mockDocumentUC) GetForEdit(ctx context.Context, entryID string) (*entity.Document, string, error) {
+	return m.getForEditFn(ctx, entryID)
+}
+func (m *mockDocumentUC) GetPublished(ctx context.Context, entryID string) (*entity.Document, error) {
+	return m.getPublishedFn(ctx, entryID)
 }
 func (m *mockDocumentUC) GetAll(ctx context.Context, contentTypeID string) ([]*entity.Document, error) {
 	return m.getAllFn(ctx, contentTypeID)
 }
-func (m *mockDocumentUC) Update(ctx context.Context, doc *entity.Document) error {
-	return m.updateFn(ctx, doc)
+func (m *mockDocumentUC) Delete(ctx context.Context, entryID string) error {
+	return m.deleteFn(ctx, entryID)
 }
-func (m *mockDocumentUC) Delete(ctx context.Context, id string) error {
-	return m.deleteFn(ctx, id)
+func (m *mockDocumentUC) Publish(ctx context.Context, entryID, userID string) error {
+	return m.publishFn(ctx, entryID, userID)
 }
-func (m *mockDocumentUC) Publish(ctx context.Context, id string) error {
-	return m.publishFn(ctx, id)
-}
-func (m *mockDocumentUC) Unpublish(ctx context.Context, id string) error {
-	return m.unpublishFn(ctx, id)
+func (m *mockDocumentUC) Unpublish(ctx context.Context, entryID string) error {
+	return m.unpublishFn(ctx, entryID)
 }
 
 // ---- List ------------------------------------------------------------------
@@ -52,7 +52,10 @@ func (m *mockDocumentUC) Unpublish(ctx context.Context, id string) error {
 func TestDocumentHandler_List(t *testing.T) {
 	uc := &mockDocumentUC{}
 	uc.getAllFn = func(_ context.Context, contentTypeID string) ([]*entity.Document, error) {
-		return []*entity.Document{{ID: "1", ContentTypeID: contentTypeID}}, nil
+		return []*entity.Document{{EntryID: "1", ContentTypeID: contentTypeID}}, nil
+	}
+	uc.getForEditFn = func(_ context.Context, entryID string) (*entity.Document, string, error) {
+		return &entity.Document{EntryID: entryID}, "draft", nil
 	}
 	h := handler.NewDocumentHandler(uc)
 
@@ -70,6 +73,9 @@ func TestDocumentHandler_List(t *testing.T) {
 	if len(out) != 1 {
 		t.Errorf("List() count = %d, want 1", len(out))
 	}
+	if out[0]["status"] != "draft" {
+		t.Errorf("List() status field = %v, want draft", out[0]["status"])
+	}
 }
 
 // ---- Create ----------------------------------------------------------------
@@ -85,9 +91,9 @@ func TestDocumentHandler_Create(t *testing.T) {
 			name: "201 on valid create",
 			body: map[string]any{"contentTypeId": "ct-1", "data": map[string]any{"title": "Hello"}},
 			setupUC: func(m *mockDocumentUC) {
-				m.createFn = func(_ context.Context, doc *entity.Document) error {
-					doc.ID = "new-id"
-					return nil
+				m.saveFn = func(_ context.Context, doc *entity.Document, _ string) (*entity.Document, error) {
+					doc.EntryID = "new-entry"
+					return doc, nil
 				}
 			},
 			wantStatus: http.StatusCreated,
@@ -119,7 +125,7 @@ func TestDocumentHandler_Create(t *testing.T) {
 	}
 }
 
-// ---- GetByID ---------------------------------------------------------------
+// ---- GetByID (admin, draft + status) ---------------------------------------
 
 func TestDocumentHandler_GetByID(t *testing.T) {
 	tests := []struct {
@@ -132,8 +138,8 @@ func TestDocumentHandler_GetByID(t *testing.T) {
 			name: "200 found",
 			id:   "abc",
 			setupUC: func(m *mockDocumentUC) {
-				m.getOneFn = func(_ context.Context, id string) (*entity.Document, error) {
-					return &entity.Document{ID: id}, nil
+				m.getForEditFn = func(_ context.Context, entryID string) (*entity.Document, string, error) {
+					return &entity.Document{EntryID: entryID}, "draft", nil
 				}
 			},
 			wantStatus: http.StatusOK,
@@ -142,8 +148,8 @@ func TestDocumentHandler_GetByID(t *testing.T) {
 			name: "404 not found",
 			id:   "missing",
 			setupUC: func(m *mockDocumentUC) {
-				m.getOneFn = func(_ context.Context, _ string) (*entity.Document, error) {
-					return nil, pkgerrors.ErrNotFound
+				m.getForEditFn = func(_ context.Context, _ string) (*entity.Document, string, error) {
+					return nil, "", pkgerrors.ErrNotFound
 				}
 			},
 			wantStatus: http.StatusNotFound,
@@ -168,11 +174,62 @@ func TestDocumentHandler_GetByID(t *testing.T) {
 	}
 }
 
+// ---- GetPublic (public/content read) ----------------------------------------
+
+func TestDocumentHandler_GetPublic(t *testing.T) {
+	tests := []struct {
+		name       string
+		setupUC    func(*mockDocumentUC)
+		wantStatus int
+	}{
+		{
+			name: "200 when published",
+			setupUC: func(m *mockDocumentUC) {
+				m.getPublishedFn = func(_ context.Context, entryID string) (*entity.Document, error) {
+					return &entity.Document{EntryID: entryID}, nil
+				}
+			},
+			wantStatus: http.StatusOK,
+		},
+		{
+			name: "404 when never published",
+			setupUC: func(m *mockDocumentUC) {
+				m.getPublishedFn = func(_ context.Context, _ string) (*entity.Document, error) {
+					return nil, pkgerrors.ErrNotFound
+				}
+			},
+			wantStatus: http.StatusNotFound,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			uc := &mockDocumentUC{}
+			tt.setupUC(uc)
+			h := handler.NewDocumentHandler(uc)
+
+			req := httptest.NewRequest(http.MethodGet, "/api/public/documents/abc", nil)
+			req.SetPathValue("id", "abc")
+			w := httptest.NewRecorder()
+			h.GetPublic(w, req)
+
+			if w.Code != tt.wantStatus {
+				t.Errorf("GetPublic() status = %d, want %d", w.Code, tt.wantStatus)
+			}
+		})
+	}
+}
+
 // ---- Update ----------------------------------------------------------------
 
 func TestDocumentHandler_Update(t *testing.T) {
 	uc := &mockDocumentUC{}
-	uc.updateFn = func(_ context.Context, _ *entity.Document) error { return nil }
+	uc.saveFn = func(_ context.Context, doc *entity.Document, _ string) (*entity.Document, error) {
+		return doc, nil
+	}
+	uc.getForEditFn = func(_ context.Context, entryID string) (*entity.Document, string, error) {
+		return &entity.Document{EntryID: entryID}, "modified", nil
+	}
 	h := handler.NewDocumentHandler(uc)
 
 	body := map[string]any{"data": map[string]any{"title": "Updated"}}
@@ -209,7 +266,7 @@ func TestDocumentHandler_Delete(t *testing.T) {
 
 func TestDocumentHandler_Publish(t *testing.T) {
 	uc := &mockDocumentUC{}
-	uc.publishFn = func(_ context.Context, _ string) error { return nil }
+	uc.publishFn = func(_ context.Context, _, _ string) error { return nil }
 	h := handler.NewDocumentHandler(uc)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/documents/abc/publish", nil)

@@ -6,18 +6,10 @@ import (
 	"project-abyssoftime-cms-v2/api/internal/domain/entity"
 )
 
+// DocumentRepository addresses a logical entry by entryID across its
+// draft/published record pair (two physical Mongo documents in the same
+// collection — see Domain Rules: Draft & Publish in SPEC.md).
 type DocumentRepository interface {
-	// Deprecated: the methods below operate on a single Mongo record by its
-	// own _id. They are superseded by the entry-aware methods further down,
-	// which address a logical entry by entryID across its draft/published
-	// record pair. Removed once the document usecase migrates (see B2).
-	Create(ctx context.Context, doc *entity.Document) error
-	FindByID(ctx context.Context, id string) (*entity.Document, error)
-	FindByContentType(ctx context.Context, contentTypeID string) ([]*entity.Document, error)
-	Update(ctx context.Context, doc *entity.Document) error
-	UpdateStatus(ctx context.Context, id string, status entity.DocumentStatus) error
-	Delete(ctx context.Context, id string) error
-
 	// FindDraftByEntryID returns the draft record for entryID, or
 	// pkgerrors.ErrNotFound if it doesn't exist.
 	FindDraftByEntryID(ctx context.Context, entryID string) (*entity.Document, error)
@@ -34,6 +26,10 @@ type DocumentRepository interface {
 	// DeleteByEntryID removes both the draft and published record (if any)
 	// for entryID.
 	DeleteByEntryID(ctx context.Context, entryID string) error
+	// DeletePublishedByEntryID removes only the published record for
+	// entryID, leaving the draft untouched. Backs the Unpublish convenience
+	// (see tasks/plan.md — kept beyond what SPEC.md defines).
+	DeletePublishedByEntryID(ctx context.Context, entryID string) error
 	// DeleteByContentType removes every draft and published record
 	// belonging to contentTypeID.
 	DeleteByContentType(ctx context.Context, contentTypeID string) error

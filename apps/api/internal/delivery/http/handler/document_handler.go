@@ -4,18 +4,20 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"time"
 
+	"project-abyssoftime-cms-v2/api/internal/delivery/http/middleware"
 	"project-abyssoftime-cms-v2/api/internal/domain/entity"
 )
 
 type documentUseCase interface {
-	Create(ctx context.Context, doc *entity.Document) error
-	GetOne(ctx context.Context, id string) (*entity.Document, error)
+	Save(ctx context.Context, doc *entity.Document, userID string) (*entity.Document, error)
+	GetForEdit(ctx context.Context, entryID string) (*entity.Document, string, error)
+	GetPublished(ctx context.Context, entryID string) (*entity.Document, error)
 	GetAll(ctx context.Context, contentTypeID string) ([]*entity.Document, error)
-	Update(ctx context.Context, doc *entity.Document) error
-	Delete(ctx context.Context, id string) error
-	Publish(ctx context.Context, id string) error
-	Unpublish(ctx context.Context, id string) error
+	Publish(ctx context.Context, entryID, userID string) error
+	Unpublish(ctx context.Context, entryID string) error
+	Delete(ctx context.Context, entryID string) error
 }
 
 type DocumentHandler struct {
@@ -31,35 +33,86 @@ type documentRequest struct {
 	Data          map[string]any `json:"data"`
 }
 
+// entrySummary is the admin-facing view of an entry: its draft data plus
+// the computed draft/modified/published status.
+type entrySummary struct {
+	EntryID       string         `json:"entryId"`
+	ContentTypeID string         `json:"contentTypeId"`
+	Data          map[string]any `json:"data"`
+	Status        string         `json:"status"`
+	Locale        string         `json:"locale"`
+	CreatedAt     time.Time      `json:"createdAt"`
+	UpdatedAt     time.Time      `json:"updatedAt"`
+	CreatedBy     string         `json:"createdBy"`
+	UpdatedBy     string         `json:"updatedBy"`
+}
+
+func toSummary(doc *entity.Document, status string) entrySummary {
+	return entrySummary{
+		EntryID:       doc.EntryID,
+		ContentTypeID: doc.ContentTypeID,
+		Data:          doc.Data,
+		Status:        status,
+		Locale:        doc.Locale,
+		CreatedAt:     doc.CreatedAt,
+		UpdatedAt:     doc.UpdatedAt,
+		CreatedBy:     doc.CreatedBy,
+		UpdatedBy:     doc.UpdatedBy,
+	}
+}
+
+// List returns every entry of a content type with its computed status —
+// the admin list view (collection-type panels).
 func (h *DocumentHandler) List(w http.ResponseWriter, r *http.Request) {
 	contentTypeID := r.URL.Query().Get("contentType")
-	docs, err := h.uc.GetAll(r.Context(), contentTypeID)
+	drafts, err := h.uc.GetAll(r.Context(), contentTypeID)
 	if err != nil {
 		writeErr(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, docs)
+	summaries := make([]entrySummary, 0, len(drafts))
+	for _, draft := range drafts {
+		_, status, err := h.uc.GetForEdit(r.Context(), draft.EntryID)
+		if err != nil {
+			writeErr(w, err)
+			return
+		}
+		summaries = append(summaries, toSummary(draft, status))
+	}
+	writeJSON(w, http.StatusOK, summaries)
 }
 
+// Create saves a brand-new entry's draft (collection-type "add entry").
 func (h *DocumentHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req documentRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	doc := &entity.Document{
-		ContentTypeID: req.ContentTypeID,
-		Data:          req.Data,
-	}
-	if err := h.uc.Create(r.Context(), doc); err != nil {
+	doc := &entity.Document{ContentTypeID: req.ContentTypeID, Data: req.Data}
+	saved, err := h.uc.Save(r.Context(), doc, middleware.UserID(r.Context()))
+	if err != nil {
 		writeErr(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, doc)
+	writeJSON(w, http.StatusCreated, toSummary(saved, "draft"))
 }
 
+// GetByID returns the draft + computed status for the admin edit screen.
 func (h *DocumentHandler) GetByID(w http.ResponseWriter, r *http.Request) {
-	doc, err := h.uc.GetOne(r.Context(), r.PathValue("id"))
+	draft, status, err := h.uc.GetForEdit(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, toSummary(draft, status))
+}
+
+// GetPublic resolves an entry's published record only — the public/content
+// read path. Returns 404 if the entry has never been published, however
+// recent its draft.
+func (h *DocumentHandler) GetPublic(w http.ResponseWriter, r *http.Request) {
+	doc, err := h.uc.GetPublished(r.Context(), r.PathValue("id"))
 	if err != nil {
 		writeErr(w, err)
 		return
@@ -67,6 +120,7 @@ func (h *DocumentHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, doc)
 }
 
+// Update saves changes to an existing entry's draft.
 func (h *DocumentHandler) Update(w http.ResponseWriter, r *http.Request) {
 	var req documentRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -74,15 +128,21 @@ func (h *DocumentHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	doc := &entity.Document{
-		ID:            r.PathValue("id"),
+		EntryID:       r.PathValue("id"),
 		ContentTypeID: req.ContentTypeID,
 		Data:          req.Data,
 	}
-	if err := h.uc.Update(r.Context(), doc); err != nil {
+	saved, err := h.uc.Save(r.Context(), doc, middleware.UserID(r.Context()))
+	if err != nil {
 		writeErr(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, doc)
+	_, status, err := h.uc.GetForEdit(r.Context(), saved.EntryID)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, toSummary(saved, status))
 }
 
 func (h *DocumentHandler) Delete(w http.ResponseWriter, r *http.Request) {
@@ -94,11 +154,11 @@ func (h *DocumentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *DocumentHandler) Publish(w http.ResponseWriter, r *http.Request) {
-	if err := h.uc.Publish(r.Context(), r.PathValue("id")); err != nil {
+	if err := h.uc.Publish(r.Context(), r.PathValue("id"), middleware.UserID(r.Context())); err != nil {
 		writeErr(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": string(entity.StatusPublished)})
+	writeJSON(w, http.StatusOK, map[string]string{"status": "published"})
 }
 
 func (h *DocumentHandler) Unpublish(w http.ResponseWriter, r *http.Request) {
@@ -106,5 +166,5 @@ func (h *DocumentHandler) Unpublish(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": string(entity.StatusDraft)})
+	writeJSON(w, http.StatusOK, map[string]string{"status": "draft"})
 }
