@@ -14,11 +14,47 @@ Build a self-hosted headless CMS for developers and administrators who prefer co
 
 ## 2. Commands
 
-### Root (monorepo)
+### Native development (recommended)
+
+MongoDB runs as a container; API and web run natively. See `docs/local-dev.md` for full setup.
+
 | Command | Description |
 |---|---|
-| `docker-compose up` | Start all services locally (API + Web + MongoDB) |
-| `docker-compose build` | Rebuild all service images |
+| `make mongo-start` | Start MongoDB container (`cms-mongo`, port 27017) |
+| `make mongo-stop` | Stop the MongoDB container |
+| `make dev` | Start API + web in parallel (Ctrl-C stops both) |
+| `make dev-api` | Start Go API server only |
+| `make dev-web` | Start Vite dev server only |
+| `make test-api` | `go test ./...` inside `apps/api` |
+| `make test-web` | `vitest run` inside `apps/web` |
+
+Podman users: prefix any `make` target with `CONTAINER_CLI=podman`.
+
+### Docker Compose (full stack)
+| Command | Description |
+|---|---|
+| `docker-compose -f docker-compose.yml -f docker-compose.dev.yml up --build` | First run: build images + start all services with hot reload |
+| `docker-compose -f docker-compose.yml -f docker-compose.dev.yml up` | Start services after images are already built |
+| `docker-compose down` | Stop and remove all containers |
+| `docker-compose logs -f api` | Tail API logs |
+| `docker-compose logs -f web` | Tail web (Vite) logs |
+
+### Pre-deploy verification (local)
+| Command | Description |
+|---|---|
+| `docker-compose run --rm api go vet ./...` | Go static analysis in a clean container |
+| `docker-compose run --rm api go test ./...` | Backend tests in a clean container |
+| `docker-compose run --rm web npm run lint` | Frontend lint in a clean container |
+| `docker-compose run --rm web npm run build` | Verify production frontend build compiles |
+| `docker-compose build` | Build production images |
+| `docker-compose up` | Start production stack locally for smoke testing |
+| `docker-compose down` | Tear down after verification |
+
+### Production (Render.com)
+| Command | Description |
+|---|---|
+| `docker-compose up --build` | Build production images and start all services |
+| `docker-compose build` | Rebuild production images without starting |
 
 ### Backend (`apps/api`)
 | Command | Description |

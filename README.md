@@ -10,7 +10,7 @@ Two modes are supported: **Native** (Go + Node directly on your machine) and **D
 
 ### Native (recommended for day-to-day development)
 
-**Prerequisites:** Go 1.21+, Node.js 20 LTS, MongoDB 7 running locally.
+**Prerequisites:** Go 1.21+, Node.js 20 LTS, Docker or Podman (for MongoDB).
 
 ```sh
 # Install frontend dependencies (first time)
@@ -18,6 +18,10 @@ cd apps/web && npm install && cd ../..
 
 # Copy and fill in env vars
 cp .env.example .env   # set JWT_SECRET, CLOUDINARY_*, etc.
+
+# Start MongoDB container (idempotent — safe to rerun)
+make mongo-start
+# Podman: CONTAINER_CLI=podman make mongo-start
 
 # Start API + web concurrently (Ctrl-C stops both)
 make dev
@@ -27,6 +31,8 @@ The web app runs at **http://localhost:5173** and the API at **http://localhost:
 
 | Command | Description |
 |---------|-------------|
+| `make mongo-start` | Start MongoDB container |
+| `make mongo-stop` | Stop MongoDB container |
 | `make dev` | API + web in parallel |
 | `make dev-api` | Go API only |
 | `make dev-web` | Vite dev server only |

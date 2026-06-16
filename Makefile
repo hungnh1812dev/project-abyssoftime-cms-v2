@@ -1,13 +1,40 @@
-.PHONY: dev dev-api dev-web test-api test-web
+.PHONY: dev dev-api dev-web test-api test-web mongo-start mongo-stop
+
+CONTAINER_CLI ?= docker
+MONGO_CONTAINER = cms-mongo
+MONGO_IMAGE     = mongo:7
+MONGO_PORT      = 27017
+MONGO_VOLUME    = cms-mongo-data
+
+# Start MongoDB container (idempotent — skips if already running)
+mongo-start:
+	@if $(CONTAINER_CLI) ps --format '{{.Names}}' | grep -q '^$(MONGO_CONTAINER)$$'; then \
+		echo "MongoDB already running ($(MONGO_CONTAINER))"; \
+	elif $(CONTAINER_CLI) ps -a --format '{{.Names}}' | grep -q '^$(MONGO_CONTAINER)$$'; then \
+		$(CONTAINER_CLI) start $(MONGO_CONTAINER); \
+		echo "MongoDB resumed ($(MONGO_CONTAINER))"; \
+	else \
+		$(CONTAINER_CLI) run -d \
+			--name $(MONGO_CONTAINER) \
+			-p $(MONGO_PORT):27017 \
+			-v $(MONGO_VOLUME):/data/db \
+			$(MONGO_IMAGE); \
+		echo "MongoDB started ($(MONGO_CONTAINER)) on port $(MONGO_PORT)"; \
+	fi
+
+# Stop the MongoDB container
+mongo-stop:
+	$(CONTAINER_CLI) stop $(MONGO_CONTAINER)
 
 # Start API and web in parallel; Ctrl-C kills both
+# Run `make mongo-start` first if MongoDB is not already up
 dev:
 	@trap 'kill 0' INT; \
 		(cd apps/api && go run ./cmd/server) & \
 		(cd apps/web && npm run dev) & \
 		wait
 
-# Start only the Go API server (requires MongoDB running locally or via docker-compose)
+# Start only the Go API server
 dev-api:
 	cd apps/api && go run ./cmd/server
 

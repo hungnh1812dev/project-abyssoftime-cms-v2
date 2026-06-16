@@ -1,6 +1,6 @@
 # Local Development Guide
 
-Run the full stack natively (no Docker required) using `make dev`.
+Run API + web natively (Go + Node directly) with MongoDB in a container. No full Docker Compose stack required.
 
 ---
 
@@ -10,12 +10,40 @@ Run the full stack natively (no Docker required) using `make dev`.
 |------|-----------------|---------|
 | Go | 1.21+ | https://go.dev/dl |
 | Node.js | 20 LTS | https://nodejs.org |
-| MongoDB | 7.x | https://www.mongodb.com/try/download/community |
+| Docker **or** Podman | any recent | https://docs.docker.com/get-docker / https://podman.io/getting-started/installation |
 
-Start MongoDB before launching the app. On macOS with Homebrew:
+MongoDB runs as a container — no native install needed.
+
+---
+
+## Start MongoDB
+
+Use the Makefile target (defaults to `docker`; override with `CONTAINER_CLI=podman` if needed):
 
 ```sh
-brew services start mongodb-community
+make mongo-start
+# or with Podman:
+CONTAINER_CLI=podman make mongo-start
+```
+
+This creates a named container `cms-mongo` on port `27017` with a persistent volume `cms-mongo-data`. The command is **idempotent** — safe to run again if the container already exists.
+
+To stop MongoDB when you're done:
+
+```sh
+make mongo-stop
+# or:
+CONTAINER_CLI=podman make mongo-stop
+```
+
+### Manual alternative (without make)
+
+```sh
+# Docker
+docker run -d --name cms-mongo -p 27017:27017 -v cms-mongo-data:/data/db mongo:7
+
+# Podman
+podman run -d --name cms-mongo -p 27017:27017 -v cms-mongo-data:/data/db mongo:7
 ```
 
 ---
@@ -102,7 +130,7 @@ See the root `SPEC.md` §2 for the full command reference.
 ## Troubleshooting
 
 **API exits immediately with "mongodb connect" error**  
-→ MongoDB is not running. Start it with `brew services start mongodb-community` (macOS) or `sudo systemctl start mongod` (Linux).
+→ MongoDB container is not running. Start it with `make mongo-start` (or `CONTAINER_CLI=podman make mongo-start`). Verify it's up with `docker ps | grep cms-mongo`.
 
 **"JWT_SECRET not set" panic**  
 → Export `JWT_SECRET` before running `make dev-api`.
