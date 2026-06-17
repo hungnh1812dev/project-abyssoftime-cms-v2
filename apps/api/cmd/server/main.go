@@ -24,14 +24,14 @@ import (
 )
 
 func newStorageAdapter(ctx context.Context, cfg *config.Config) (repository.StorageAdapter, error) {
-	switch cfg.StorageProvider {
+	switch cfg.Media.Driver {
 	case "s3":
-		return s3adapter.New(ctx, cfg.S3Bucket, cfg.S3Region)
+		return s3adapter.New(ctx, cfg.Media.S3.Bucket, cfg.Media.S3.Region)
 	default:
 		return cloudinaryadapter.NewCloudinaryAdapter(
-			cfg.CloudinaryCloudName,
-			cfg.CloudinaryAPIKey,
-			cfg.CloudinaryAPISecret,
+			cfg.Media.Cloudinary.CloudName,
+			cfg.Media.Cloudinary.APIKey,
+			cfg.Media.Cloudinary.APISecret,
 		)
 	}
 }
@@ -46,7 +46,7 @@ func main() {
 
 	pkgjwt.SetSecret(cfg.JWTSecret)
 
-	mongoClient, err := mongodb.NewClient(ctx, cfg.MongoDBURI)
+	mongoClient, err := mongodb.NewClient(ctx, cfg.DB.Mongo.URI)
 	if err != nil {
 		log.Fatalf("mongodb connect: %v", err)
 	}
@@ -57,7 +57,7 @@ func main() {
 	}()
 	log.Println("connected to mongodb")
 
-	db := mongodb.Database(mongoClient, cfg.MongoDBDB)
+	db := mongodb.Database(mongoClient, cfg.DB.Mongo.Name)
 
 	if err := mongodb.EnsureIndexes(ctx, db); err != nil {
 		log.Fatalf("ensure indexes: %v", err)
@@ -73,19 +73,19 @@ func main() {
 	// storage adapter: config-selected, S3 or Cloudinary, behind the same interface
 	storage, err := newStorageAdapter(ctx, cfg)
 	if err != nil {
-		log.Fatalf("%s init: %v", cfg.StorageProvider, err)
+		log.Fatalf("%s init: %v", cfg.Media.Driver, err)
 	}
-	log.Printf("storage provider: %s", cfg.StorageProvider)
+	log.Printf("storage provider: %s", cfg.Media.Driver)
 
 	// usecases
 	authUC := auth.New(userRepo)
 	ctUC := contenttype.New(ctRepo)
 	documentUC := docuc.New(docRepo, mediaRepo, cfg.SupportedLocales)
-	mediaUC := mediauc.New(mediaRepo, storage, cfg.MediaAutoThumbnail)
+	mediaUC := mediauc.New(mediaRepo, storage, cfg.Media.GenerateThumbnail)
 
 	// content-type schema-as-code sync: JSON definitions are the source of
 	// truth, reconciled into Mongo before the server starts accepting traffic.
-	defsDir := cfg.ContentTypesDir
+	defsDir := cfg.ContentTypeDir
 	defs, err := contenttype.LoadDefinitions(defsDir)
 	if err != nil {
 		log.Fatalf("load content-type definitions: %v", err)
@@ -151,11 +151,11 @@ func main() {
 		},
 	})
 	gqlSrv := gqlhandler.NewDefaultServer(gqlSchema)
-	mux.Handle(cfg.GraphQLPath, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mux.Handle(cfg.GraphQL.Path, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := resolver.WithRequest(r.Context(), r)
 		gqlSrv.ServeHTTP(w, r.WithContext(ctx))
 	}))
-	log.Printf("graphql endpoint: %s", cfg.GraphQLPath)
+	log.Printf("graphql endpoint: %s", cfg.GraphQL.Path)
 
 	addr := ":" + cfg.Port
 	log.Printf("server listening on %s", addr)

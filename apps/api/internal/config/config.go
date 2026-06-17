@@ -11,20 +11,50 @@ import (
 )
 
 type Config struct {
-	Port                string
-	MongoDBURI          string
-	MongoDBDB           string
-	JWTSecret           string
-	CloudinaryCloudName string
-	CloudinaryAPIKey    string
-	CloudinaryAPISecret string
-	ContentTypesDir     string
-	StorageProvider     string
-	S3Bucket            string
-	S3Region            string
-	SupportedLocales    []string
-	MediaAutoThumbnail  bool
-	GraphQLPath         string
+	Port             string
+	JWTSecret        string
+	ContentTypeDir   string // was ContentTypesDir; env var CONTENT_TYPES_DIR unchanged
+	SupportedLocales []string
+	DB               DBConfig
+	Media            MediaConfig
+	GraphQL          GraphQLConfig
+}
+
+type DBConfig struct {
+	Driver     string // DB_DRIVER, default "mongo"
+	Mongo      MongoConfig
+	Postgresql PostgresConfig
+}
+
+type MongoConfig struct {
+	URI  string // MONGODB_URI, default "mongodb://localhost:27017"
+	Name string // MONGODB_DB,  default "cms"
+}
+
+type PostgresConfig struct {
+	URI string // POSTGRES_URI — placeholder, not validated in v1
+}
+
+type MediaConfig struct {
+	Driver            string // STORAGE_PROVIDER, default "cloudinary"
+	GenerateThumbnail bool   // MEDIA_AUTO_THUMBNAIL, default true
+	Cloudinary        CloudinaryConfig
+	S3                S3Config
+}
+
+type CloudinaryConfig struct {
+	CloudName string // CLOUDINARY_CLOUD_NAME
+	APIKey    string // CLOUDINARY_API_KEY
+	APISecret string // CLOUDINARY_API_SECRET
+}
+
+type S3Config struct {
+	Bucket string // S3_BUCKET
+	Region string // S3_REGION
+}
+
+type GraphQLConfig struct {
+	Path string // GRAPHQL_PATH, default "/graphql"
 }
 
 func getenv(key, fallback string) string {
@@ -55,34 +85,82 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("JWT_SECRET is required")
 	}
 
-	storageProvider := getenv("STORAGE_PROVIDER", "cloudinary")
-	if storageProvider != "s3" && storageProvider != "cloudinary" {
-		return nil, fmt.Errorf("unknown STORAGE_PROVIDER %q (want %q or %q)", storageProvider, "s3", "cloudinary")
+	dbDriver := getenv("DB_DRIVER", "mongo")
+	if dbDriver != "mongo" && dbDriver != "postgresql" {
+		return nil, fmt.Errorf("unknown DB_DRIVER %q (want %q or %q)", dbDriver, "mongo", "postgresql")
 	}
 
-	mediaAutoThumbnail := true
+	storageRaw := os.Getenv("STORAGE_PROVIDER")
+	storageExplicit := storageRaw != ""
+	mediaDriver := storageRaw
+	if mediaDriver == "" {
+		mediaDriver = "cloudinary"
+	}
+	if mediaDriver != "s3" && mediaDriver != "cloudinary" {
+		return nil, fmt.Errorf("unknown STORAGE_PROVIDER %q (want %q or %q)", mediaDriver, "s3", "cloudinary")
+	}
+
+	generateThumbnail := true
 	if raw := os.Getenv("MEDIA_AUTO_THUMBNAIL"); raw != "" {
 		v, err := strconv.ParseBool(raw)
 		if err != nil {
 			return nil, fmt.Errorf("invalid MEDIA_AUTO_THUMBNAIL %q: %w", raw, err)
 		}
-		mediaAutoThumbnail = v
+		generateThumbnail = v
+	}
+
+	cloudinaryCloudName := os.Getenv("CLOUDINARY_CLOUD_NAME")
+	cloudinaryAPIKey := os.Getenv("CLOUDINARY_API_KEY")
+	cloudinaryAPISecret := os.Getenv("CLOUDINARY_API_SECRET")
+	// Validate Cloudinary creds only when STORAGE_PROVIDER is explicitly configured.
+	// When using the default (env var unset), empty creds are tolerated for local dev.
+	if storageExplicit && mediaDriver == "cloudinary" {
+		if cloudinaryCloudName == "" || cloudinaryAPIKey == "" || cloudinaryAPISecret == "" {
+			return nil, fmt.Errorf("CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET are required when STORAGE_PROVIDER=cloudinary")
+		}
+	}
+
+	s3Bucket := os.Getenv("S3_BUCKET")
+	s3Region := os.Getenv("S3_REGION")
+	if mediaDriver == "s3" {
+		if s3Bucket == "" {
+			return nil, fmt.Errorf("S3_BUCKET is required when STORAGE_PROVIDER=s3")
+		}
+		if s3Region == "" {
+			return nil, fmt.Errorf("S3_REGION is required when STORAGE_PROVIDER=s3")
+		}
 	}
 
 	return &Config{
-		Port:                getenv("PORT", "8080"),
-		MongoDBURI:          getenv("MONGODB_URI", "mongodb://localhost:27017"),
-		MongoDBDB:           getenv("MONGODB_DB", "cms"),
-		JWTSecret:           jwtSecret,
-		CloudinaryCloudName: os.Getenv("CLOUDINARY_CLOUD_NAME"),
-		CloudinaryAPIKey:    os.Getenv("CLOUDINARY_API_KEY"),
-		CloudinaryAPISecret: os.Getenv("CLOUDINARY_API_SECRET"),
-		ContentTypesDir:     getenv("CONTENT_TYPES_DIR", "content-types"),
-		StorageProvider:     storageProvider,
-		S3Bucket:            os.Getenv("S3_BUCKET"),
-		S3Region:            os.Getenv("S3_REGION"),
-		SupportedLocales:    splitLocales(getenv("SUPPORTED_LOCALES", "en,vi")),
-		MediaAutoThumbnail:  mediaAutoThumbnail,
-		GraphQLPath:         getenv("GRAPHQL_PATH", "/graphql"),
+		Port:             getenv("PORT", "8080"),
+		JWTSecret:        jwtSecret,
+		ContentTypeDir:   getenv("CONTENT_TYPES_DIR", "content-types"),
+		SupportedLocales: splitLocales(getenv("SUPPORTED_LOCALES", "en,vi")),
+		DB: DBConfig{
+			Driver: dbDriver,
+			Mongo: MongoConfig{
+				URI:  getenv("MONGODB_URI", "mongodb://localhost:27017"),
+				Name: getenv("MONGODB_DB", "cms"),
+			},
+			Postgresql: PostgresConfig{
+				URI: os.Getenv("POSTGRES_URI"),
+			},
+		},
+		Media: MediaConfig{
+			Driver:            mediaDriver,
+			GenerateThumbnail: generateThumbnail,
+			Cloudinary: CloudinaryConfig{
+				CloudName: cloudinaryCloudName,
+				APIKey:    cloudinaryAPIKey,
+				APISecret: cloudinaryAPISecret,
+			},
+			S3: S3Config{
+				Bucket: s3Bucket,
+				Region: s3Region,
+			},
+		},
+		GraphQL: GraphQLConfig{
+			Path: getenv("GRAPHQL_PATH", "/graphql"),
+		},
 	}, nil
 }
