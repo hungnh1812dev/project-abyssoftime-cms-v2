@@ -54,6 +54,51 @@ func TestContentTypeHandler_List(t *testing.T) {
 	}
 }
 
+// ---- List includes fields --------------------------------------------------
+
+func TestContentTypeHandler_List_IncludesFields(t *testing.T) {
+	uc := &mockContentTypeUC{}
+	uc.findAllFn = func(_ context.Context) ([]*entity.ContentType, error) {
+		return []*entity.ContentType{
+			{
+				ID:   "1",
+				Slug: "blog",
+				Fields: []entity.FieldDefinition{
+					{Name: "title", Type: "text"},
+					{Name: "body", Type: "richtext"},
+				},
+			},
+		}, nil
+	}
+	h := handler.NewContentTypeHandler(uc)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/content-types", nil)
+	w := httptest.NewRecorder()
+	h.List(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("List() status = %d, want 200", w.Code)
+	}
+	var out []map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&out); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	if len(out) != 1 {
+		t.Fatalf("List() count = %d, want 1", len(out))
+	}
+	fields, ok := out[0]["fields"]
+	if !ok {
+		t.Fatal("List() response item missing 'fields' key")
+	}
+	fieldsSlice, ok := fields.([]any)
+	if !ok {
+		t.Fatalf("List() 'fields' is not an array, got %T", fields)
+	}
+	if len(fieldsSlice) != 2 {
+		t.Errorf("List() fields count = %d, want 2", len(fieldsSlice))
+	}
+}
+
 // ---- GetByID ---------------------------------------------------------------
 
 func TestContentTypeHandler_GetByID(t *testing.T) {
