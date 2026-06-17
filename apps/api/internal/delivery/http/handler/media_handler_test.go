@@ -3,6 +3,7 @@ package handler_test
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -45,6 +46,25 @@ func TestMediaHandler_Upload_OK(t *testing.T) {
 	if w.Code != http.StatusCreated {
 		t.Errorf("Upload() status = %d, want %d", w.Code, http.StatusCreated)
 	}
+
+	var respBody map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&respBody); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if _, ok := respBody["url"]; !ok {
+		t.Errorf("response JSON missing field %q; got keys: %v", "url", jsonKeys(respBody))
+	}
+	if _, ok := respBody["thumbnailUrl"]; !ok {
+		t.Errorf("response JSON missing field %q; got keys: %v", "thumbnailUrl", jsonKeys(respBody))
+	}
+}
+
+func jsonKeys(m map[string]any) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
 }
 
 func TestMediaHandler_Upload_MissingFile_BadRequest(t *testing.T) {
