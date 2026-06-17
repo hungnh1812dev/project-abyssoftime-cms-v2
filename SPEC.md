@@ -325,3 +325,211 @@ jobs:
 1. **Media storage**: Support both AWS S3 and Cloudinary from day one, behind the storage interface (`internal/infrastructure/storage/`), selectable via config/env.
 2. **Go module path**: `project-abyssoftime-cms-v2/api`.
 3. **Render deployment**: Single Render service running `docker-compose up` (the full stack as one service, not split per Docker service).
+
+---
+
+## 7. Web — Content-Type Management System (Refactor)
+
+**Scope**: Web layer only. API is untouched.
+
+### 7.1 Objective
+
+Refactor the web admin panel's content-type handling to:
+- Enforce a strict form lifecycle: dirty-tracking, toast notifications on save success/failure, and post-save form reset to server state
+- Introduce `ContentTypeLayout` — a render-prop wrapper that handles the standard layout shell, with `renderHeader` and `renderActions` escape hatches for custom UI
+- Replace ad-hoc column display in collection-type tables with a React-side column registry
+- Restructure routes under `/admin` to distinguish single-type from collection-type paths
+- Sidebar loads only metadata eagerly; component source code is loaded on demand (React.lazy), never at sidebar mount time
+- Locale switching is in scope for both `SingleTypePage` and `CollectionDetailPage`
+
+---
+
+### 7.2 Routing Structure
+
+All routes remain under `/admin`. Sub-paths are restructured:
+
+| Route | Component | Description |
+|---|---|---|
+| `/admin/content-type/single-type/:slug` | `SingleTypePage` | Single-type edit form |
+| `/admin/content-type/collection-type/:slug` | `CollectionListPage` | Collection-type list + "Add new item" |
+| `/admin/content-type/collection-type/:slug/:id` | `CollectionDetailPage` | Collection-type item edit form |
+
+Existing `/admin/content-types/:slug` and `/admin/content-types/:slug/:id` routes are removed.
+
+---
+
+### 7.3 Components
+
+#### `ContentTypeLayout`
+
+Standard layout shell for any content-type form page. Exported from `src/components/content-type/ContentTypeLayout.tsx`.
+
+```ts
+interface ContentTypeLayoutProps {
+  title: string
+  status?: string
+  // Replaces the entire header section if provided
+  renderHeader?: (defaultHeader: ReactNode) => ReactNode
+  // Appends action buttons (Publish, Unpublish, locale select, Save) to the right of the header
+  renderActions?: () => ReactNode
+  children: ReactNode
+}
+```
+
+Default render: `title` + status badge on the left; `renderActions()` slot on the right. `renderHeader` overrides the entire header row when provided.
+
+---
+
+#### Content-Type Registry
+
+A metadata-only module at `src/content-type-registry/index.ts`. **No component imports here.**
+
+```ts
+interface CollectionColumnDef {
+  key: string
+  label: string
+  type: 'text' | 'boolean' | 'number' | 'image'
+}
+
+interface ContentTypeRegistration {
+  slug: string
+  kind: 'single' | 'collection'
+  // For collection types: defines which columns appear in the list table
+  columns?: CollectionColumnDef[]
+  // Optional custom layout wrapper; default ContentTypeLayout used if omitted
+  wrapper?: React.ComponentType<ContentTypeLayoutProps>
+}
+
+export const contentTypeRegistry: ContentTypeRegistration[]
+```
+
+The sidebar reads `slug`, `kind`, and `name` (from the API) and uses the registry to resolve column definitions and custom wrappers. No component code is bundled at the registry level.
+
+---
+
+#### `FormProvider` — Enhanced Lifecycle
+
+`FormProvider` is updated to cover the full form lifecycle:
+
+| Moment | Behaviour |
+|---|---|
+| Initial load | All fields rendered; pre-filled from server data if available, empty otherwise |
+| Clean state | `Save` button disabled (`isDirty === false`) |
+| After any edit | `Save` button enabled (`isDirty === true`) |
+| Failed save | `toast.error(serverMessage)` — form stays in edited state |
+| Successful save | `toast.success('Saved')` → `queryClient.invalidateQueries(queryKey)` → `reset(newServerData)` → Save disabled again |
+
+`isDirty` is exposed on `FormStateContext` so action slots can read it:
+
+```ts
+interface FormState {
+  loading: boolean
+  submitting: boolean
+  isDirty: boolean
+}
+```
+
+---
+
+### 7.4 Single-Type Page (`SingleTypePage`)
+
+Replaces `SingleTypePanel`. Responsibilities:
+- Fetches document via `useDocuments(contentType.ID)`
+- Maintains local `locale` state (defaults to first locale from `useLocales()`)
+- When `useLocales()` returns more than one locale, renders a locale `<select>` in `renderActions`
+- Switching locale resets the form to the new locale's document data; `isDirty` becomes `false`
+- Wraps form in `ContentTypeLayout` — passes `renderActions` for locale selector + Publish/Unpublish buttons
+- Uses registry `wrapper` override if registered for the slug; falls back to `ContentTypeLayout`
+- Delegates all form state to `FormProvider`; does not own `isDirty` locally
+
+---
+
+### 7.5 Collection-Type List Page (`CollectionListPage`)
+
+- Renders a `<table>` driven by `columns` from the registry for the resolved slug
+- **Fallback**: if no registry entry defines `columns`, display the first field as a text column + Status column
+- Column type rendering:
+  - `text` → string value
+  - `boolean` → `✓` / `—`
+  - `number` → numeric string
+  - `image` → `<img>` thumbnail (src = field value)
+- "Add new item": creates document (`useCreateDocument`) → navigate to `/admin/content-type/collection-type/:slug/:id`
+- Per-row: Edit link → detail page; Delete button → `useDeleteDocument` (with `window.confirm` guard)
+- No locale switching on the list view (locale is only relevant on the detail/edit form)
+
+---
+
+### 7.6 Collection-Type Detail Page (`CollectionDetailPage`)
+
+- Navigates by URL (`/admin/content-type/collection-type/:slug/:id`)
+- Maintains local `locale` state identical to `SingleTypePage`
+- When `useLocales()` returns more than one locale, renders a locale `<select>` in `renderActions`
+- Switching locale reloads the document for the new locale; form resets and `isDirty` becomes `false`
+- Save mutation sends `{ data, locale: activeLocale }` — identical shape to existing `useUpdateDocument`
+- Back link returns to `/admin/content-type/collection-type/:slug`
+- `ContentTypeLayout` used with `renderActions` for locale selector + Publish/Unpublish
+
+---
+
+### 7.7 Locale Switching — Shared Process
+
+Applies identically to `SingleTypePage` and `CollectionDetailPage`:
+
+1. `useLocales()` fetches available locales on mount
+2. Local `locale` state initialises to `locales[0]` (or `''` before locales load)
+3. `<select aria-label="Locale">` rendered in `renderActions` only when `locales.length > 1`
+4. On locale change: update local state → React Query re-fetches the document for the new locale → `FormProvider`'s `values` prop (from `useForm({ values: ... })`) syncs the form inputs → `isDirty` resets to `false` automatically
+5. Publish/Unpublish/Save mutations always forward `locale: activeLocale`
+
+---
+
+### 7.8 Sidebar (Lazy Loading)
+
+`Sidebar`:
+- Eagerly loads `useContentTypes()` (metadata only: `Name`, `Slug`, `Kind`)
+- Groups into **Single Types** / **Collection Types** nav sections
+- Generates `NavLink` hrefs:
+  - single → `/admin/content-type/single-type/:slug`
+  - collection → `/admin/content-type/collection-type/:slug`
+- **Never imports component source at sidebar mount** — component code is loaded via `React.lazy` when the router renders the target route
+
+---
+
+### 7.9 Acceptance Criteria
+
+**Single-type form:**
+- [ ] Navigating to `/admin/content-type/single-type/:slug` renders all fields, pre-filled from draft data
+- [ ] Save disabled on initial load; enabled after any field edit
+- [ ] Successful save: success toast + form reset to new server data + Save disabled again
+- [ ] Failed save: error toast with server message; edited values preserved
+- [ ] Locale selector shown only when API returns > 1 locale
+- [ ] Switching locale resets form to new locale's data; isDirty becomes false
+
+**Collection-type list:**
+- [ ] Table columns come from the registry for the slug; first-field fallback applies when absent
+- [ ] `text`, `boolean`, `number`, `image` column types render correctly
+- [ ] "Add new item" creates a document and navigates to the detail page
+- [ ] Edit navigates to detail page; Delete removes with confirm guard
+
+**Collection-type detail:**
+- [ ] Full single-type lifecycle applies (dirty-tracking, toasts, post-save reset)
+- [ ] Locale selector shown/hidden under same condition as single-type
+- [ ] Switching locale resets form to new locale's data
+- [ ] Back link navigates to the list page
+
+**Sidebar:**
+- [ ] Groups by kind; links use the new route structure
+- [ ] Component source is never imported at sidebar mount time
+- [ ] Renders gracefully when API returns an empty list
+
+**Routing:**
+- [ ] Old `/admin/content-types/...` routes removed
+- [ ] All new routes require authentication (existing `ProtectedRoute` guard)
+
+---
+
+### 7.10 Out of Scope
+
+- Any API changes
+- New input types beyond existing six (`TextInput`, `BooleanInput`, `NumberInput`, `MediaInput`, `RichTextInput`, `JsonInput`)
+- Publish/Unpublish mutation logic (only layout wrapper changes; mutations are unchanged)

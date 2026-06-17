@@ -26,7 +26,27 @@
 - [x] ✅ Checkpoint D (Final): both adapters pass tests, selectable via env var (verified live, both providers boot); full suite green; full E2E verified live against running server (register/promote test admin → draft save → public 404 → publish → public 200 synced → new draft save → status "modified" while public read still serves old data) → test artifacts cleaned up
 
 ## Follow-up
-- [ ] `/spec` pass to record the kept "Unpublish" behavior in SPEC.md
+- [x] `/spec` pass to record the kept "Unpublish" behavior in SPEC.md (done as part of §7 refactor spec)
+
+---
+
+## Phase W — Web Content-Type Management System (Refactor)
+
+### Foundation
+- [x] W1 FormProvider lifecycle: `isDirty` on context, success toast + `reset(newData)`, error toast, Save disabled when clean
+- [x] W2 `ContentTypeLayout` component: `renderHeader`, `renderActions`, title + status badge
+- [x] W3 Content-type registry: `src/content-type-registry/index.ts`, types only, no component imports
+- [x] ✅ Checkpoint W-Alpha: FormProvider tests pass, ContentTypeLayout renders, registry compiles, `npm run build` clean
+
+### Content-Type Pages
+- [x] W4 `SingleTypePage`: locale state + selector, `ContentTypeLayout` wrapper, full form lifecycle
+- [x] W5 `CollectionListPage`: registry-driven columns, column type rendering (`text`/`boolean`/`number`/`image`), first-field fallback
+- [x] W6 `CollectionDetailPanel` / `CollectionDetailPage`: `ContentTypeLayout`, locale + full form lifecycle, back link
+- [x] ✅ Checkpoint W-Beta: single-type and collection-type pages complete, `npm run build` + tests green
+
+### Routing Migration
+- [x] W7 Sidebar + Router: new route paths, `SiteHomepagePanel` via registry, remove old routes, `React.lazy` for all panels
+- [x] ✅ Checkpoint W-Final: all SPEC.md §7.9 criteria met, full suite green (126/126)
 
 ---
 

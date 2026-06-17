@@ -205,3 +205,338 @@ See git history / existing code for full detail — summarized here for context 
 - **Phase 3 (Core CMS):** ContentType + Document CRUD (old single-record model), admin layout, single-type/collection-type panels. ✅ Done — being migrated by Phases A–C above.
 - **Phase 4 (Media Upload):** MediaAsset + StorageAdapter + Cloudinary adapter, MediaInput. ✅ Done — extended by Phase D above.
 - **Phase 5 (CI/CD + Docker):** Dockerfiles, docker-compose, GitHub Actions. ✅ Done (assumed stable; not affected by this migration).
+
+---
+
+---
+
+# Plan — Web Content-Type Management System (Refactor)
+
+## Context
+
+`SPEC.md §7` specifies a refactor of the web admin panel. The API is untouched.
+All work is in `apps/web/src/`.
+
+**Current state (what already exists):**
+- `FormProvider` — works, but missing: `isDirty` exposure, success toast, post-save `reset()`
+- `FormStateContext` — has `loading` + `submitting`; missing `isDirty`
+- `SingleTypePanel` — has locale state + Publish/Unpublish; needs `ContentTypeLayout` wrapper
+- `CollectionListPage` — has a table, but columns are hard-coded (first-field + Status)
+- `CollectionDetailPanel` / `CollectionDetailPage` — same locale/layout issues as SingleTypePanel
+- `Sidebar` — grouped by kind (correct); links use old `/admin/content-types/...` paths
+- `router.tsx` — old routes; `SiteHomepagePanelWrapper` is a one-off inline wrapper
+- `SiteHomepagePanel` — custom panel; must keep working after migration
+
+**What is new:**
+- `ContentTypeLayout` component (render-prop wrapper)
+- Content-type registry (`src/content-type-registry/index.ts`)
+- `SingleTypePage` (replaces `SingleTypePanel`; uses `ContentTypeLayout`)
+- Updated `CollectionListPage` (registry-driven columns)
+- Updated `CollectionDetailPage` / `CollectionDetailPanel` (uses `ContentTypeLayout`)
+- Updated `Sidebar` (new route paths)
+- Updated `router.tsx` (new routes, remove old, re-wire `SiteHomepagePanel`)
+
+---
+
+## Dependency Graph
+
+```
+FormStateContext (+ isDirty)
+        ↓
+FormProvider (success toast, reset, isDirty forwarded)
+        ↓
+ContentTypeLayout (reads isDirty from FormStateContext for Save button state)
+
+Registry (standalone, no component imports)
+        ↓
+CollectionListPage (reads columns from registry)
+
+ContentTypeLayout + FormProvider + Registry
+        ↓
+SingleTypePage
+CollectionDetailPanel (refactored)
+
+Sidebar (standalone: just route string changes)
+
+Router (depends on: SingleTypePage, CollectionListPage, CollectionDetailPage, Sidebar)
+```
+
+---
+
+## Slices
+
+Work is sliced **vertically** — each task delivers a complete, testable unit of user-visible behaviour.
+
+---
+
+### W1 — FormProvider Lifecycle Hardening
+
+**What**: Extend `FormProvider` and `FormStateContext` to enforce the full form lifecycle.
+
+**Changes:**
+- Add `isDirty: boolean` to `FormStateContext` value (sourced from `react-hook-form`'s `formState.isDirty`)
+- On successful save: `toast.success('Saved')` + `queryClient.invalidateQueries(queryKey)` + `reset(newServerData)` so form syncs to fresh server data and `isDirty` resets to `false`
+- On failed save: `toast.error(message)` — already fired in mutation hooks; `FormProvider` must not suppress it
+- Save button (`type="submit"`) disabled when `submitting || !isDirty`
+
+**Files changed:**
+- `src/components/form/FormStateContext.tsx` — add `isDirty` field
+- `src/components/form/FormProvider.tsx` — wire isDirty, onSuccess reset, toast
+- `src/components/form/__tests__/FormProvider.test.tsx` — add lifecycle test cases
+
+**Acceptance criteria:**
+- [ ] `FormStateContext` exports `isDirty`
+- [ ] On mount with server data, `isDirty === false`
+- [ ] After editing any field, `isDirty === true`
+- [ ] Successful mutation: success toast fired, `reset()` called with new data, `isDirty` becomes `false`
+- [ ] Failed mutation: error toast fired, form values unchanged
+- [ ] TypeScript strict: no `any`, no type errors
+
+**Verification:** `npm run test -- FormProvider` passes; `npm run build` clean.
+
+---
+
+### W2 — ContentTypeLayout Component
+
+**What**: New layout shell for any content-type page.
+
+```ts
+interface ContentTypeLayoutProps {
+  title: string
+  status?: string
+  renderHeader?: (defaultHeader: ReactNode) => ReactNode
+  renderActions?: () => ReactNode
+  children: ReactNode
+}
+```
+
+Default render: left side = title + status badge; right side = `renderActions()` output.
+`renderHeader(defaultHeader)` replaces the entire header row when provided.
+
+**Files changed:**
+- `src/components/content-type/ContentTypeLayout.tsx` — new
+- `src/components/content-type/__tests__/ContentTypeLayout.test.tsx` — new
+
+**Acceptance criteria:**
+- [ ] Default header renders title and status badge
+- [ ] `renderActions` output appears to the right of the default header
+- [ ] `renderHeader` completely replaces the header row
+- [ ] `children` renders below the header
+- [ ] When `status` is omitted, no badge rendered
+- [ ] TypeScript strict
+
+**Verification:** `npm run test -- ContentTypeLayout` passes.
+
+---
+
+### W3 — Content-Type Registry
+
+**What**: Metadata-only module; no component imports at this level.
+
+```ts
+// src/content-type-registry/index.ts
+export interface CollectionColumnDef {
+  key: string
+  label: string
+  type: 'text' | 'boolean' | 'number' | 'image'
+}
+
+export interface ContentTypeRegistration {
+  slug: string
+  kind: 'single' | 'collection'
+  columns?: CollectionColumnDef[]
+  wrapper?: React.ComponentType<ContentTypeLayoutProps>
+}
+
+export const contentTypeRegistry: ContentTypeRegistration[] = []
+```
+
+**Files changed:**
+- `src/content-type-registry/index.ts` — new
+
+**Acceptance criteria:**
+- [ ] Module exports `ContentTypeRegistration`, `CollectionColumnDef`, `contentTypeRegistry`
+- [ ] No component imports in this file
+- [ ] TypeScript strict; no `any`
+
+**Verification:** `npm run build` compiles without error; no circular imports.
+
+Registry starts empty; content types registered in W4–W7 as needed.
+
+---
+
+### ✅ Checkpoint W-Alpha
+
+Foundation complete. Verify before proceeding:
+- `FormProvider` lifecycle tests all pass
+- `ContentTypeLayout` renders correctly in isolation
+- Registry types compile
+- `npm run build` clean
+
+---
+
+### W4 — SingleTypePage with Locale + Layout
+
+**What**: New `SingleTypePage` replaces `SingleTypePanel`. Complete single-type edit with new layout and form lifecycle.
+
+**Locale process:**
+1. `useLocales()` fetches available locales
+2. Local `locale` state initialises to `locales[0]`
+3. `<select aria-label="Locale">` in `renderActions` only when `locales.length > 1`
+4. Switching locale → `useDocuments` re-fetches for new locale → `FormProvider` `values` prop syncs inputs → `isDirty` auto-resets to `false`
+5. Save/Publish/Unpublish mutations forward `locale: activeLocale`
+
+**Files changed:**
+- `src/pages/admin/panels/SingleTypePage.tsx` — new
+- `src/pages/admin/panels/__tests__/SingleTypePage.test.tsx` — new
+
+**Acceptance criteria:**
+- [ ] All fields pre-filled from draft data on load
+- [ ] Save disabled on initial load; enabled after any field edit
+- [ ] Successful save: success toast + form reset to server data + Save disabled
+- [ ] Failed save: error toast; edited values preserved
+- [ ] Locale selector hidden when ≤ 1 locale
+- [ ] Locale selector shown when > 1 locale
+- [ ] Switching locale resets form and disables Save
+
+**Verification:** `npm run test -- SingleTypePage` passes.
+
+---
+
+### W5 — CollectionListPage with Column Registry
+
+**What**: Registry-driven columns replace hard-coded first-field display.
+
+**Column rendering rules:**
+- `text` → string value
+- `boolean` → `✓` or `—`
+- `number` → numeric string
+- `image` → `<img>` thumbnail (src = field value as string)
+- **Fallback**: when no registry entry for the slug defines `columns`, render first field as text + Status column
+
+**Files changed:**
+- `src/pages/admin/panels/CollectionListPage.tsx` — update
+- `src/pages/admin/panels/__tests__/CollectionListPage.test.tsx` — update
+
+**Acceptance criteria:**
+- [ ] Registry `columns` drive table headers and cell rendering
+- [ ] Each type renders its correct cell format
+- [ ] Fallback to first-field + Status when no registry entry
+- [ ] "Add new item" navigates to `/admin/content-type/collection-type/:slug/:id`
+- [ ] Edit link navigates to detail page
+- [ ] Delete fires `window.confirm` then `useDeleteDocument`
+
+**Verification:** `npm run test -- CollectionListPage` passes.
+
+---
+
+### W6 — CollectionDetailPage/Panel with Locale + Layout
+
+**What**: Refactor `CollectionDetailPanel` to use `ContentTypeLayout` and full form lifecycle. Locale process identical to `SingleTypePage`.
+
+**Files changed:**
+- `src/pages/admin/panels/CollectionDetailPanel.tsx` — refactor in-place
+- `src/pages/admin/panels/CollectionDetailPage.tsx` — minor (slug-based registry lookup)
+- `src/pages/admin/panels/__tests__/CollectionDetailPanel.test.tsx` — update
+
+**Acceptance criteria:**
+- [ ] Full single-type form lifecycle applies (dirty, toasts, reset)
+- [ ] Locale selector shown/hidden under same condition as `SingleTypePage`
+- [ ] Switching locale resets form and disables Save
+- [ ] Back link navigates to `/admin/content-type/collection-type/:slug`
+- [ ] Publish/Unpublish buttons behave as before
+
+**Verification:** `npm run test -- CollectionDetailPanel` passes.
+
+---
+
+### ✅ Checkpoint W-Beta
+
+All content-type pages functionally complete. Verify before proceeding:
+- Single-type lifecycle: save → toast → reset; locale switching
+- Collection list: registry columns + fallback; column type rendering
+- Collection detail: same lifecycle as single-type; locale switching
+- `npm run build` clean; full test suite passes
+
+---
+
+### W7 — Sidebar + Router Migration
+
+**What**: Update routes and sidebar links to the new path structure. Remove old routes. Wire `SiteHomepagePanel` through the registry.
+
+**Route changes:**
+
+| Old | New |
+|---|---|
+| `/admin/content-types/:slug` (single) | `/admin/content-type/single-type/:slug` |
+| `/admin/content-types/:slug` (collection) | `/admin/content-type/collection-type/:slug` |
+| `/admin/content-types/:slug/:id` | `/admin/content-type/collection-type/:slug/:id` |
+
+`SiteHomepagePanel` currently uses a one-off `SiteSiteHomepagePanelWrapper` in `router.tsx`. After this task: register the `site-settings` slug in `contentTypeRegistry` with `SiteHomepagePanel` as the `wrapper` component so the generic `SingleTypePage` route handles it without a bespoke wrapper.
+
+**Files changed:**
+- `src/pages/admin/layout/Sidebar.tsx` — update `NavLink` hrefs
+- `src/router.tsx` — new routes with `React.lazy`, remove old routes, remove `SiteSiteHomepagePanelWrapper`
+- `src/content-type-registry/index.ts` — register `site-settings` slug
+- `src/pages/admin/layout/__tests__/AdminLayout.test.tsx` — update route assertions if any
+
+**Acceptance criteria:**
+- [ ] Sidebar single-type links → `/admin/content-type/single-type/:slug`
+- [ ] Sidebar collection-type links → `/admin/content-type/collection-type/:slug`
+- [ ] Old `/admin/content-types/...` routes removed
+- [ ] `SiteHomepagePanel` still renders when navigating to its slug via new path
+- [ ] Component code loaded via `React.lazy` (not eagerly imported)
+- [ ] `ProtectedRoute` auth guard still applies to all new routes
+- [ ] `npm run build` clean; no dead imports
+
+**Verification:** `npm run test` full suite passes; `npm run build` clean.
+
+---
+
+### ✅ Checkpoint W-Final
+
+Full migration complete. Verify:
+- All acceptance criteria from SPEC.md §7.9 checked off
+- `SiteHomepagePanel` works end-to-end via new routing
+- Sidebar links and routing are consistent
+- No old `/admin/content-types/...` routes remain
+- `npm run lint && npm run build && npm run test` all green
+
+---
+
+## File Map
+
+```
+src/
+  components/
+    content-type/
+      ContentTypeLayout.tsx            ← NEW (W2)
+      __tests__/
+        ContentTypeLayout.test.tsx     ← NEW (W2)
+    form/
+      FormStateContext.tsx             ← UPDATED (W1: adds isDirty)
+      FormProvider.tsx                 ← UPDATED (W1: success/reset/error)
+      __tests__/
+        FormProvider.test.tsx          ← UPDATED (W1)
+  content-type-registry/
+    index.ts                           ← NEW (W3), UPDATED (W7: registers site-settings)
+  pages/admin/
+    layout/
+      Sidebar.tsx                      ← UPDATED (W7: new hrefs)
+    panels/
+      SingleTypePage.tsx               ← NEW (W4)
+      CollectionListPage.tsx           ← UPDATED (W5: registry columns)
+      CollectionDetailPanel.tsx        ← UPDATED (W6: ContentTypeLayout)
+      CollectionDetailPage.tsx         ← UPDATED (W6)
+      __tests__/
+        SingleTypePage.test.tsx        ← NEW (W4)
+        CollectionListPage.test.tsx    ← UPDATED (W5)
+        CollectionDetailPanel.test.tsx ← UPDATED (W6)
+  router.tsx                           ← UPDATED (W7: new routes)
+```
+
+## Notes
+
+- `SingleTypePanel.tsx` stays on disk until W7 is complete. Do not delete it before `SingleTypePage` is wired into the router.
+- `CollectionDetailPanel` is refactored in-place (not replaced) since `CollectionDetailPage` delegates to it.
+- Use `axios-mock-adapter` (already in devDependencies) for API mocking in component tests — no MSW setup exists in this project.
