@@ -6,18 +6,15 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"project-abyssoftime-cms-v2/api/internal/domain/entity"
 )
 
-type FieldDefinition struct {
-	Name string `json:"name"`
-	Type string `json:"type"`
-}
-
 type ContentTypeDefinition struct {
-	Slug   string            `json:"slug"`
-	Name   string            `json:"name"`
-	Kind   string            `json:"kind"`
-	Fields []FieldDefinition `json:"fields"`
+	Slug   string                   `json:"slug"`
+	Name   string                   `json:"name"`
+	Kind   string                   `json:"kind"`
+	Fields []entity.FieldDefinition `json:"fields"`
 }
 
 // LoadDefinitions reads every *.json file in dir and parses it into a
