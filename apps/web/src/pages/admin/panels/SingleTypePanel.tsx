@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { api } from '@/lib/api'
 import { FormProvider } from '@/components/form/FormProvider'
 import { FormField } from '@/components/form/FormField'
@@ -5,6 +6,7 @@ import { TextInput } from '@/components/form/inputs/TextInput'
 import { Button } from '@/components/ui/button'
 import {
   useDocuments,
+  useLocales,
   useUpdateDocument,
   usePublishDocument,
   useUnpublishDocument,
@@ -16,8 +18,12 @@ interface Props {
 }
 
 export function SingleTypePanel({ contentType }: Props) {
-  const { data: docs, isLoading } = useDocuments(contentType.ID)
-  const doc = docs?.[0]
+  const { data: docs = [], isLoading } = useDocuments(contentType.ID)
+  const { data: locales = [] } = useLocales()
+  const [locale, setLocale] = useState('')
+  const activeLocale = locale || locales[0] || ''
+
+  const doc = docs.find((d) => d.Locale === activeLocale) ?? docs[0]
 
   const { mutateAsync: updateDoc } = useUpdateDocument()
   const publish = usePublishDocument()
@@ -32,7 +38,7 @@ export function SingleTypePanel({ contentType }: Props) {
   }
 
   const mutationFn = (data: Record<string, unknown>) =>
-    updateDoc({ id: doc.EntryID, contentTypeId: contentType.ID, data })
+    updateDoc({ id: doc.EntryID, contentTypeId: contentType.ID, data, locale: activeLocale })
 
   const fieldKeys = Object.keys(doc.Data)
   const canPublish = doc.Status !== 'published'
@@ -45,10 +51,29 @@ export function SingleTypePanel({ contentType }: Props) {
           <h1 className="text-xl font-semibold">{contentType.Name}</h1>
           <span className="text-sm text-muted-foreground capitalize">{doc.Status}</span>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          {locales.length > 1 && (
+            <select
+              aria-label="Locale"
+              value={activeLocale}
+              onChange={(e) => setLocale(e.target.value)}
+            >
+              {locales.map((l) => (
+                <option key={l} value={l}>
+                  {l}
+                </option>
+              ))}
+            </select>
+          )}
           {canPublish && (
             <Button
-              onClick={() => publish.mutate({ id: doc.EntryID, contentTypeId: contentType.ID })}
+              onClick={() =>
+                publish.mutate({
+                  id: doc.EntryID,
+                  contentTypeId: contentType.ID,
+                  locale: activeLocale,
+                })
+              }
               disabled={publish.isPending}
             >
               Publish
@@ -57,7 +82,13 @@ export function SingleTypePanel({ contentType }: Props) {
           {canUnpublish && (
             <Button
               variant="outline"
-              onClick={() => unpublish.mutate({ id: doc.EntryID, contentTypeId: contentType.ID })}
+              onClick={() =>
+                unpublish.mutate({
+                  id: doc.EntryID,
+                  contentTypeId: contentType.ID,
+                  locale: activeLocale,
+                })
+              }
               disabled={unpublish.isPending}
             >
               Unpublish
@@ -68,9 +99,11 @@ export function SingleTypePanel({ contentType }: Props) {
 
       <FormProvider
         query={{
-          queryKey: ['documents', 'detail', doc.EntryID, 'data'],
+          queryKey: ['documents', 'detail', doc.EntryID, activeLocale, 'data'],
           queryFn: () =>
-            api.get<Document>(`/api/documents/${doc.EntryID}`).then((r) => r.data.Data),
+            api
+              .get<Document>(`/api/documents/${doc.EntryID}`, { params: { locale: activeLocale } })
+              .then((r) => r.data.Data),
         }}
         mutationFn={mutationFn}
       >

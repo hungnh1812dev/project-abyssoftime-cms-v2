@@ -111,4 +111,32 @@ describe('CollectionDetailPanel', () => {
       expect(screen.getByRole('button', { name: /unpublish/i })).toBeInTheDocument()
     })
   })
+
+  it('renders a locale selector when multiple locales are available', async () => {
+    mock.onGet('/api/locales').reply(200, ['en', 'vi'])
+    mock.onGet('/api/documents/doc-1').reply(200, doc)
+
+    renderWithProviders(<CollectionDetailPanel contentType={ct} documentId="doc-1" />)
+
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: /locale/i })).toBeInTheDocument(),
+    )
+  })
+
+  it('sends active locale as query param on publish', async () => {
+    const user = userEvent.setup()
+    mock.onGet('/api/locales').reply(200, ['en', 'vi'])
+    mock.onGet('/api/documents/doc-1').reply(200, doc)
+    mock.onPost('/api/documents/doc-1/publish').reply(200, { status: 'published' })
+
+    renderWithProviders(<CollectionDetailPanel contentType={ct} documentId="doc-1" />)
+
+    await waitFor(() => screen.getByRole('button', { name: /^publish$/i }))
+    await user.click(screen.getByRole('button', { name: /^publish$/i }))
+
+    await waitFor(() =>
+      expect(mock.history.post.some((r) => r.url?.includes('/publish'))).toBe(true),
+    )
+    expect(mock.history.post[0].params).toEqual({ locale: 'en' })
+  })
 })

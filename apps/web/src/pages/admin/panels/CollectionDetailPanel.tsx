@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { FormProvider } from '@/components/form/FormProvider'
@@ -6,6 +7,7 @@ import { TextInput } from '@/components/form/inputs/TextInput'
 import { Button } from '@/components/ui/button'
 import {
   useDocument,
+  useLocales,
   useUpdateDocument,
   usePublishDocument,
   useUnpublishDocument,
@@ -18,7 +20,11 @@ interface Props {
 }
 
 export function CollectionDetailPanel({ contentType, documentId }: Props) {
-  const { data: doc, isLoading } = useDocument(documentId)
+  const { data: locales = [] } = useLocales()
+  const [locale, setLocale] = useState('')
+  const activeLocale = locale || locales[0] || ''
+
+  const { data: doc, isLoading } = useDocument(documentId, activeLocale)
 
   const { mutateAsync: updateDoc } = useUpdateDocument()
   const publish = usePublishDocument()
@@ -33,7 +39,7 @@ export function CollectionDetailPanel({ contentType, documentId }: Props) {
   }
 
   const mutationFn = (data: Record<string, unknown>) =>
-    updateDoc({ id: doc.EntryID, contentTypeId: contentType.ID, data })
+    updateDoc({ id: doc.EntryID, contentTypeId: contentType.ID, data, locale: activeLocale })
 
   const fieldKeys = Object.keys(doc.Data)
   const canPublish = doc.Status !== 'published'
@@ -53,10 +59,29 @@ export function CollectionDetailPanel({ contentType, documentId }: Props) {
           <h1 className="text-xl font-semibold">{contentType.Name}</h1>
           <span className="text-sm text-muted-foreground capitalize">{doc.Status}</span>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          {locales.length > 1 && (
+            <select
+              aria-label="Locale"
+              value={activeLocale}
+              onChange={(e) => setLocale(e.target.value)}
+            >
+              {locales.map((l) => (
+                <option key={l} value={l}>
+                  {l}
+                </option>
+              ))}
+            </select>
+          )}
           {canPublish && (
             <Button
-              onClick={() => publish.mutate({ id: doc.EntryID, contentTypeId: contentType.ID })}
+              onClick={() =>
+                publish.mutate({
+                  id: doc.EntryID,
+                  contentTypeId: contentType.ID,
+                  locale: activeLocale,
+                })
+              }
               disabled={publish.isPending}
             >
               Publish
@@ -65,7 +90,13 @@ export function CollectionDetailPanel({ contentType, documentId }: Props) {
           {canUnpublish && (
             <Button
               variant="outline"
-              onClick={() => unpublish.mutate({ id: doc.EntryID, contentTypeId: contentType.ID })}
+              onClick={() =>
+                unpublish.mutate({
+                  id: doc.EntryID,
+                  contentTypeId: contentType.ID,
+                  locale: activeLocale,
+                })
+              }
               disabled={unpublish.isPending}
             >
               Unpublish
@@ -76,9 +107,11 @@ export function CollectionDetailPanel({ contentType, documentId }: Props) {
 
       <FormProvider
         query={{
-          queryKey: ['documents', 'detail', doc.EntryID, 'data'],
+          queryKey: ['documents', 'detail', doc.EntryID, activeLocale, 'data'],
           queryFn: () =>
-            api.get<Document>(`/api/documents/${doc.EntryID}`).then((r) => r.data.Data),
+            api
+              .get<Document>(`/api/documents/${doc.EntryID}`, { params: { locale: activeLocale } })
+              .then((r) => r.data.Data),
         }}
         mutationFn={mutationFn}
       >

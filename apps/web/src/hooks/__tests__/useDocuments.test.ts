@@ -13,6 +13,7 @@ import {
   useDeleteDocument,
   usePublishDocument,
   useUnpublishDocument,
+  useLocales,
 } from '@/hooks/useDocuments'
 import type { Document } from '@/types/cms'
 
@@ -64,14 +65,42 @@ describe('useDocuments', () => {
 describe('useDocument', () => {
   it('returns a single document from GET /api/documents/{id}', async () => {
     mock.onGet('/api/documents/1').reply(200, doc)
-    const { result } = renderHook(() => useDocument('1'), { wrapper: createWrapper() })
+    const { result } = renderHook(() => useDocument('1', 'en'), { wrapper: createWrapper() })
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(result.current.data).toEqual(doc)
   })
 
   it('is disabled when id is empty', () => {
-    const { result } = renderHook(() => useDocument(''), { wrapper: createWrapper() })
+    const { result } = renderHook(() => useDocument('', 'en'), { wrapper: createWrapper() })
     expect(result.current.fetchStatus).toBe('idle')
+  })
+
+  it('sends locale as a query param and includes it in the query key', async () => {
+    mock.onGet('/api/documents/1').reply(200, doc)
+    const { result } = renderHook(() => useDocument('1', 'vi'), { wrapper: createWrapper() })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(mock.history.get[0].params).toEqual({ locale: 'vi' })
+  })
+
+  it('refetches when locale changes (different query key)', async () => {
+    mock.onGet('/api/documents/1').reply(200, doc)
+    const { result, rerender } = renderHook(({ locale }: { locale: string }) => useDocument('1', locale), {
+      wrapper: createWrapper(),
+      initialProps: { locale: 'en' },
+    })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    rerender({ locale: 'vi' })
+    await waitFor(() => expect(mock.history.get).toHaveLength(2))
+    expect(mock.history.get[1].params).toEqual({ locale: 'vi' })
+  })
+})
+
+describe('useLocales', () => {
+  it('returns the configured locale list from GET /api/locales', async () => {
+    mock.onGet('/api/locales').reply(200, ['en', 'vi'])
+    const { result } = renderHook(() => useLocales(), { wrapper: createWrapper() })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(result.current.data).toEqual(['en', 'vi'])
   })
 })
 
@@ -97,6 +126,16 @@ describe('useUpdateDocument', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(result.current.data).toEqual(doc)
   })
+
+  it('sends locale as a query param', async () => {
+    mock.onPut('/api/documents/1').reply(200, doc)
+    const { result } = renderHook(() => useUpdateDocument(), { wrapper: createWrapper() })
+    await act(async () => {
+      result.current.mutate({ id: '1', contentTypeId: 'ct-1', data: { title: 'Updated' }, locale: 'vi' })
+    })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(mock.history.put[0].params).toEqual({ locale: 'vi' })
+  })
 })
 
 describe('useDeleteDocument', () => {
@@ -120,6 +159,16 @@ describe('usePublishDocument', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(result.current.data).toEqual({ status: 'published' })
   })
+
+  it('sends locale as a query param', async () => {
+    mock.onPost('/api/documents/1/publish').reply(200, { status: 'published' })
+    const { result } = renderHook(() => usePublishDocument(), { wrapper: createWrapper() })
+    await act(async () => {
+      result.current.mutate({ id: '1', contentTypeId: 'ct-1', locale: 'vi' })
+    })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(mock.history.post[0].params).toEqual({ locale: 'vi' })
+  })
 })
 
 describe('useUnpublishDocument', () => {
@@ -131,5 +180,15 @@ describe('useUnpublishDocument', () => {
     })
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(result.current.data).toEqual({ status: 'draft' })
+  })
+
+  it('sends locale as a query param', async () => {
+    mock.onPost('/api/documents/1/unpublish').reply(200, { status: 'draft' })
+    const { result } = renderHook(() => useUnpublishDocument(), { wrapper: createWrapper() })
+    await act(async () => {
+      result.current.mutate({ id: '1', contentTypeId: 'ct-1', locale: 'vi' })
+    })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(mock.history.post[0].params).toEqual({ locale: 'vi' })
   })
 })
