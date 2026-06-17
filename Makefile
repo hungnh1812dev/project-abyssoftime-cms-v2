@@ -29,14 +29,15 @@ mongo-stop:
 # Start API and web in parallel; Ctrl-C kills both
 # Run `make mongo-start` first if MongoDB is not already up
 dev:
-	@trap 'kill 0' INT; \
+	@set -a; [ -f .env ] && . ./.env; set +a; \
+		trap 'kill 0' INT; \
 		(cd apps/api && go run ./cmd/server) & \
 		(cd apps/web && npm run dev) & \
 		wait
 
 # Start only the Go API server
 dev-api:
-	cd apps/api && go run ./cmd/server
+	@set -a; [ -f .env ] && . ./.env; set +a; cd apps/api && go run ./cmd/server
 
 # Start only the Vite dev server
 dev-web:
