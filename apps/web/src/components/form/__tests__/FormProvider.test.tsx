@@ -6,6 +6,14 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { FormProvider } from '../FormProvider'
 import { FormField } from '../FormField'
+import { useCmsFormState } from '../FormStateContext'
+
+vi.mock('sonner', () => ({
+  toast: {
+    success: vi.fn(),
+    error: vi.fn(),
+  },
+}))
 
 function createClient() {
   return new QueryClient({
@@ -38,7 +46,6 @@ describe('FormProvider + FormField', () => {
 
     await waitFor(() => {
       expect(mutationFn).toHaveBeenCalledTimes(1)
-      // TanStack Query v5 passes a context object as the second arg — check only the form data
       expect(mutationFn.mock.calls[0][0]).toEqual({ a: { b: 'hello' } })
     })
   })
@@ -68,14 +75,15 @@ describe('FormProvider + FormField', () => {
     expect(formFieldSrc).not.toContain('Children.map')
   })
 
-  it('exposes loading and submitting state via context', async () => {
+  it('exposes loading, submitting and isDirty state via context', async () => {
     const mutationFn = vi.fn().mockResolvedValue(undefined)
-    const { useCmsFormState } = await import('../FormStateContext')
 
     function StateConsumer() {
-      const { loading, submitting } = useCmsFormState()
+      const { loading, submitting, isDirty } = useCmsFormState()
       return (
-        <span data-testid="state">{loading ? 'loading' : submitting ? 'submitting' : 'idle'}</span>
+        <span data-testid="state">
+          {loading ? 'loading' : submitting ? 'submitting' : isDirty ? 'dirty' : 'idle'}
+        </span>
       )
     }
 
@@ -89,5 +97,92 @@ describe('FormProvider + FormField', () => {
     )
 
     expect(screen.getByTestId('state')).toHaveTextContent('idle')
+  })
+
+  it('isDirty is false on initial load and true after editing a field', async () => {
+    const user = userEvent.setup()
+    const mutationFn = vi.fn().mockResolvedValue(undefined)
+
+    function DirtyConsumer() {
+      const { isDirty } = useCmsFormState()
+      return <span data-testid="dirty">{isDirty ? 'dirty' : 'clean'}</span>
+    }
+
+    render(
+      <Wrapper>
+        <FormProvider mutationFn={mutationFn}>
+          <DirtyConsumer />
+          <FormField name="title">
+            <input aria-label="title" />
+          </FormField>
+        </FormProvider>
+      </Wrapper>,
+    )
+
+    expect(screen.getByTestId('dirty')).toHaveTextContent('clean')
+    await user.type(screen.getByLabelText('title'), 'x')
+    expect(screen.getByTestId('dirty')).toHaveTextContent('dirty')
+  })
+
+  it('fires success toast and resets form to clean after successful save', async () => {
+    const { toast } = await import('sonner')
+    const user = userEvent.setup()
+    const mutationFn = vi.fn().mockResolvedValue({ title: 'saved-value' })
+
+    function DirtyConsumer() {
+      const { isDirty } = useCmsFormState()
+      return <span data-testid="dirty">{isDirty ? 'dirty' : 'clean'}</span>
+    }
+
+    render(
+      <Wrapper>
+        <FormProvider mutationFn={mutationFn}>
+          <DirtyConsumer />
+          <FormField name="title">
+            <input aria-label="title" />
+          </FormField>
+          <button type="submit">Save</button>
+        </FormProvider>
+      </Wrapper>,
+    )
+
+    await user.type(screen.getByLabelText('title'), 'hello')
+    expect(screen.getByTestId('dirty')).toHaveTextContent('dirty')
+
+    await user.click(screen.getByRole('button', { name: /save/i }))
+
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith('Saved')
+      expect(screen.getByTestId('dirty')).toHaveTextContent('clean')
+    })
+  })
+
+  it('fires error toast and preserves edited values on failed save', async () => {
+    const { toast } = await import('sonner')
+    const user = userEvent.setup()
+    const mutationFn = vi.fn().mockRejectedValue(
+      Object.assign(new Error('Bad request'), {
+        response: { data: { error: 'Validation failed' } },
+      }),
+    )
+
+    render(
+      <Wrapper>
+        <FormProvider mutationFn={mutationFn}>
+          <FormField name="title">
+            <input aria-label="title" />
+          </FormField>
+          <button type="submit">Save</button>
+        </FormProvider>
+      </Wrapper>,
+    )
+
+    await user.type(screen.getByLabelText('title'), 'bad value')
+    await user.click(screen.getByRole('button', { name: /save/i }))
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith('Validation failed')
+    })
+    expect(screen.getByLabelText('title')).toHaveValue('bad value')
   })
 })
