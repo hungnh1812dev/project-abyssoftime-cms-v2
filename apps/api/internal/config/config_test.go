@@ -117,36 +117,3 @@ func TestLoad_InvalidMediaAutoThumbnail(t *testing.T) {
 	}
 }
 
-func TestLoad_CloudinaryMissingCreds(t *testing.T) {
-	clearEnv(t)
-	t.Setenv("JWT_SECRET", "s")
-	t.Setenv("STORAGE_PROVIDER", "cloudinary")
-
-	_, err := config.Load()
-	if err == nil {
-		t.Fatal("Load() error = nil, want error for missing Cloudinary credentials")
-	}
-}
-
-func TestLoad_S3MissingBucket(t *testing.T) {
-	clearEnv(t)
-	t.Setenv("JWT_SECRET", "s")
-	t.Setenv("STORAGE_PROVIDER", "s3")
-
-	_, err := config.Load()
-	if err == nil {
-		t.Fatal("Load() error = nil, want error for missing S3_BUCKET")
-	}
-}
-
-func TestLoad_S3MissingRegion(t *testing.T) {
-	clearEnv(t)
-	t.Setenv("JWT_SECRET", "s")
-	t.Setenv("STORAGE_PROVIDER", "s3")
-	t.Setenv("S3_BUCKET", "my-bucket")
-
-	_, err := config.Load()
-	if err == nil {
-		t.Fatal("Load() error = nil, want error for missing S3_REGION")
-	}
-}

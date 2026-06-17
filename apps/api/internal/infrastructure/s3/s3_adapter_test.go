@@ -22,6 +22,20 @@ func (f *fakeS3API) DeleteObject(ctx context.Context, params *awss3.DeleteObject
 	return f.deleteObjectFn(ctx, params, optFns...)
 }
 
+func TestNew_MissingBucket_ReturnsError(t *testing.T) {
+	_, err := New(context.Background(), "", "us-east-1")
+	if err == nil {
+		t.Fatal("New() error = nil, want error for empty bucket")
+	}
+}
+
+func TestNew_MissingRegion_ReturnsError(t *testing.T) {
+	_, err := New(context.Background(), "my-bucket", "")
+	if err == nil {
+		t.Fatal("New() error = nil, want error for empty region")
+	}
+}
+
 func TestAdapter_Upload_ReturnsURLAndPublicID(t *testing.T) {
 	var gotBucket, gotKey string
 	fake := &fakeS3API{

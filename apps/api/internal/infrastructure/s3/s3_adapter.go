@@ -31,6 +31,12 @@ type adapter struct {
 // AWS SDK's default chain (env vars, shared config, instance role, etc.)
 // — never hard-coded.
 func New(ctx context.Context, bucket, region string) (repository.StorageAdapter, error) {
+	if bucket == "" {
+		return nil, fmt.Errorf("s3: bucket is required")
+	}
+	if region == "" {
+		return nil, fmt.Errorf("s3: region is required")
+	}
 	cfg, err := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithRegion(region))
 	if err != nil {
 		return nil, err

@@ -90,12 +90,7 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("unknown DB_DRIVER %q (want %q or %q)", dbDriver, "mongo", "postgresql")
 	}
 
-	storageRaw := os.Getenv("STORAGE_PROVIDER")
-	storageExplicit := storageRaw != ""
-	mediaDriver := storageRaw
-	if mediaDriver == "" {
-		mediaDriver = "cloudinary"
-	}
+	mediaDriver := getenv("STORAGE_PROVIDER", "cloudinary")
 	if mediaDriver != "s3" && mediaDriver != "cloudinary" {
 		return nil, fmt.Errorf("unknown STORAGE_PROVIDER %q (want %q or %q)", mediaDriver, "s3", "cloudinary")
 	}
@@ -112,24 +107,9 @@ func Load() (*Config, error) {
 	cloudinaryCloudName := os.Getenv("CLOUDINARY_CLOUD_NAME")
 	cloudinaryAPIKey := os.Getenv("CLOUDINARY_API_KEY")
 	cloudinaryAPISecret := os.Getenv("CLOUDINARY_API_SECRET")
-	// Validate Cloudinary creds only when STORAGE_PROVIDER is explicitly configured.
-	// When using the default (env var unset), empty creds are tolerated for local dev.
-	if storageExplicit && mediaDriver == "cloudinary" {
-		if cloudinaryCloudName == "" || cloudinaryAPIKey == "" || cloudinaryAPISecret == "" {
-			return nil, fmt.Errorf("CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET are required when STORAGE_PROVIDER=cloudinary")
-		}
-	}
 
 	s3Bucket := os.Getenv("S3_BUCKET")
 	s3Region := os.Getenv("S3_REGION")
-	if mediaDriver == "s3" {
-		if s3Bucket == "" {
-			return nil, fmt.Errorf("S3_BUCKET is required when STORAGE_PROVIDER=s3")
-		}
-		if s3Region == "" {
-			return nil, fmt.Errorf("S3_REGION is required when STORAGE_PROVIDER=s3")
-		}
-	}
 
 	return &Config{
 		Port:             getenv("PORT", "8080"),

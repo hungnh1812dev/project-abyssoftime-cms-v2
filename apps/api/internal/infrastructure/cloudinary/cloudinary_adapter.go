@@ -2,6 +2,7 @@ package cloudinary
 
 import (
 	"context"
+	"fmt"
 	"io"
 
 	cloudinarygo "github.com/cloudinary/cloudinary-go/v2"
@@ -17,6 +18,9 @@ type adapter struct {
 }
 
 func NewCloudinaryAdapter(cloudName, apiKey, apiSecret string) (repository.StorageAdapter, error) {
+	if cloudName == "" || apiKey == "" || apiSecret == "" {
+		return nil, fmt.Errorf("cloudinary: cloudName, apiKey, and apiSecret are all required")
+	}
 	cld, err := cloudinarygo.NewFromParams(cloudName, apiKey, apiSecret)
 	if err != nil {
 		return nil, err
