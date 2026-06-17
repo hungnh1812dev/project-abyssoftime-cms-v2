@@ -56,10 +56,14 @@ describe('Sidebar', () => {
     )
   })
 
-  it('renders empty state when no content types exist', async () => {
+  it('renders no content-type links when no content types exist', async () => {
     mock.onGet('/api/content-types').reply(200, [])
     renderWithProviders(<Sidebar />, { initialEntries: ['/admin'] })
-    await waitFor(() => expect(screen.queryByRole('link')).toBeNull())
+    await waitFor(() =>
+      expect(screen.getByRole('link', { name: /media library/i })).toBeInTheDocument(),
+    )
+    expect(screen.queryByRole('link', { name: 'Blog' })).toBeNull()
+    expect(screen.queryByRole('link', { name: 'About' })).toBeNull()
   })
 
   it('groups content types into Single Types and Collection Types sections', async () => {
@@ -93,6 +97,19 @@ describe('Sidebar', () => {
     await waitFor(() => expect(screen.getByText('Blog')).toBeInTheDocument())
     expect(screen.queryByText('Single Types')).not.toBeInTheDocument()
     expect(screen.getByText('Collection Types')).toBeInTheDocument()
+  })
+
+  it('renders a Settings section with a Media Library link to /admin/settings/media', async () => {
+    mock.onGet('/api/content-types').reply(200, [])
+    renderWithProviders(<Sidebar />, { initialEntries: ['/admin'] })
+
+    await waitFor(() =>
+      expect(screen.getByRole('link', { name: /media library/i })).toBeInTheDocument(),
+    )
+    expect(screen.getByRole('link', { name: /media library/i })).toHaveAttribute(
+      'href',
+      '/admin/settings/media',
+    )
   })
 })
 

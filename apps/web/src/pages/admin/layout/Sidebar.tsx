@@ -45,6 +45,14 @@ export function Sidebar() {
       <nav className="flex-1 p-2 space-y-1">
         <NavGroup title="Single Types" items={singleTypes} />
         <NavGroup title="Collection Types" items={collectionTypes} />
+        <div className="space-y-0.5">
+          <h2 className="px-3 pt-3 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Settings
+          </h2>
+          <NavLink to="/admin/settings/media" className={navLinkClass}>
+            Media Library
+          </NavLink>
+        </div>
       </nav>
     </aside>
   )

@@ -33,6 +33,12 @@ const CollectionDetailPage = lazy(() =>
   ),
 );
 
+const MediaLibraryPage = lazy(() =>
+  import("@/pages/admin/settings/MediaLibraryPage").then((m) => ({
+    default: m.MediaLibraryPage,
+  })),
+);
+
 function PanelFallback() {
   return <div className="text-muted-foreground p-4">Loading…</div>;
 }
@@ -100,6 +106,14 @@ export function AppRouter() {
           element={
             <Suspense fallback={<PanelFallback />}>
               <CollectionDetailPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="settings/media"
+          element={
+            <Suspense fallback={<PanelFallback />}>
+              <MediaLibraryPage />
             </Suspense>
           }
         />
