@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	gqlhandler "github.com/99designs/gqlgen/graphql/handler"
+	"project-abyssoftime-cms-v2/api/graphql/codegen"
 	"project-abyssoftime-cms-v2/api/graphql/generated"
 	"project-abyssoftime-cms-v2/api/graphql/resolver"
 	"project-abyssoftime-cms-v2/api/internal/config"
@@ -37,6 +38,13 @@ func newStorageAdapter(ctx context.Context, cfg *config.Config) (repository.Stor
 }
 
 func main() {
+	const schemaPath = "graphql/schema.graphqls"
+	const sentinelPath = "graphql/.graphql.hash"
+	if err := codegen.EnsureUpToDate(schemaPath, sentinelPath, codegen.DefaultRunner()); err != nil {
+		log.Fatalf("graphql codegen: %v", err)
+	}
+	log.Println("graphql: generated code up to date")
+
 	ctx := context.Background()
 
 	cfg, err := config.Load()
