@@ -1,8 +1,13 @@
 package media
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"fmt"
 	"io"
+	"path/filepath"
+	"strings"
 
 	"project-abyssoftime-cms-v2/api/internal/domain/entity"
 	"project-abyssoftime-cms-v2/api/internal/domain/repository"
@@ -19,7 +24,19 @@ func New(assetRepo repository.MediaAssetRepository, storage repository.StorageAd
 }
 
 func (uc *UseCase) Upload(ctx context.Context, file io.Reader, filename, documentRef, contentTypeID string) (*entity.MediaAsset, error) {
-	result, err := uc.storage.Upload(ctx, file, filename, uc.mediaAutoThumbnail)
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return nil, err
+	}
+
+	sum := sha256.Sum256(data)
+	hash12 := fmt.Sprintf("%x", sum)[:12]
+
+	ext := strings.TrimPrefix(filepath.Ext(filename), ".")
+	stem := strings.TrimSuffix(filename, filepath.Ext(filename))
+	hashedFilename := stem + "_" + hash12 + "." + ext
+
+	result, err := uc.storage.Upload(ctx, bytes.NewReader(data), hashedFilename, uc.mediaAutoThumbnail)
 	if err != nil {
 		return nil, err
 	}
@@ -27,6 +44,9 @@ func (uc *UseCase) Upload(ctx context.Context, file io.Reader, filename, documen
 		URL:           result.URL,
 		ThumbnailURL:  result.ThumbnailURL,
 		PublicID:      result.PublicID,
+		FileName:      hashedFilename,
+		FileExt:       ext,
+		Hash:          hash12,
 		DocumentRef:   documentRef,
 		ContentTypeID: contentTypeID,
 	}

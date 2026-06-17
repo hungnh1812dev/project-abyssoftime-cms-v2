@@ -3,7 +3,9 @@ package media_test
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"errors"
+	"fmt"
 	"io"
 	"testing"
 
@@ -118,6 +120,84 @@ func TestUpload_StorageError_ReturnsError(t *testing.T) {
 	_, err := uc.Upload(ctx, bytes.NewReader([]byte("img")), "photo.jpg", "doc-1", "ct-1")
 	if !errors.Is(err, storageErr) {
 		t.Errorf("Upload() error = %v, want %v", err, storageErr)
+	}
+}
+
+func TestUpload_BuildsHashedFilename(t *testing.T) {
+	content := []byte("deterministic content")
+	sum := sha256.Sum256(content)
+	expectedHash := fmt.Sprintf("%x", sum)[:12]
+
+	var capturedFilename string
+	storage := &repomock.StorageAdapter{}
+	storage.UploadFn = func(_ context.Context, _ io.Reader, filename string, _ bool) (*repository.UploadResult, error) {
+		capturedFilename = filename
+		return &repository.UploadResult{URL: "u", ThumbnailURL: "t", PublicID: "p"}, nil
+	}
+	assetRepo := &repomock.MediaAssetRepository{}
+	assetRepo.CreateFn = func(_ context.Context, _ *entity.MediaAsset) error { return nil }
+
+	uc := mediauc.New(assetRepo, storage, false)
+	if _, err := uc.Upload(ctx, bytes.NewReader(content), "photo.jpg", "doc-1", "ct-1"); err != nil {
+		t.Fatalf("Upload() error = %v", err)
+	}
+	want := "photo_" + expectedHash + ".jpg"
+	if capturedFilename != want {
+		t.Errorf("Upload() filename passed to storage = %q, want %q", capturedFilename, want)
+	}
+}
+
+func TestUpload_HashedFilenameIsDeterministic(t *testing.T) {
+	content := []byte("same bytes")
+	var names []string
+	storage := &repomock.StorageAdapter{}
+	storage.UploadFn = func(_ context.Context, _ io.Reader, filename string, _ bool) (*repository.UploadResult, error) {
+		names = append(names, filename)
+		return &repository.UploadResult{URL: "u", ThumbnailURL: "t", PublicID: "p"}, nil
+	}
+	assetRepo := &repomock.MediaAssetRepository{}
+	assetRepo.CreateFn = func(_ context.Context, _ *entity.MediaAsset) error { return nil }
+
+	uc := mediauc.New(assetRepo, storage, false)
+	for i := 0; i < 3; i++ {
+		if _, err := uc.Upload(ctx, bytes.NewReader(content), "photo.jpg", "doc", "ct"); err != nil {
+			t.Fatalf("Upload() run %d error = %v", i, err)
+		}
+	}
+	if names[0] != names[1] || names[1] != names[2] {
+		t.Errorf("Upload() filenames not deterministic: %v", names)
+	}
+}
+
+func TestUpload_PopulatesFileFields(t *testing.T) {
+	content := []byte("file content")
+	storage := &repomock.StorageAdapter{}
+	storage.UploadFn = func(_ context.Context, _ io.Reader, _ string, _ bool) (*repository.UploadResult, error) {
+		return &repository.UploadResult{URL: "u", ThumbnailURL: "t", PublicID: "p"}, nil
+	}
+	var capturedAsset *entity.MediaAsset
+	assetRepo := &repomock.MediaAssetRepository{}
+	assetRepo.CreateFn = func(_ context.Context, asset *entity.MediaAsset) error {
+		capturedAsset = asset
+		return nil
+	}
+
+	uc := mediauc.New(assetRepo, storage, false)
+	if _, err := uc.Upload(ctx, bytes.NewReader(content), "photo.jpg", "doc", "ct"); err != nil {
+		t.Fatalf("Upload() error = %v", err)
+	}
+
+	sum := sha256.Sum256(content)
+	wantHash := fmt.Sprintf("%x", sum)[:12]
+
+	if capturedAsset.FileName != "photo_"+wantHash+".jpg" {
+		t.Errorf("Upload() asset.FileName = %q, want %q", capturedAsset.FileName, "photo_"+wantHash+".jpg")
+	}
+	if capturedAsset.FileExt != "jpg" {
+		t.Errorf("Upload() asset.FileExt = %q, want %q", capturedAsset.FileExt, "jpg")
+	}
+	if capturedAsset.Hash != wantHash {
+		t.Errorf("Upload() asset.Hash = %q, want %q", capturedAsset.Hash, wantHash)
 	}
 }
 
