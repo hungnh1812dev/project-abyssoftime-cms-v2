@@ -55,7 +55,7 @@ docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
 
 ## Adding a content panel
 
-Panels are hard-coded React pages — no drag-and-drop engine. See [docs/panel-guide.md](docs/panel-guide.md) for a step-by-step walkthrough.
+Panels are hard-coded React pages — no drag-and-drop engine. See [docs/guide.md](docs/guide.md) for a step-by-step walkthrough.
 
 ---
 

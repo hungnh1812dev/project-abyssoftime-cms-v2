@@ -10,6 +10,7 @@ let mock: MockAdapter
 
 beforeEach(() => {
   mock = new MockAdapter(api)
+  mock.onGet('/auth/setup').reply(200, { adminExists: false })
 })
 
 afterEach(() => {
@@ -18,20 +19,21 @@ afterEach(() => {
 })
 
 describe('RegisterPage', () => {
-  it('renders email and password fields with a submit button', () => {
+  it('renders email and password fields with a submit button', async () => {
     renderWithProviders(<RegisterPage />)
-    expect(screen.getByLabelText(/email/i)).toBeInTheDocument()
+    expect(await screen.findByLabelText(/email/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/password/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /create account/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /create admin account/i })).toBeInTheDocument()
   })
 
   it('shows validation error for invalid email', async () => {
     const user = userEvent.setup()
     renderWithProviders(<RegisterPage />)
 
-    await user.type(screen.getByLabelText(/email/i), 'bad-email')
+    const emailInput = await screen.findByLabelText(/email/i)
+    await user.type(emailInput, 'bad-email')
     await user.type(screen.getByLabelText(/password/i), 'password123')
-    await user.click(screen.getByRole('button', { name: /create account/i }))
+    await user.click(screen.getByRole('button', { name: /create admin account/i }))
 
     await waitFor(() => {
       expect(screen.getByText(/valid email/i)).toBeInTheDocument()
@@ -42,9 +44,10 @@ describe('RegisterPage', () => {
     const user = userEvent.setup()
     renderWithProviders(<RegisterPage />)
 
-    await user.type(screen.getByLabelText(/email/i), 'user@example.com')
+    const emailInput = await screen.findByLabelText(/email/i)
+    await user.type(emailInput, 'user@example.com')
     await user.type(screen.getByLabelText(/password/i), 'short')
-    await user.click(screen.getByRole('button', { name: /create account/i }))
+    await user.click(screen.getByRole('button', { name: /create admin account/i }))
 
     await waitFor(() => {
       expect(screen.getByText(/at least 8/i)).toBeInTheDocument()
@@ -60,9 +63,10 @@ describe('RegisterPage', () => {
     })
     renderWithProviders(<RegisterPage />)
 
-    await user.type(screen.getByLabelText(/email/i), 'newuser@example.com')
+    const emailInput = await screen.findByLabelText(/email/i)
+    await user.type(emailInput, 'newuser@example.com')
     await user.type(screen.getByLabelText(/password/i), 'securepass')
-    await user.click(screen.getByRole('button', { name: /create account/i }))
+    await user.click(screen.getByRole('button', { name: /create admin account/i }))
 
     await waitFor(() => {
       expect(capturedBody).toEqual({ email: 'newuser@example.com', password: 'securepass' })
@@ -74,9 +78,10 @@ describe('RegisterPage', () => {
     mock.onPost('/auth/register').reply(409, { message: 'Email already exists' })
     renderWithProviders(<RegisterPage />)
 
-    await user.type(screen.getByLabelText(/email/i), 'taken@example.com')
+    const emailInput = await screen.findByLabelText(/email/i)
+    await user.type(emailInput, 'taken@example.com')
     await user.type(screen.getByLabelText(/password/i), 'password123')
-    await user.click(screen.getByRole('button', { name: /create account/i }))
+    await user.click(screen.getByRole('button', { name: /create admin account/i }))
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toBeInTheDocument()

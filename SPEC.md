@@ -189,7 +189,7 @@ personal-cms/
   - `FormField` is the only mechanism for injecting `register`/`control` into inputs.
   - `FormProvider` must never use `React.Children.map` or any recursive child scanning.
   - Nested field names use dot notation (`block.house.title`); `FormProvider` converts to nested JSON on submit.
-- **Panels**: Each content panel is a standalone page file in `src/pages/admin/panels/`. No dynamic panel engine. The generic `ContentTypePanelPage` handles any content type automatically; see `docs/panel-guide.md` for the full walkthrough on writing a custom panel (query hook → mutations → `FormProvider`/`FormField` form → route registration).
+- **Panels**: Each content panel is a standalone page file in `src/pages/admin/panels/`. No dynamic panel engine. The generic `ContentTypePanelPage` handles any content type automatically; see `docs/guide.md` for the full walkthrough on writing a custom panel (query hook → mutations → `FormProvider`/`FormField` form → route registration).
 - **Styling**: TailwindCSS utility classes. Shadcn UI components as the base. No inline `style` props.
 - **Imports**: Path aliases (`@/components`, `@/lib`, etc.) configured in `vite.config.ts`.
 
