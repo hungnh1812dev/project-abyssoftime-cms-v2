@@ -45,3 +45,18 @@ export function useUploadMedia() {
     },
   })
 }
+
+export function useDeleteMedia() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/api/media/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['media', 'list'] })
+    },
+    onError: (err: unknown) => {
+      const msg =
+        (err as AxiosError<{ error: string }>).response?.data?.error ?? 'Delete failed'
+      toast.error(msg)
+    },
+  })
+}
