@@ -17,6 +17,10 @@ const ct: ContentType = {
   Name: 'Blog Posts',
   Slug: 'blog-posts',
   Kind: 'collection',
+  Fields: [
+    { name: 'title', type: 'text' },
+    { name: 'body', type: 'text' },
+  ],
   CreatedAt: '',
   UpdatedAt: '',
 }

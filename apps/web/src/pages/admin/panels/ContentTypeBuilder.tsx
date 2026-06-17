@@ -21,6 +21,10 @@ interface ContentTypeBuilderProps {
   children?: React.ReactNode
 }
 
+export function renderSchemaField(field: FieldDefinition, prefix = ''): React.ReactNode {
+  return renderField(field, prefix)
+}
+
 function renderField(field: FieldDefinition, prefix = ''): React.ReactNode {
   const fieldName = prefix + field.name
 

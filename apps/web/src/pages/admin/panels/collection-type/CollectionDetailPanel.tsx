@@ -5,11 +5,10 @@ import { api } from '@/lib/api'
 import { useLocales, usePublishDocument, useUnpublishDocument } from '@/hooks/useDocuments'
 import { ContentDetailLayout } from '../layout/ContentDetailLayout'
 import { FormProvider } from '@/components/form/FormProvider'
-import { FormField } from '@/components/form/FormField'
-import { TextInput } from '@/components/form/inputs/TextInput'
 import { Button } from '@/components/ui/button'
 import { useCmsFormState } from '@/components/form/FormStateContext'
 import type { ContentType, Document } from '@/types/cms'
+import { renderSchemaField } from '../ContentTypeBuilder'
 
 interface Props {
   contentType: ContentType
@@ -51,7 +50,7 @@ export function CollectionDetailPanel({ contentType, documentId }: Props) {
     return <p className="text-muted-foreground">Document not found.</p>
   }
 
-  const fieldKeys = Object.keys(doc.Data)
+  const schema = contentType.Fields ?? []
   const canPublish = doc.Status !== 'published'
   const canUnpublish = doc.Status !== 'draft'
 
@@ -126,14 +125,7 @@ export function CollectionDetailPanel({ contentType, documentId }: Props) {
         )}
       >
         <div className="space-y-4">
-          {fieldKeys.map((key) => (
-            <div key={key}>
-              <label className="block text-sm font-medium mb-1">{key}</label>
-              <FormField name={key}>
-                <TextInput aria-label={key} placeholder={key} />
-              </FormField>
-            </div>
-          ))}
+          {schema.map((field) => renderSchemaField(field))}
         </div>
       </ContentDetailLayout>
     </FormProvider>
