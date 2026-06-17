@@ -12,6 +12,7 @@ import (
 type mediaUseCase interface {
 	Upload(ctx context.Context, file io.Reader, filename, documentRef, contentTypeID string) (*entity.MediaAsset, error)
 	List(ctx context.Context, page, limit int) ([]*entity.MediaAsset, int64, error)
+	Delete(ctx context.Context, id string) error
 }
 
 type MediaHandler struct {
@@ -42,6 +43,15 @@ func (h *MediaHandler) List(w http.ResponseWriter, r *http.Request) {
 		"page":  page,
 		"limit": limit,
 	})
+}
+
+func (h *MediaHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if err := h.uc.Delete(r.Context(), id); err != nil {
+		writeErr(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *MediaHandler) Upload(w http.ResponseWriter, r *http.Request) {

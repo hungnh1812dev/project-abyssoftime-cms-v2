@@ -27,6 +27,17 @@ func (uc *UseCase) List(ctx context.Context, page, limit int) ([]*entity.MediaAs
 	return uc.assetRepo.FindAll(ctx, page, limit)
 }
 
+func (uc *UseCase) Delete(ctx context.Context, id string) error {
+	asset, err := uc.assetRepo.FindByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	if err := uc.storage.Delete(ctx, asset.PublicID); err != nil {
+		return err
+	}
+	return uc.assetRepo.Delete(ctx, id)
+}
+
 func (uc *UseCase) Upload(ctx context.Context, file io.Reader, filename, documentRef, contentTypeID string) (*entity.MediaAsset, error) {
 	data, err := io.ReadAll(file)
 	if err != nil {

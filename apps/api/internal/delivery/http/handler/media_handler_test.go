@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -12,13 +13,15 @@ import (
 
 	"project-abyssoftime-cms-v2/api/internal/delivery/http/handler"
 	"project-abyssoftime-cms-v2/api/internal/domain/entity"
+	pkgerrors "project-abyssoftime-cms-v2/api/pkg/errors"
 )
 
 // ---- mock usecase ----------------------------------------------------------
 
 type mockMediaUC struct {
-	uploadFn func(ctx context.Context, file io.Reader, filename, documentRef, contentTypeID string) (*entity.MediaAsset, error)
-	listFn   func(ctx context.Context, page, limit int) ([]*entity.MediaAsset, int64, error)
+	uploadFn   func(ctx context.Context, file io.Reader, filename, documentRef, contentTypeID string) (*entity.MediaAsset, error)
+	listFn     func(ctx context.Context, page, limit int) ([]*entity.MediaAsset, int64, error)
+	deleteFn   func(ctx context.Context, id string) error
 }
 
 func (m *mockMediaUC) Upload(ctx context.Context, file io.Reader, filename, documentRef, contentTypeID string) (*entity.MediaAsset, error) {
@@ -27,6 +30,10 @@ func (m *mockMediaUC) Upload(ctx context.Context, file io.Reader, filename, docu
 
 func (m *mockMediaUC) List(ctx context.Context, page, limit int) ([]*entity.MediaAsset, int64, error) {
 	return m.listFn(ctx, page, limit)
+}
+
+func (m *mockMediaUC) Delete(ctx context.Context, id string) error {
+	return m.deleteFn(ctx, id)
 }
 
 // ---- Upload ----------------------------------------------------------------
@@ -135,4 +142,53 @@ func buildMultipartForm(t *testing.T, filename string, content []byte, documentR
 	w.Close()
 
 	return &buf, w.FormDataContentType()
+}
+
+// ---- Delete ----------------------------------------------------------------
+
+func serveDelete(t *testing.T, h *handler.MediaHandler, id string) *httptest.ResponseRecorder {
+	t.Helper()
+	mux := http.NewServeMux()
+	mux.HandleFunc("DELETE /api/media/{id}", h.Delete)
+	req := httptest.NewRequest(http.MethodDelete, "/api/media/"+id, nil)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+	return w
+}
+
+func TestMediaHandler_Delete_Returns204(t *testing.T) {
+	uc := &mockMediaUC{}
+	uc.deleteFn = func(_ context.Context, _ string) error { return nil }
+	h := handler.NewMediaHandler(uc)
+
+	w := serveDelete(t, h, "asset-1")
+	if w.Code != http.StatusNoContent {
+		t.Errorf("Delete() status = %d, want 204", w.Code)
+	}
+}
+
+func TestMediaHandler_Delete_NotFound_Returns404(t *testing.T) {
+	uc := &mockMediaUC{}
+	uc.deleteFn = func(_ context.Context, _ string) error {
+		return pkgerrors.ErrNotFound
+	}
+	h := handler.NewMediaHandler(uc)
+
+	w := serveDelete(t, h, "missing")
+	if w.Code != http.StatusNotFound {
+		t.Errorf("Delete() status = %d, want 404", w.Code)
+	}
+}
+
+func TestMediaHandler_Delete_UseCaseError_Returns500(t *testing.T) {
+	uc := &mockMediaUC{}
+	uc.deleteFn = func(_ context.Context, _ string) error {
+		return errors.New("storage error")
+	}
+	h := handler.NewMediaHandler(uc)
+
+	w := serveDelete(t, h, "asset-1")
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("Delete() status = %d, want 500", w.Code)
+	}
 }

@@ -241,3 +241,112 @@ func TestUpload_RepoError_ReturnsError(t *testing.T) {
 		t.Errorf("Upload() error = %v, want %v", err, repoErr)
 	}
 }
+
+// ---- Delete ----------------------------------------------------------------
+
+func TestDelete_CallsStorageAndRepo(t *testing.T) {
+	var storageDeleteID string
+	var repoDeleteID string
+
+	assetRepo := &repomock.MediaAssetRepository{}
+	assetRepo.FindByIDFn = func(_ context.Context, id string) (*entity.MediaAsset, error) {
+		return &entity.MediaAsset{ID: id, PublicID: "pub-123"}, nil
+	}
+	assetRepo.DeleteFn = func(_ context.Context, id string) error {
+		repoDeleteID = id
+		return nil
+	}
+
+	storage := &repomock.StorageAdapter{}
+	storage.DeleteFn = func(_ context.Context, publicID string) error {
+		storageDeleteID = publicID
+		return nil
+	}
+
+	uc := mediauc.New(assetRepo, storage, false)
+	if err := uc.Delete(ctx, "asset-1"); err != nil {
+		t.Fatalf("Delete() error = %v", err)
+	}
+	if storageDeleteID != "pub-123" {
+		t.Errorf("Delete() storage.Delete publicID = %q, want %q", storageDeleteID, "pub-123")
+	}
+	if repoDeleteID != "asset-1" {
+		t.Errorf("Delete() repo.Delete id = %q, want %q", repoDeleteID, "asset-1")
+	}
+}
+
+func TestDelete_AssetNotFound_ReturnsError(t *testing.T) {
+	notFound := errors.New("not found")
+	storageDeleteCalled := false
+
+	assetRepo := &repomock.MediaAssetRepository{}
+	assetRepo.FindByIDFn = func(_ context.Context, _ string) (*entity.MediaAsset, error) {
+		return nil, notFound
+	}
+
+	storage := &repomock.StorageAdapter{}
+	storage.DeleteFn = func(_ context.Context, _ string) error {
+		storageDeleteCalled = true
+		return nil
+	}
+
+	uc := mediauc.New(assetRepo, storage, false)
+	err := uc.Delete(ctx, "asset-1")
+	if !errors.Is(err, notFound) {
+		t.Errorf("Delete() error = %v, want %v", err, notFound)
+	}
+	if storageDeleteCalled {
+		t.Error("Delete() called storage.Delete after FindByID returned an error")
+	}
+}
+
+func TestDelete_StorageError_DoesNotDeleteFromRepo(t *testing.T) {
+	storageErr := errors.New("cloudinary error")
+	repoDeleteCalled := false
+
+	assetRepo := &repomock.MediaAssetRepository{}
+	assetRepo.FindByIDFn = func(_ context.Context, id string) (*entity.MediaAsset, error) {
+		return &entity.MediaAsset{ID: id, PublicID: "pub-123"}, nil
+	}
+	assetRepo.DeleteFn = func(_ context.Context, _ string) error {
+		repoDeleteCalled = true
+		return nil
+	}
+
+	storage := &repomock.StorageAdapter{}
+	storage.DeleteFn = func(_ context.Context, _ string) error {
+		return storageErr
+	}
+
+	uc := mediauc.New(assetRepo, storage, false)
+	err := uc.Delete(ctx, "asset-1")
+	if !errors.Is(err, storageErr) {
+		t.Errorf("Delete() error = %v, want %v", err, storageErr)
+	}
+	if repoDeleteCalled {
+		t.Error("Delete() called repo.Delete after storage.Delete returned an error")
+	}
+}
+
+func TestDelete_RepoDeleteError_ReturnsError(t *testing.T) {
+	repoErr := errors.New("mongo write failed")
+
+	assetRepo := &repomock.MediaAssetRepository{}
+	assetRepo.FindByIDFn = func(_ context.Context, id string) (*entity.MediaAsset, error) {
+		return &entity.MediaAsset{ID: id, PublicID: "pub-123"}, nil
+	}
+	assetRepo.DeleteFn = func(_ context.Context, _ string) error {
+		return repoErr
+	}
+
+	storage := &repomock.StorageAdapter{}
+	storage.DeleteFn = func(_ context.Context, _ string) error {
+		return nil
+	}
+
+	uc := mediauc.New(assetRepo, storage, false)
+	err := uc.Delete(ctx, "asset-1")
+	if !errors.Is(err, repoErr) {
+		t.Errorf("Delete() error = %v, want %v", err, repoErr)
+	}
+}

@@ -146,6 +146,7 @@ func main() {
 
 	mux.Handle("GET /api/media", adminOnly(mediaHandler.List))
 	mux.Handle("POST /api/media/upload", adminOnly(mediaHandler.Upload))
+	mux.Handle("DELETE /api/media/{id}", adminOnly(mediaHandler.Delete))
 
 	mux.HandleFunc("GET /api/locales", localeHandler.List)
 
