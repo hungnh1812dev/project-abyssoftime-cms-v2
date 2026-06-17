@@ -6,20 +6,21 @@ import { FormStateContext } from './FormStateContext'
 
 interface CmsFormProviderProps {
   query?: UseQueryOptions
+  values?: Record<string, unknown>
   mutationFn: (data: Record<string, unknown>) => Promise<unknown>
   onSuccess?: () => void
   children: React.ReactNode
 }
 
-export function FormProvider({ query, mutationFn, onSuccess, children }: CmsFormProviderProps) {
+export function FormProvider({ query, values: externalValues, mutationFn, onSuccess, children }: CmsFormProviderProps) {
   const queryClient = useQueryClient()
 
-  const { data, isFetching } = useQuery(
+  const { data: queryData, isFetching } = useQuery(
     query ?? { queryKey: ['__noop__'], queryFn: () => null, enabled: false },
   )
 
   const methods = useForm({
-    values: (data as Record<string, unknown>) ?? {},
+    values: externalValues ?? (queryData as Record<string, unknown>) ?? {},
   })
 
   const { isDirty } = methods.formState

@@ -1,17 +1,14 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { api } from '@/lib/api'
+import { useLocales, usePublishDocument, useUnpublishDocument } from '@/hooks/useDocuments'
+import { ContentTypeLayout } from '@/components/content-type/ContentTypeLayout'
 import { FormProvider } from '@/components/form/FormProvider'
 import { FormField } from '@/components/form/FormField'
 import { TextInput } from '@/components/form/inputs/TextInput'
 import { Button } from '@/components/ui/button'
-import {
-  useDocument,
-  useLocales,
-  useUpdateDocument,
-  usePublishDocument,
-  useUnpublishDocument,
-} from '@/hooks/useDocuments'
+import { useCmsFormState } from '@/components/form/FormStateContext'
 import type { ContentType, Document } from '@/types/cms'
 
 interface Props {
@@ -19,14 +16,30 @@ interface Props {
   documentId: string
 }
 
+function SaveButton() {
+  const { isDirty, submitting } = useCmsFormState()
+  return (
+    <Button type="submit" disabled={!isDirty || submitting}>
+      Save
+    </Button>
+  )
+}
+
 export function CollectionDetailPanel({ contentType, documentId }: Props) {
+  const qc = useQueryClient()
   const { data: locales = [] } = useLocales()
   const [locale, setLocale] = useState('')
   const activeLocale = locale || locales[0] || ''
 
-  const { data: doc, isLoading } = useDocument(documentId, activeLocale)
-
-  const { mutateAsync: updateDoc } = useUpdateDocument()
+  const { data: doc, isLoading } = useQuery({
+    queryKey: ['documents', 'detail', documentId, activeLocale],
+    queryFn: () =>
+      api
+        .get<Document>(`/api/documents/${documentId}`, { params: { locale: activeLocale } })
+        .then((r) => r.data),
+    enabled: Boolean(documentId),
+    placeholderData: keepPreviousData,
+  })
   const publish = usePublishDocument()
   const unpublish = useUnpublishDocument()
 
@@ -34,87 +47,82 @@ export function CollectionDetailPanel({ contentType, documentId }: Props) {
     return <p className="text-muted-foreground">Loading…</p>
   }
 
-  if (!doc) {
+  if (!doc || !doc.Data) {
     return <p className="text-muted-foreground">Document not found.</p>
   }
-
-  const mutationFn = (data: Record<string, unknown>) =>
-    updateDoc({ id: doc.EntryID, contentTypeId: contentType.ID, data, locale: activeLocale })
 
   const fieldKeys = Object.keys(doc.Data)
   const canPublish = doc.Status !== 'published'
   const canUnpublish = doc.Status !== 'draft'
 
+  const mutationFn = async (data: Record<string, unknown>) => {
+    const result = await api
+      .put<Document>(
+        `/api/documents/${doc.EntryID}`,
+        { contentTypeId: contentType.ID, data },
+        { params: { locale: activeLocale } },
+      )
+      .then((r) => r.data)
+    await qc.invalidateQueries({ queryKey: ['documents', contentType.ID] })
+    return result
+  }
+
   return (
-    <div className="space-y-6">
-      <Link
-        to={`/admin/content-types/${contentType.Slug}`}
-        className="text-sm text-muted-foreground hover:text-foreground"
+    <FormProvider
+      values={doc.Data as Record<string, unknown>}
+      mutationFn={mutationFn}
+    >
+      <ContentTypeLayout
+        title={contentType.Name}
+        status={doc.Status}
+        renderActions={() => (
+          <>
+            {locales.length > 1 && (
+              <select
+                aria-label="Locale"
+                value={activeLocale}
+                onChange={(e) => setLocale(e.target.value)}
+              >
+                {locales.map((l) => (
+                  <option key={l} value={l}>
+                    {l}
+                  </option>
+                ))}
+              </select>
+            )}
+            {canPublish && (
+              <Button
+                type="button"
+                onClick={() =>
+                  publish.mutate({ id: doc.EntryID, contentTypeId: contentType.ID, locale: activeLocale })
+                }
+                disabled={publish.isPending}
+              >
+                Publish
+              </Button>
+            )}
+            {canUnpublish && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() =>
+                  unpublish.mutate({ id: doc.EntryID, contentTypeId: contentType.ID, locale: activeLocale })
+                }
+                disabled={unpublish.isPending}
+              >
+                Unpublish
+              </Button>
+            )}
+            <SaveButton />
+          </>
+        )}
       >
-        ← Back
-      </Link>
-
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold">{contentType.Name}</h1>
-          <span className="text-sm text-muted-foreground capitalize">{doc.Status}</span>
-        </div>
-        <div className="flex gap-2 items-center">
-          {locales.length > 1 && (
-            <select
-              aria-label="Locale"
-              value={activeLocale}
-              onChange={(e) => setLocale(e.target.value)}
-            >
-              {locales.map((l) => (
-                <option key={l} value={l}>
-                  {l}
-                </option>
-              ))}
-            </select>
-          )}
-          {canPublish && (
-            <Button
-              onClick={() =>
-                publish.mutate({
-                  id: doc.EntryID,
-                  contentTypeId: contentType.ID,
-                  locale: activeLocale,
-                })
-              }
-              disabled={publish.isPending}
-            >
-              Publish
-            </Button>
-          )}
-          {canUnpublish && (
-            <Button
-              variant="outline"
-              onClick={() =>
-                unpublish.mutate({
-                  id: doc.EntryID,
-                  contentTypeId: contentType.ID,
-                  locale: activeLocale,
-                })
-              }
-              disabled={unpublish.isPending}
-            >
-              Unpublish
-            </Button>
-          )}
-        </div>
-      </div>
-
-      <FormProvider
-        query={{
-          queryKey: ['documents', 'detail', doc.EntryID, activeLocale, 'data'],
-          queryFn: () =>
-            api
-              .get<Document>(`/api/documents/${doc.EntryID}`, { params: { locale: activeLocale } })
-              .then((r) => r.data.Data),
-        }}
-        mutationFn={mutationFn}
-      >
+        <Link
+          to={`/admin/content-type/collection-type/${contentType.Slug}`}
+          className="text-sm text-muted-foreground hover:text-foreground"
+        >
+          ← Back
+        </Link>
         <div className="space-y-4">
           {fieldKeys.map((key) => (
             <div key={key}>
@@ -124,9 +132,8 @@ export function CollectionDetailPanel({ contentType, documentId }: Props) {
               </FormField>
             </div>
           ))}
-          <Button type="submit">Save</Button>
         </div>
-      </FormProvider>
-    </div>
+      </ContentTypeLayout>
+    </FormProvider>
   )
 }
