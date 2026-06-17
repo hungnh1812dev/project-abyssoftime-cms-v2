@@ -28,46 +28,46 @@ beforeEach(() => {
 })
 
 describe('MediaInput', () => {
-  it('renders a Choose file button', () => {
-    const mutate = vi.fn()
+  it('renders a clickable upload zone with placeholder text', () => {
     vi.mocked(useUploadMedia).mockReturnValue({
-      mutate,
+      mutate: vi.fn(),
       isPending: false,
     } as ReturnType<typeof useUploadMedia>)
 
-    const mutationFn = vi.fn().mockResolvedValue(undefined)
     render(
       <Wrapper>
-        <FormProvider mutationFn={mutationFn}>
+        <FormProvider mutationFn={vi.fn().mockResolvedValue(undefined)}>
           <FormField name="image">
             <MediaInput />
           </FormField>
         </FormProvider>
       </Wrapper>,
     )
-    expect(screen.getByRole('button', { name: /choose file/i })).toBeInTheDocument()
+    expect(screen.getByTestId('media-upload-zone')).toBeInTheDocument()
+    expect(screen.getByText(/click to upload/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /choose file/i })).not.toBeInTheDocument()
   })
 
-  it('shows Uploading… while upload is in flight', () => {
+  it('shows a spinner overlay while uploading', () => {
     vi.mocked(useUploadMedia).mockReturnValue({
       mutate: vi.fn(),
       isPending: true,
     } as ReturnType<typeof useUploadMedia>)
 
-    const mutationFn = vi.fn().mockResolvedValue(undefined)
     render(
       <Wrapper>
-        <FormProvider mutationFn={mutationFn}>
+        <FormProvider mutationFn={vi.fn().mockResolvedValue(undefined)}>
           <FormField name="image">
             <MediaInput />
           </FormField>
         </FormProvider>
       </Wrapper>,
     )
-    expect(screen.getByRole('button', { name: /uploading/i })).toBeDisabled()
+    expect(screen.getByTestId('upload-spinner')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /uploading/i })).not.toBeInTheDocument()
   })
 
-  it('calls upload and shows preview on file select', async () => {
+  it('calls upload and shows the image in the zone after success', async () => {
     const user = userEvent.setup()
     let onSuccessCb: ((asset: { url: string; thumbnailUrl: string }) => void) | undefined
 
@@ -79,10 +79,9 @@ describe('MediaInput', () => {
       isPending: false,
     } as ReturnType<typeof useUploadMedia>)
 
-    const mutationFn = vi.fn().mockResolvedValue(undefined)
     render(
       <Wrapper>
-        <FormProvider mutationFn={mutationFn}>
+        <FormProvider mutationFn={vi.fn().mockResolvedValue(undefined)}>
           <FormField name="image">
             <MediaInput documentRef="doc-1" contentTypeId="ct-1" />
           </FormField>
@@ -99,21 +98,19 @@ describe('MediaInput', () => {
       expect.any(Object),
     )
 
-    // Simulate successful upload (thumbnailUrl same as url — no second preview)
     await act(async () => {
       onSuccessCb?.({ url: 'https://cdn.example.com/photo.jpg', thumbnailUrl: 'https://cdn.example.com/photo.jpg' })
     })
 
     await waitFor(() => {
-      expect(screen.getByRole('img', { name: /uploaded media/i })).toHaveAttribute(
+      expect(screen.getByRole('img', { name: /media preview/i })).toHaveAttribute(
         'src',
         'https://cdn.example.com/photo.jpg',
       )
     })
-    expect(screen.queryByRole('img', { name: /thumbnail preview/i })).not.toBeInTheDocument()
   })
 
-  it('shows thumbnail preview when thumbnailUrl differs from url', async () => {
+  it('displays thumbnailUrl in the zone when it differs from url', async () => {
     const user = userEvent.setup()
     let onSuccessCb: ((asset: { url: string; thumbnailUrl: string }) => void) | undefined
 
@@ -125,10 +122,9 @@ describe('MediaInput', () => {
       isPending: false,
     } as ReturnType<typeof useUploadMedia>)
 
-    const mutationFn = vi.fn().mockResolvedValue(undefined)
     render(
       <Wrapper>
-        <FormProvider mutationFn={mutationFn}>
+        <FormProvider mutationFn={vi.fn().mockResolvedValue(undefined)}>
           <FormField name="image">
             <MediaInput documentRef="doc-1" contentTypeId="ct-1" />
           </FormField>
@@ -148,11 +144,7 @@ describe('MediaInput', () => {
     })
 
     await waitFor(() => {
-      expect(screen.getByRole('img', { name: /uploaded media/i })).toHaveAttribute(
-        'src',
-        'https://cdn.example.com/photo.jpg',
-      )
-      expect(screen.getByRole('img', { name: /thumbnail preview/i })).toHaveAttribute(
+      expect(screen.getByRole('img', { name: /media preview/i })).toHaveAttribute(
         'src',
         'https://cdn.example.com/thumb_photo.jpg',
       )

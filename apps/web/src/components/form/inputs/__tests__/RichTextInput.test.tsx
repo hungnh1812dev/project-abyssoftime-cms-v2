@@ -7,20 +7,27 @@ import { FormField } from '../../FormField'
 
 // CKEditor cannot run in jsdom — mock it with a controlled textarea that
 // mirrors the real onChange(event, editor) API.
+let lastCapturedConfig: unknown = undefined
+
 vi.mock('@ckeditor/ckeditor5-react', () => ({
   CKEditor: ({
     data,
     onChange,
+    config,
   }: {
     data: string
     onChange: (event: null, editor: { getData: () => string }) => void
-  }) => (
-    <textarea
-      data-testid="ckeditor-mock"
-      defaultValue={data}
-      onChange={(e) => onChange(null, { getData: () => e.target.value })}
-    />
-  ),
+    config?: unknown
+  }) => {
+    lastCapturedConfig = config
+    return (
+      <textarea
+        data-testid="ckeditor-mock"
+        defaultValue={data}
+        onChange={(e) => onChange(null, { getData: () => e.target.value })}
+      />
+    )
+  },
 }))
 
 vi.mock('@ckeditor/ckeditor5-build-classic', () => ({ default: class MockEditor {} }))
@@ -41,6 +48,7 @@ const { RichTextInput } = await import('../RichTextInput')
 describe('RichTextInput', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    lastCapturedConfig = undefined
   })
 
   it('renders the CKEditor', () => {
@@ -80,6 +88,51 @@ describe('RichTextInput', () => {
     await waitFor(() => {
       expect(mutationFn.mock.calls[0][0]).toEqual({ body: '<p>Hello</p>' })
     })
+  })
+
+  it('injects min-height style for .ck-editor__editable_inline', () => {
+    render(
+      <Wrapper>
+        <FormProvider mutationFn={vi.fn().mockResolvedValue(undefined)}>
+          <FormField name="body">
+            <RichTextInput />
+          </FormField>
+        </FormProvider>
+      </Wrapper>,
+    )
+    const styles = Array.from(document.querySelectorAll('style'))
+    const hasMinHeight = styles.some((s) =>
+      s.textContent?.includes('.ck-editor__editable_inline') &&
+      s.textContent?.includes('min-height: 12em'),
+    )
+    expect(hasMinHeight).toBe(true)
+  })
+
+  it('forwards toolbar prop to CKEditor config when provided', () => {
+    const toolbar = ['bold', 'italic']
+    render(
+      <Wrapper>
+        <FormProvider mutationFn={vi.fn().mockResolvedValue(undefined)}>
+          <FormField name="body">
+            <RichTextInput toolbar={toolbar} />
+          </FormField>
+        </FormProvider>
+      </Wrapper>,
+    )
+    expect((lastCapturedConfig as { toolbar?: string[] })?.toolbar).toEqual(toolbar)
+  })
+
+  it('does not set toolbar config when prop is omitted', () => {
+    render(
+      <Wrapper>
+        <FormProvider mutationFn={vi.fn().mockResolvedValue(undefined)}>
+          <FormField name="body">
+            <RichTextInput />
+          </FormField>
+        </FormProvider>
+      </Wrapper>,
+    )
+    expect((lastCapturedConfig as { toolbar?: string[] } | undefined)?.toolbar).toBeUndefined()
   })
 
   it('stores HTML string (not DOM nodes) in form state', async () => {

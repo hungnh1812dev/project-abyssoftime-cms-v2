@@ -55,6 +55,20 @@ describe('JsonInput', () => {
     expect(screen.getByTestId('codemirror-mock')).toBeInTheDocument()
   })
 
+  it('wraps the editor in a min-h-[15em] container', () => {
+    render(
+      <Wrapper>
+        <FormProvider mutationFn={vi.fn().mockResolvedValue(undefined)}>
+          <FormField name="metadata">
+            <JsonInput />
+          </FormField>
+        </FormProvider>
+      </Wrapper>,
+    )
+    const wrapper = screen.getByTestId('json-editor-wrapper')
+    expect(wrapper).toHaveClass('min-h-[15em]')
+  })
+
   it('parses valid JSON and submits as an object (not a string)', async () => {
     const user = userEvent.setup()
     const mutationFn = vi.fn().mockResolvedValue(undefined)

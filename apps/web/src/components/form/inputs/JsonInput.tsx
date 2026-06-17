@@ -22,26 +22,29 @@ export function JsonInput({ name, control }: JsonInputProps) {
       }}
       render={({ field }) => (
         <div>
-          <CodeMirror
-            value={rawValue}
-            extensions={[json()]}
-            onChange={(val) => {
-              setRawValue(val)
-              if (val.trim() === '') {
-                setSyntaxError(null)
-                field.onChange(null)
-                return
-              }
-              try {
-                const parsed = JSON.parse(val)
-                setSyntaxError(null)
-                field.onChange(parsed)
-              } catch {
-                setSyntaxError('Invalid JSON')
-                field.onChange(undefined)
-              }
-            }}
-          />
+          <div data-testid="json-editor-wrapper" className="min-h-[15em]">
+            <CodeMirror
+              value={rawValue}
+              extensions={[json()]}
+              minHeight="15em"
+              onChange={(val) => {
+                setRawValue(val)
+                if (val.trim() === '') {
+                  setSyntaxError(null)
+                  field.onChange(null)
+                  return
+                }
+                try {
+                  const parsed = JSON.parse(val)
+                  setSyntaxError(null)
+                  field.onChange(parsed)
+                } catch {
+                  setSyntaxError('Invalid JSON')
+                  field.onChange(undefined)
+                }
+              }}
+            />
+          </div>
           {syntaxError && <p role="alert">{syntaxError}</p>}
         </div>
       )}
