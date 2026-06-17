@@ -2,6 +2,7 @@ package mongodb
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"go.mongodb.org/mongo-driver/mongo"
@@ -9,6 +10,9 @@ import (
 )
 
 func NewClient(ctx context.Context, uri string) (*mongo.Client, error) {
+	if uri == "" {
+		return nil, fmt.Errorf("mongodb: uri is required")
+	}
 	opts := options.Client().ApplyURI(uri).SetConnectTimeout(10 * time.Second)
 	client, err := mongo.Connect(ctx, opts)
 	if err != nil {

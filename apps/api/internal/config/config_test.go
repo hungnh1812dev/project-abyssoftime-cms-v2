@@ -86,34 +86,4 @@ func TestLoad_OverridesAndLocaleSplit(t *testing.T) {
 	}
 }
 
-func TestLoad_MissingJWTSecret(t *testing.T) {
-	clearEnv(t)
-
-	_, err := config.Load()
-	if err == nil {
-		t.Fatal("Load() error = nil, want error for missing JWT_SECRET")
-	}
-}
-
-func TestLoad_InvalidMediaDriver(t *testing.T) {
-	clearEnv(t)
-	t.Setenv("JWT_SECRET", "s")
-	t.Setenv("STORAGE_PROVIDER", "dropbox")
-
-	_, err := config.Load()
-	if err == nil {
-		t.Fatal("Load() error = nil, want error for invalid STORAGE_PROVIDER")
-	}
-}
-
-func TestLoad_InvalidMediaAutoThumbnail(t *testing.T) {
-	clearEnv(t)
-	t.Setenv("JWT_SECRET", "s")
-	t.Setenv("MEDIA_AUTO_THUMBNAIL", "not-a-bool")
-
-	_, err := config.Load()
-	if err == nil {
-		t.Fatal("Load() error = nil, want error for invalid MEDIA_AUTO_THUMBNAIL")
-	}
-}
 

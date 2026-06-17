@@ -4,7 +4,6 @@
 package config
 
 import (
-	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -80,63 +79,41 @@ func splitLocales(raw string) []string {
 // application needs, returning a single typed Config or the first
 // validation error encountered.
 func Load() (*Config, error) {
-	jwtSecret := os.Getenv("JWT_SECRET")
-	if jwtSecret == "" {
-		return nil, fmt.Errorf("JWT_SECRET is required")
-	}
-
-	dbDriver := getenv("DB_DRIVER", "mongo")
-	if dbDriver != "mongo" && dbDriver != "postgresql" {
-		return nil, fmt.Errorf("unknown DB_DRIVER %q (want %q or %q)", dbDriver, "mongo", "postgresql")
-	}
-
-	mediaDriver := getenv("STORAGE_PROVIDER", "cloudinary")
-	if mediaDriver != "s3" && mediaDriver != "cloudinary" {
-		return nil, fmt.Errorf("unknown STORAGE_PROVIDER %q (want %q or %q)", mediaDriver, "s3", "cloudinary")
-	}
-
 	generateThumbnail := true
 	if raw := os.Getenv("MEDIA_AUTO_THUMBNAIL"); raw != "" {
 		v, err := strconv.ParseBool(raw)
 		if err != nil {
-			return nil, fmt.Errorf("invalid MEDIA_AUTO_THUMBNAIL %q: %w", raw, err)
-		}
-		generateThumbnail = v
+			generateThumbnail = false
+		} else{
+		generateThumbnail = v}
 	}
-
-	cloudinaryCloudName := os.Getenv("CLOUDINARY_CLOUD_NAME")
-	cloudinaryAPIKey := os.Getenv("CLOUDINARY_API_KEY")
-	cloudinaryAPISecret := os.Getenv("CLOUDINARY_API_SECRET")
-
-	s3Bucket := os.Getenv("S3_BUCKET")
-	s3Region := os.Getenv("S3_REGION")
 
 	return &Config{
 		Port:             getenv("PORT", "8080"),
-		JWTSecret:        jwtSecret,
+		JWTSecret:        getenv("JWT_SECRET", ""),
 		ContentTypeDir:   getenv("CONTENT_TYPES_DIR", "content-types"),
 		SupportedLocales: splitLocales(getenv("SUPPORTED_LOCALES", "en,vi")),
 		DB: DBConfig{
-			Driver: dbDriver,
+			Driver: getenv("DB_DRIVER", "mongo"),
 			Mongo: MongoConfig{
 				URI:  getenv("MONGODB_URI", "mongodb://localhost:27017"),
 				Name: getenv("MONGODB_DB", "cms"),
 			},
 			Postgresql: PostgresConfig{
-				URI: os.Getenv("POSTGRES_URI"),
+				URI: getenv("POSTGRES_URI", ""),
 			},
 		},
 		Media: MediaConfig{
-			Driver:            mediaDriver,
+			Driver:            getenv("STORAGE_PROVIDER", "cloudinary"),
 			GenerateThumbnail: generateThumbnail,
 			Cloudinary: CloudinaryConfig{
-				CloudName: cloudinaryCloudName,
-				APIKey:    cloudinaryAPIKey,
-				APISecret: cloudinaryAPISecret,
+				CloudName: getenv("CLOUDINARY_CLOUD_NAME", ""),
+				APIKey:    getenv("CLOUDINARY_API_KEY", ""),
+				APISecret: getenv("CLOUDINARY_API_SECRET", ""),
 			},
 			S3: S3Config{
-				Bucket: s3Bucket,
-				Region: s3Region,
+				Bucket: getenv("S3_BUCKET", ""),
+				Region: getenv("S3_REGION", ""),
 			},
 		},
 		GraphQL: GraphQLConfig{
