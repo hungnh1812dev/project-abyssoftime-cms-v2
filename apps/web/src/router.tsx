@@ -1,34 +1,66 @@
 import { lazy, Suspense } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useParams } from "react-router-dom";
 import { LoginPage } from "@/pages/auth/LoginPage";
 import { RegisterPage } from "@/pages/auth/RegisterPage";
 import { AdminLayout } from "@/pages/admin/layout/AdminLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { useContentTypes } from "@/hooks/useContentTypes";
 
 const FormTestPanel = lazy(() =>
   import("@/pages/FormTestPanel").then((m) => ({ default: m.FormTestPanel })),
 );
 
 const SingleTypePage = lazy(() =>
-  import("@/pages/admin/panels/SingleTypePage").then((m) => ({
+  import("@/pages/admin/panels/single-type/SingleTypePage").then((m) => ({
     default: m.SingleTypePage,
   })),
 );
 
 const CollectionTypePage = lazy(() =>
-  import("@/pages/admin/panels/CollectionTypePage").then((m) => ({
+  import("@/pages/admin/panels/collection-type/layout/CollectionTypePage").then((m) => ({
     default: m.CollectionTypePage,
   })),
 );
 
 const CollectionDetailPage = lazy(() =>
-  import("@/pages/admin/panels/CollectionDetailPage").then((m) => ({
+  import("@/pages/admin/panels/collection-type/CollectionDetailPage").then((m) => ({
     default: m.CollectionDetailPage,
+  })),
+);
+
+const AboutPagePanel = lazy(() =>
+  import("@/pages/admin/panels/AboutPagePanel").then((m) => ({
+    default: m.AboutPagePanel,
+  })),
+);
+
+const BlogPostDetailPanel = lazy(() =>
+  import("@/pages/admin/panels/BlogPostDetailPanel").then((m) => ({
+    default: m.BlogPostDetailPanel,
   })),
 );
 
 function PanelFallback() {
   return <div className="text-muted-foreground p-4">Loading…</div>;
+}
+
+function AboutPageWrapper() {
+  const { data: contentTypes = [], isLoading } = useContentTypes();
+  const ct = contentTypes.find((c) => c.Slug === "about-page");
+  if (isLoading) return <PanelFallback />;
+  if (!ct)
+    return <p className="text-muted-foreground">Content type not found.</p>;
+  return <AboutPagePanel contentType={ct} />;
+}
+
+function BlogPostDetailWrapper() {
+  const { id } = useParams<{ id: string }>();
+  const { data: contentTypes = [], isLoading } = useContentTypes();
+  const ct = contentTypes.find((c) => c.Slug === "blog-posts");
+  if (isLoading) return <PanelFallback />;
+  if (!ct || !id)
+    return <p className="text-muted-foreground">Not found.</p>;
+  return <BlogPostDetailPanel contentType={ct} documentId={id} />;
 }
 
 export function AppRouter() {
@@ -60,6 +92,25 @@ export function AppRouter() {
             </p>
           }
         />
+        {/* Custom panels — static segments match before the generic :slug routes */}
+        <Route
+          path="content-type/single-type/about-page"
+          element={
+            <Suspense fallback={<PanelFallback />}>
+              <AboutPageWrapper />
+            </Suspense>
+          }
+        />
+        <Route
+          path="content-type/collection-type/blog-posts/:id"
+          element={
+            <Suspense fallback={<PanelFallback />}>
+              <BlogPostDetailWrapper />
+            </Suspense>
+          }
+        />
+
+        {/* Generic panels — catch all remaining slugs */}
         <Route
           path="content-type/single-type/:slug"
           element={

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { api } from '@/lib/api'
+import { ContentDetailLayout } from '../layout/ContentDetailLayout'
 import { FormProvider } from '@/components/form/FormProvider'
 import { FormField } from '@/components/form/FormField'
 import { TextInput } from '@/components/form/inputs/TextInput'
@@ -45,13 +46,11 @@ export function SingleTypePanel({ contentType }: Props) {
   const canUnpublish = doc.Status !== 'draft'
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold">{contentType.Name}</h1>
-          <span className="text-sm text-muted-foreground capitalize">{doc.Status}</span>
-        </div>
-        <div className="flex gap-2 items-center">
+    <ContentDetailLayout
+      title={contentType.Name}
+      status={doc.Status}
+      renderActions={() => (
+        <>
           {locales.length > 1 && (
             <select
               aria-label="Locale"
@@ -94,9 +93,9 @@ export function SingleTypePanel({ contentType }: Props) {
               Unpublish
             </Button>
           )}
-        </div>
-      </div>
-
+        </>
+      )}
+    >
       <FormProvider
         query={{
           queryKey: ['documents', 'detail', doc.EntryID, activeLocale, 'data'],
@@ -119,6 +118,6 @@ export function SingleTypePanel({ contentType }: Props) {
           <Button type="submit">Save</Button>
         </div>
       </FormProvider>
-    </div>
+    </ContentDetailLayout>
   )
 }

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { useLocales, usePublishDocument, useUnpublishDocument } from '@/hooks/useDocuments'
-import { ContentTypeLayout } from '@/components/content-type/ContentTypeLayout'
+import { ContentDetailLayout } from '../layout/ContentDetailLayout'
 import { FormProvider } from '@/components/form/FormProvider'
 import { FormField } from '@/components/form/FormField'
 import { TextInput } from '@/components/form/inputs/TextInput'
@@ -72,9 +72,17 @@ export function CollectionDetailPanel({ contentType, documentId }: Props) {
       values={doc.Data as Record<string, unknown>}
       mutationFn={mutationFn}
     >
-      <ContentTypeLayout
+      <ContentDetailLayout
         title={contentType.Name}
         status={doc.Status}
+        backLink={
+          <Link
+            to={`/admin/content-type/collection-type/${contentType.Slug}`}
+            className="text-sm text-muted-foreground hover:text-foreground"
+          >
+            ← Back
+          </Link>
+        }
         renderActions={() => (
           <>
             {locales.length > 1 && (
@@ -117,12 +125,6 @@ export function CollectionDetailPanel({ contentType, documentId }: Props) {
           </>
         )}
       >
-        <Link
-          to={`/admin/content-type/collection-type/${contentType.Slug}`}
-          className="text-sm text-muted-foreground hover:text-foreground"
-        >
-          ← Back
-        </Link>
         <div className="space-y-4">
           {fieldKeys.map((key) => (
             <div key={key}>
@@ -133,7 +135,7 @@ export function CollectionDetailPanel({ contentType, documentId }: Props) {
             </div>
           ))}
         </div>
-      </ContentTypeLayout>
+      </ContentDetailLayout>
     </FormProvider>
   )
 }
