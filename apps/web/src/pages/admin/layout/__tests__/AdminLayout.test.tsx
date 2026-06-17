@@ -42,17 +42,17 @@ describe('Sidebar', () => {
     expect(screen.getByText('About')).toBeInTheDocument()
   })
 
-  it('renders nav links pointing to /admin/content-types/:slug', async () => {
+  it('renders nav links pointing to new content-type routes by kind', async () => {
     mock.onGet('/api/content-types').reply(200, contentTypes)
     renderWithProviders(<Sidebar />, { initialEntries: ['/admin'] })
     await waitFor(() => expect(screen.getByRole('link', { name: 'Blog' })).toBeInTheDocument())
     expect(screen.getByRole('link', { name: 'Blog' })).toHaveAttribute(
       'href',
-      '/admin/content-types/blog',
+      '/admin/content-type/collection-type/blog',
     )
     expect(screen.getByRole('link', { name: 'About' })).toHaveAttribute(
       'href',
-      '/admin/content-types/about',
+      '/admin/content-type/single-type/about',
     )
   })
 

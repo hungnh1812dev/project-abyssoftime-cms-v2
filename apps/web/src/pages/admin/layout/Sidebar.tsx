@@ -20,7 +20,11 @@ function NavGroup({ title, items }: { title: string; items: ContentType[] }) {
         {title}
       </h2>
       {items.map((ct) => (
-        <NavLink key={ct.ID} to={`/admin/content-types/${ct.Slug}`} className={navLinkClass}>
+        <NavLink
+          key={ct.ID}
+          to={`/admin/content-type/${ct.Kind === 'single' ? 'single-type' : 'collection-type'}/${ct.Slug}`}
+          className={navLinkClass}
+        >
           {ct.Name}
         </NavLink>
       ))}

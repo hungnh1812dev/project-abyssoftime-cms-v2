@@ -1,28 +1,34 @@
-import { lazy, Suspense } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
-import { LoginPage } from '@/pages/auth/LoginPage'
-import { RegisterPage } from '@/pages/auth/RegisterPage'
-import { AdminLayout } from '@/pages/admin/layout/AdminLayout'
-import { ProtectedRoute } from '@/components/ProtectedRoute'
+import { lazy, Suspense } from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
+import { LoginPage } from "@/pages/auth/LoginPage";
+import { RegisterPage } from "@/pages/auth/RegisterPage";
+import { AdminLayout } from "@/pages/admin/layout/AdminLayout";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 
 const FormTestPanel = lazy(() =>
-  import('@/pages/FormTestPanel').then((m) => ({ default: m.FormTestPanel })),
-)
+  import("@/pages/FormTestPanel").then((m) => ({ default: m.FormTestPanel })),
+);
 
-const ContentTypePanelPage = lazy(() =>
-  import('@/pages/admin/panels/ContentTypePanelPage').then((m) => ({
-    default: m.ContentTypePanelPage,
+const SingleTypePage = lazy(() =>
+  import("@/pages/admin/panels/SingleTypePage").then((m) => ({
+    default: m.SingleTypePage,
   })),
-)
+);
+
+const CollectionTypePage = lazy(() =>
+  import("@/pages/admin/panels/CollectionTypePage").then((m) => ({
+    default: m.CollectionTypePage,
+  })),
+);
 
 const CollectionDetailPage = lazy(() =>
-  import('@/pages/admin/panels/CollectionDetailPage').then((m) => ({
+  import("@/pages/admin/panels/CollectionDetailPage").then((m) => ({
     default: m.CollectionDetailPage,
   })),
-)
+);
 
 function PanelFallback() {
-  return <div className="text-muted-foreground p-4">Loading…</div>
+  return <div className="text-muted-foreground p-4">Loading…</div>;
 }
 
 export function AppRouter() {
@@ -46,17 +52,32 @@ export function AppRouter() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<p className="text-muted-foreground">Select a panel from the sidebar.</p>} />
         <Route
-          path="content-types/:slug"
+          index
+          element={
+            <p className="text-muted-foreground">
+              Select a panel from the sidebar.
+            </p>
+          }
+        />
+        <Route
+          path="content-type/single-type/:slug"
           element={
             <Suspense fallback={<PanelFallback />}>
-              <ContentTypePanelPage />
+              <SingleTypePage />
             </Suspense>
           }
         />
         <Route
-          path="content-types/:slug/:id"
+          path="content-type/collection-type/:slug"
+          element={
+            <Suspense fallback={<PanelFallback />}>
+              <CollectionTypePage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="content-type/collection-type/:slug/:id"
           element={
             <Suspense fallback={<PanelFallback />}>
               <CollectionDetailPage />
@@ -74,5 +95,5 @@ export function AppRouter() {
       />
       <Route path="*" element={<Navigate to="/admin" replace />} />
     </Routes>
-  )
+  );
 }

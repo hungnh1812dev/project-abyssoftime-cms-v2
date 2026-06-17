@@ -1,4 +1,4 @@
-import type { ComponentType } from 'react'
+import { lazy, type ComponentType } from 'react'
 import type { ContentTypeLayoutProps } from '@/components/content-type/ContentTypeLayout'
 
 export interface CollectionColumnDef {
@@ -14,7 +14,17 @@ export interface ContentTypeRegistration {
   wrapper?: ComponentType<ContentTypeLayoutProps>
 }
 
-export const contentTypeRegistry: ContentTypeRegistration[] = []
+export const contentTypeRegistry: ContentTypeRegistration[] = [
+  {
+    slug: 'site-settings',
+    kind: 'single',
+    wrapper: lazy(() =>
+      import('@/pages/admin/panels/SiteHomepagePanel').then((m) => ({
+        default: m.SiteHomepagePanel,
+      })),
+    ),
+  },
+]
 
 export function getRegistration(slug: string): ContentTypeRegistration | undefined {
   return contentTypeRegistry.find((r) => r.slug === slug)
