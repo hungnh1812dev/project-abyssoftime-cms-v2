@@ -1,0 +1,13 @@
+{
+  "slug": "about-page",
+  "name": "About Page",
+  "kind": "single",
+  "fields": [
+    { "name": "headline", "type": "text" },
+    { "name": "introduction", "type": "richtext" },
+    { "name": "profilePhoto", "type": "media" },
+    { "name": "yearsOfExp", "type": "number" },
+    { "name": "openToWork", "type": "boolean" },
+    { "name": "socialLinks", "type": "json" }
+  ]
+}

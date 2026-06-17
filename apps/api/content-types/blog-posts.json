@@ -1,0 +1,15 @@
+{
+  "slug": "blog-posts",
+  "name": "Blog Posts",
+  "kind": "collection",
+  "fields": [
+    { "name": "title", "type": "text" },
+    { "name": "slug", "type": "text" },
+    { "name": "coverImage", "type": "media" },
+    { "name": "excerpt", "type": "text" },
+    { "name": "body", "type": "richtext" },
+    { "name": "readingTime", "type": "number" },
+    { "name": "featured", "type": "boolean" },
+    { "name": "metadata", "type": "json" }
+  ]
+}
