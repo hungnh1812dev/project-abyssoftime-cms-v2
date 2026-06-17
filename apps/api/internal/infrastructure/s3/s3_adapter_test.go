@@ -33,7 +33,7 @@ func TestAdapter_Upload_ReturnsURLAndPublicID(t *testing.T) {
 	}
 	a := &adapter{client: fake, bucket: "my-bucket", region: "us-east-1"}
 
-	result, err := a.Upload(context.Background(), bytes.NewReader([]byte("data")), "photo.jpg")
+	result, err := a.Upload(context.Background(), bytes.NewReader([]byte("data")), "photo.jpg", false)
 	if err != nil {
 		t.Fatalf("Upload() error = %v", err)
 	}
@@ -49,6 +49,25 @@ func TestAdapter_Upload_ReturnsURLAndPublicID(t *testing.T) {
 	}
 }
 
+func TestAdapter_Upload_AlwaysSetsThumbnailURLEqualToURL(t *testing.T) {
+	fake := &fakeS3API{
+		putObjectFn: func(_ context.Context, _ *awss3.PutObjectInput, _ ...func(*awss3.Options)) (*awss3.PutObjectOutput, error) {
+			return &awss3.PutObjectOutput{}, nil
+		},
+	}
+	a := &adapter{client: fake, bucket: "my-bucket", region: "us-east-1"}
+
+	for _, generateThumbnail := range []bool{true, false} {
+		result, err := a.Upload(context.Background(), bytes.NewReader([]byte("data")), "photo.jpg", generateThumbnail)
+		if err != nil {
+			t.Fatalf("Upload(generateThumbnail=%v) error = %v", generateThumbnail, err)
+		}
+		if result.ThumbnailURL != result.URL {
+			t.Errorf("Upload(generateThumbnail=%v) ThumbnailURL=%q, want same as URL=%q", generateThumbnail, result.ThumbnailURL, result.URL)
+		}
+	}
+}
+
 func TestAdapter_Upload_PropagatesError(t *testing.T) {
 	fake := &fakeS3API{
 		putObjectFn: func(_ context.Context, _ *awss3.PutObjectInput, _ ...func(*awss3.Options)) (*awss3.PutObjectOutput, error) {
@@ -57,7 +76,7 @@ func TestAdapter_Upload_PropagatesError(t *testing.T) {
 	}
 	a := &adapter{client: fake, bucket: "b", region: "r"}
 
-	if _, err := a.Upload(context.Background(), bytes.NewReader(nil), "f.jpg"); err == nil {
+	if _, err := a.Upload(context.Background(), bytes.NewReader(nil), "f.jpg", false); err == nil {
 		t.Error("Upload() error = nil, want error from PutObject")
 	}
 }

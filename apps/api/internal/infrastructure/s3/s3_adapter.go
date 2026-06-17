@@ -38,7 +38,7 @@ func New(ctx context.Context, bucket, region string) (repository.StorageAdapter,
 	return &adapter{client: awss3.NewFromConfig(cfg), bucket: bucket, region: region}, nil
 }
 
-func (a *adapter) Upload(ctx context.Context, file io.Reader, filename string) (*repository.UploadResult, error) {
+func (a *adapter) Upload(ctx context.Context, file io.Reader, filename string, _ bool) (*repository.UploadResult, error) {
 	_, err := a.client.PutObject(ctx, &awss3.PutObjectInput{
 		Bucket: aws.String(a.bucket),
 		Key:    aws.String(filename),
@@ -47,9 +47,11 @@ func (a *adapter) Upload(ctx context.Context, file io.Reader, filename string) (
 	if err != nil {
 		return nil, err
 	}
+	url := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", a.bucket, a.region, filename)
 	return &repository.UploadResult{
-		URL:      fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", a.bucket, a.region, filename),
-		PublicID: filename,
+		URL:          url,
+		ThumbnailURL: url,
+		PublicID:     filename,
 	}, nil
 }
 

@@ -6,6 +6,7 @@ import { api } from '@/lib/api'
 interface MediaAsset {
   ID: string
   url: string
+  thumbnailUrl: string
   publicId: string
   documentRef: string
   contentTypeId: string

@@ -69,7 +69,7 @@ describe('MediaInput', () => {
 
   it('calls upload and shows preview on file select', async () => {
     const user = userEvent.setup()
-    let onSuccessCb: ((asset: { url: string }) => void) | undefined
+    let onSuccessCb: ((asset: { url: string; thumbnailUrl: string }) => void) | undefined
 
     const mutate = vi.fn((_args, opts) => {
       onSuccessCb = opts?.onSuccess
@@ -99,15 +99,62 @@ describe('MediaInput', () => {
       expect.any(Object),
     )
 
-    // Simulate successful upload
+    // Simulate successful upload (thumbnailUrl same as url — no second preview)
     await act(async () => {
-      onSuccessCb?.({ url: 'https://cdn.example.com/photo.jpg' })
+      onSuccessCb?.({ url: 'https://cdn.example.com/photo.jpg', thumbnailUrl: 'https://cdn.example.com/photo.jpg' })
     })
 
     await waitFor(() => {
       expect(screen.getByRole('img', { name: /uploaded media/i })).toHaveAttribute(
         'src',
         'https://cdn.example.com/photo.jpg',
+      )
+    })
+    expect(screen.queryByRole('img', { name: /thumbnail preview/i })).not.toBeInTheDocument()
+  })
+
+  it('shows thumbnail preview when thumbnailUrl differs from url', async () => {
+    const user = userEvent.setup()
+    let onSuccessCb: ((asset: { url: string; thumbnailUrl: string }) => void) | undefined
+
+    const mutate = vi.fn((_args, opts) => {
+      onSuccessCb = opts?.onSuccess
+    })
+    vi.mocked(useUploadMedia).mockReturnValue({
+      mutate,
+      isPending: false,
+    } as ReturnType<typeof useUploadMedia>)
+
+    const mutationFn = vi.fn().mockResolvedValue(undefined)
+    render(
+      <Wrapper>
+        <FormProvider mutationFn={mutationFn}>
+          <FormField name="image">
+            <MediaInput documentRef="doc-1" contentTypeId="ct-1" />
+          </FormField>
+        </FormProvider>
+      </Wrapper>,
+    )
+
+    const file = new File(['fake'], 'photo.jpg', { type: 'image/jpeg' })
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement
+    await user.upload(fileInput, file)
+
+    await act(async () => {
+      onSuccessCb?.({
+        url: 'https://cdn.example.com/photo.jpg',
+        thumbnailUrl: 'https://cdn.example.com/thumb_photo.jpg',
+      })
+    })
+
+    await waitFor(() => {
+      expect(screen.getByRole('img', { name: /uploaded media/i })).toHaveAttribute(
+        'src',
+        'https://cdn.example.com/photo.jpg',
+      )
+      expect(screen.getByRole('img', { name: /thumbnail preview/i })).toHaveAttribute(
+        'src',
+        'https://cdn.example.com/thumb_photo.jpg',
       )
     })
   })

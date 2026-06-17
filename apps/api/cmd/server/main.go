@@ -78,7 +78,7 @@ func main() {
 	authUC := auth.New(userRepo)
 	ctUC := contenttype.New(ctRepo)
 	documentUC := docuc.New(docRepo, mediaRepo, cfg.SupportedLocales)
-	mediaUC := mediauc.New(mediaRepo, storage)
+	mediaUC := mediauc.New(mediaRepo, storage, cfg.MediaAutoThumbnail)
 
 	// content-type schema-as-code sync: JSON definitions are the source of
 	// truth, reconciled into Mongo before the server starts accepting traffic.

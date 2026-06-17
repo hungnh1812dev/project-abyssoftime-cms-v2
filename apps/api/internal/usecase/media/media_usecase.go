@@ -9,21 +9,23 @@ import (
 )
 
 type UseCase struct {
-	assetRepo repository.MediaAssetRepository
-	storage   repository.StorageAdapter
+	assetRepo          repository.MediaAssetRepository
+	storage            repository.StorageAdapter
+	mediaAutoThumbnail bool
 }
 
-func New(assetRepo repository.MediaAssetRepository, storage repository.StorageAdapter) *UseCase {
-	return &UseCase{assetRepo: assetRepo, storage: storage}
+func New(assetRepo repository.MediaAssetRepository, storage repository.StorageAdapter, mediaAutoThumbnail bool) *UseCase {
+	return &UseCase{assetRepo: assetRepo, storage: storage, mediaAutoThumbnail: mediaAutoThumbnail}
 }
 
 func (uc *UseCase) Upload(ctx context.Context, file io.Reader, filename, documentRef, contentTypeID string) (*entity.MediaAsset, error) {
-	result, err := uc.storage.Upload(ctx, file, filename)
+	result, err := uc.storage.Upload(ctx, file, filename, uc.mediaAutoThumbnail)
 	if err != nil {
 		return nil, err
 	}
 	asset := &entity.MediaAsset{
 		URL:           result.URL,
+		ThumbnailURL:  result.ThumbnailURL,
 		PublicID:      result.PublicID,
 		DocumentRef:   documentRef,
 		ContentTypeID: contentTypeID,

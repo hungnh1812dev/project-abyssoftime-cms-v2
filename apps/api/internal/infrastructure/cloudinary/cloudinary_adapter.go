@@ -26,18 +26,28 @@ func NewCloudinaryAdapter(cloudName, apiKey, apiSecret string) (repository.Stora
 
 func boolPtr(b bool) *bool { return &b }
 
-func (a *adapter) Upload(ctx context.Context, file io.Reader, filename string) (*repository.UploadResult, error) {
-	res, err := a.cld.Upload.Upload(ctx, file, uploader.UploadParams{
+func (a *adapter) Upload(ctx context.Context, file io.Reader, filename string, generateThumbnail bool) (*repository.UploadResult, error) {
+	params := uploader.UploadParams{
 		PublicID:       filename,
 		Overwrite:      boolPtr(true),
 		UniqueFilename: boolPtr(false),
-	})
+	}
+	if generateThumbnail {
+		params.Eager = "c_thumb,w_300,h_300"
+		params.EagerAsync = boolPtr(false)
+	}
+	res, err := a.cld.Upload.Upload(ctx, file, params)
 	if err != nil {
 		return nil, err
 	}
+	thumbnailURL := res.SecureURL
+	if generateThumbnail && len(res.Eager) > 0 {
+		thumbnailURL = res.Eager[0].SecureURL
+	}
 	return &repository.UploadResult{
-		URL:      res.SecureURL,
-		PublicID: res.PublicID,
+		URL:          res.SecureURL,
+		ThumbnailURL: thumbnailURL,
+		PublicID:     res.PublicID,
 	}, nil
 }
 
