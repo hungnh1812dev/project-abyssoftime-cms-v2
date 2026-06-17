@@ -6,6 +6,9 @@ import (
 	"log"
 	"net/http"
 
+	gqlhandler "github.com/99designs/gqlgen/graphql/handler"
+	"project-abyssoftime-cms-v2/api/graphql/generated"
+	"project-abyssoftime-cms-v2/api/graphql/resolver"
 	"project-abyssoftime-cms-v2/api/internal/config"
 	deliveryhandler "project-abyssoftime-cms-v2/api/internal/delivery/http/handler"
 	"project-abyssoftime-cms-v2/api/internal/delivery/http/middleware"
@@ -136,6 +139,23 @@ func main() {
 	mux.Handle("POST /api/media/upload", adminOnly(mediaHandler.Upload))
 
 	mux.HandleFunc("GET /api/locales", localeHandler.List)
+
+	// GraphQL endpoint alongside REST — same usecases, auth via @auth directive.
+	gqlSchema := generated.NewExecutableSchema(generated.Config{
+		Resolvers: &resolver.Resolver{
+			DocumentUC:    documentUC,
+			ContentTypeUC: ctUC,
+		},
+		Directives: generated.DirectiveRoot{
+			Auth: resolver.AuthDirective,
+		},
+	})
+	gqlSrv := gqlhandler.NewDefaultServer(gqlSchema)
+	mux.Handle(cfg.GraphQLPath, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := resolver.WithRequest(r.Context(), r)
+		gqlSrv.ServeHTTP(w, r.WithContext(ctx))
+	}))
+	log.Printf("graphql endpoint: %s", cfg.GraphQLPath)
 
 	addr := ":" + cfg.Port
 	log.Printf("server listening on %s", addr)
