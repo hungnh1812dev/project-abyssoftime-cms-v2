@@ -1,0 +1,40 @@
+scalar JSON
+scalar Time
+
+directive @auth on FIELD_DEFINITION
+
+type Document {
+  id: ID!
+  entryId: ID!
+  version: String!
+  contentTypeId: String!
+  data: JSON!
+  locale: String!
+  createdAt: Time!
+  updatedAt: Time!
+  publishedAt: Time
+  createdBy: String!
+  updatedBy: String!
+  publishedBy: String
+}
+
+type ContentType {
+  id: ID!
+  name: String!
+  slug: String!
+  kind: String!
+  createdAt: Time!
+  updatedAt: Time!
+}
+
+type Query {
+  publishedDocument(entryId: ID!, locale: String): Document
+  contentTypes: [ContentType!]!
+}
+
+type Mutation {
+  saveDocument(entryId: ID!, locale: String, data: JSON!): Document! @auth
+  publishDocument(entryId: ID!, locale: String): Document! @auth
+  unpublishDocument(entryId: ID!, locale: String): Document! @auth
+  deleteDocument(entryId: ID!): Boolean! @auth
+}

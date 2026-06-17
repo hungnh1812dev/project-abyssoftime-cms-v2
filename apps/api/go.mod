@@ -3,16 +3,19 @@ module project-abyssoftime-cms-v2/api
 go 1.26.4
 
 require (
+	github.com/99designs/gqlgen v0.17.91
 	github.com/aws/aws-sdk-go-v2 v1.42.0
 	github.com/aws/aws-sdk-go-v2/config v1.32.25
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.103.3
 	github.com/cloudinary/cloudinary-go/v2 v2.16.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
+	github.com/vektah/gqlparser/v2 v2.5.34
 	go.mongodb.org/mongo-driver v1.17.9
 	golang.org/x/crypto v0.53.0
 )
 
 require (
+	github.com/agnivade/levenshtein v1.2.1 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.13 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.24 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.29 // indirect
@@ -30,10 +33,11 @@ require (
 	github.com/aws/smithy-go v1.27.1 // indirect
 	github.com/creasty/defaults v1.7.0 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
-	github.com/google/uuid v1.5.0 // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/schema v1.4.1 // indirect
 	github.com/klauspost/compress v1.16.7 // indirect
 	github.com/montanaflynn/stats v0.7.1 // indirect
+	github.com/sosodev/duration v1.4.0 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
 	github.com/xdg-go/scram v1.1.2 // indirect
 	github.com/xdg-go/stringprep v1.0.4 // indirect

@@ -1,4 +1,4 @@
-.PHONY: dev dev-api dev-web test-api test-web mongo-start mongo-stop
+.PHONY: dev dev-api dev-web test-api test-web mongo-start mongo-stop graphql-generate
 
 CONTAINER_CLI ?= docker
 MONGO_CONTAINER = cms-mongo
@@ -49,3 +49,7 @@ test-api:
 # Run frontend tests
 test-web:
 	cd apps/web && npm test
+
+# Regenerate GraphQL boilerplate from graphql/schema.graphqls (never hand-edit graphql/generated/)
+graphql-generate:
+	cd apps/api && go run github.com/99designs/gqlgen generate
