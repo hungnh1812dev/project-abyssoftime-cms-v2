@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { useMediaList, useUploadMedia } from '@/hooks/useMedia'
+import { Trash2 } from 'lucide-react'
+import { useMediaList, useUploadMedia, useDeleteMedia } from '@/hooks/useMedia'
 import { Button } from '@/components/ui/button'
 import type { MediaAsset } from '@/types/cms'
 
@@ -14,9 +15,11 @@ export function MediaLibrary({ isOpen, onClose, onSelect, ext }: MediaLibraryPro
   const [page, setPage] = useState(1)
   const [showUpload, setShowUpload] = useState(false)
   const [stagedFiles, setStagedFiles] = useState<File[]>([])
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
 
   const { data, isLoading } = useMediaList(page, 20)
   const upload = useUploadMedia()
+  const deleteMedia = useDeleteMedia()
 
   if (!isOpen) return null
 
@@ -79,20 +82,43 @@ export function MediaLibrary({ isOpen, onClose, onSelect, ext }: MediaLibraryPro
           ) : (
             <div className="grid grid-cols-4 gap-3">
               {filteredItems.map((asset) => (
-                <button
-                  key={asset.ID}
-                  type="button"
-                  className={`border rounded overflow-hidden aspect-square hover:border-ring transition-colors ${
-                    ext && !ext.includes(asset.fileExt) ? 'opacity-40' : ''
-                  }`}
-                  onClick={() => { onSelect(asset); onClose() }}
-                >
-                  <img
-                    src={asset.thumbnailUrl || asset.url}
-                    alt={asset.fileName}
-                    className="w-full h-full object-cover"
-                  />
-                </button>
+                <div key={asset.ID} className="relative group">
+                  <button
+                    type="button"
+                    className={`w-full border rounded overflow-hidden aspect-square hover:border-ring transition-colors ${
+                      ext && !ext.includes(asset.fileExt) ? 'opacity-40' : ''
+                    }`}
+                    disabled={deleteMedia.isPending}
+                    onClick={() => { onSelect(asset); onClose() }}
+                  >
+                    <img
+                      src={asset.thumbnailUrl || asset.url}
+                      alt={asset.fileName}
+                      className="w-full h-full object-cover"
+                    />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={pendingDeleteId === asset.ID ? 'Confirm delete' : 'Delete asset'}
+                    className={`absolute top-1 right-1 rounded p-0.5 bg-background/80 transition-colors ${
+                      pendingDeleteId === asset.ID
+                        ? 'text-red-500'
+                        : 'text-muted-foreground opacity-0 group-hover:opacity-100'
+                    }`}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (pendingDeleteId === asset.ID) {
+                        deleteMedia.mutate(asset.ID)
+                        setPendingDeleteId(null)
+                      } else {
+                        setPendingDeleteId(asset.ID)
+                      }
+                    }}
+                    onMouseLeave={() => setPendingDeleteId(null)}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               ))}
             </div>
           )}
