@@ -41,8 +41,42 @@ func LoadDefinitions(dir string) ([]ContentTypeDefinition, error) {
 		if err := json.Unmarshal(data, &def); err != nil {
 			return nil, fmt.Errorf("parse %q: %w", path, err)
 		}
+		if err := validateDefinition(def, path); err != nil {
+			return nil, err
+		}
 		defs = append(defs, def)
 	}
 
 	return defs, nil
+}
+
+func validateDefinition(def ContentTypeDefinition, path string) error {
+	return validateFields(def.Fields, path, 1)
+}
+
+func validateFields(fields []entity.FieldDefinition, path string, depth int) error {
+	for _, f := range fields {
+		switch f.Type {
+		case "layout":
+			if len(f.Fields) == 0 {
+				return fmt.Errorf("%q: layout field %q must have at least one child field", path, f.Name)
+			}
+			for _, child := range f.Fields {
+				if child.Type == "component" {
+					return fmt.Errorf("%q: layout field %q must not contain component children", path, f.Name)
+				}
+			}
+		case "component":
+			if f.Name == "" {
+				return fmt.Errorf("%q: component field must have a non-empty name", path)
+			}
+			if depth > 1 {
+				return fmt.Errorf("%q: component %q exceeds maximum nesting depth of 2", path, f.Name)
+			}
+			if err := validateFields(f.Fields, path, depth+1); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

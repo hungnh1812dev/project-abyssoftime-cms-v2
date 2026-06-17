@@ -59,3 +59,31 @@ func TestLoadDefinitions_MissingDir(t *testing.T) {
 		t.Fatal("LoadDefinitions() error = nil, want non-nil for missing directory")
 	}
 }
+
+func TestLoadDefinitions_LayoutEmptyFields(t *testing.T) {
+	_, err := contenttype.LoadDefinitions("testdata/invalid/layout-empty-fields")
+	if err == nil {
+		t.Fatal("LoadDefinitions() error = nil, want error for layout with empty fields")
+	}
+}
+
+func TestLoadDefinitions_LayoutContainsComponent(t *testing.T) {
+	_, err := contenttype.LoadDefinitions("testdata/invalid/layout-contains-component")
+	if err == nil {
+		t.Fatal("LoadDefinitions() error = nil, want error for layout containing a component")
+	}
+}
+
+func TestLoadDefinitions_ComponentEmptyName(t *testing.T) {
+	_, err := contenttype.LoadDefinitions("testdata/invalid/component-empty-name")
+	if err == nil {
+		t.Fatal("LoadDefinitions() error = nil, want error for component with empty name")
+	}
+}
+
+func TestLoadDefinitions_ComponentDepthExceeded(t *testing.T) {
+	_, err := contenttype.LoadDefinitions("testdata/invalid/component-depth-exceeded")
+	if err == nil {
+		t.Fatal("LoadDefinitions() error = nil, want error for component depth > 2")
+	}
+}
