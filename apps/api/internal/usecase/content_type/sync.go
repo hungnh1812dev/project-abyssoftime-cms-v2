@@ -70,7 +70,7 @@ func (s *Syncer) syncOne(ctx context.Context, def ContentTypeDefinition) error {
 		if !pkgerrors.Is(err, pkgerrors.ErrNotFound) {
 			return err
 		}
-		ct := &entity.ContentType{Name: def.Name, Slug: def.Slug, Kind: kind}
+		ct := &entity.ContentType{Name: def.Name, Slug: def.Slug, Kind: kind, Fields: def.Fields}
 		if err := s.Create(ctx, ct); err != nil {
 			return err
 		}
@@ -80,12 +80,28 @@ func (s *Syncer) syncOne(ctx context.Context, def ContentTypeDefinition) error {
 		return nil
 	}
 
-	if current.Name == def.Name && current.Kind == kind {
+	if current.Name == def.Name && current.Kind == kind && fieldsEqual(current.Fields, def.Fields) {
 		return nil
 	}
 	current.Name = def.Name
 	current.Kind = kind
+	current.Fields = def.Fields
 	return s.Update(ctx, current)
+}
+
+func fieldsEqual(a, b []entity.FieldDefinition) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i].Name != b[i].Name || a[i].Type != b[i].Type {
+			return false
+		}
+		if !fieldsEqual(a[i].Fields, b[i].Fields) {
+			return false
+		}
+	}
+	return true
 }
 
 // createSingleton creates the one-and-only entry for a newly-created
