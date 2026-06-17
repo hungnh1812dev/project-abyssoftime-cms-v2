@@ -15,6 +15,7 @@ type MediaAssetRepository struct {
 	CreateFn               func(ctx context.Context, asset *entity.MediaAsset) error
 	FindByIDFn             func(ctx context.Context, id string) (*entity.MediaAsset, error)
 	FindByDocumentRefFn    func(ctx context.Context, documentRef string) ([]*entity.MediaAsset, error)
+	FindAllFn              func(ctx context.Context, page, limit int) ([]*entity.MediaAsset, int64, error)
 	DeleteByDocumentRefFn  func(ctx context.Context, documentRef string) error
 	DeleteFn               func(ctx context.Context, id string) error
 }
@@ -29,6 +30,10 @@ func (m *MediaAssetRepository) FindByID(ctx context.Context, id string) (*entity
 
 func (m *MediaAssetRepository) FindByDocumentRef(ctx context.Context, documentRef string) ([]*entity.MediaAsset, error) {
 	return m.FindByDocumentRefFn(ctx, documentRef)
+}
+
+func (m *MediaAssetRepository) FindAll(ctx context.Context, page, limit int) ([]*entity.MediaAsset, int64, error) {
+	return m.FindAllFn(ctx, page, limit)
 }
 
 func (m *MediaAssetRepository) DeleteByDocumentRef(ctx context.Context, documentRef string) error {

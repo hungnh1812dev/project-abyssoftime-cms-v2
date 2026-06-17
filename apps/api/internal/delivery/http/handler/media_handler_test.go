@@ -18,10 +18,15 @@ import (
 
 type mockMediaUC struct {
 	uploadFn func(ctx context.Context, file io.Reader, filename, documentRef, contentTypeID string) (*entity.MediaAsset, error)
+	listFn   func(ctx context.Context, page, limit int) ([]*entity.MediaAsset, int64, error)
 }
 
 func (m *mockMediaUC) Upload(ctx context.Context, file io.Reader, filename, documentRef, contentTypeID string) (*entity.MediaAsset, error) {
 	return m.uploadFn(ctx, file, filename, documentRef, contentTypeID)
+}
+
+func (m *mockMediaUC) List(ctx context.Context, page, limit int) ([]*entity.MediaAsset, int64, error) {
+	return m.listFn(ctx, page, limit)
 }
 
 // ---- Upload ----------------------------------------------------------------
@@ -65,6 +70,37 @@ func jsonKeys(m map[string]any) []string {
 		keys = append(keys, k)
 	}
 	return keys
+}
+
+func TestMediaHandler_List_OK(t *testing.T) {
+	uc := &mockMediaUC{}
+	uc.listFn = func(_ context.Context, page, limit int) ([]*entity.MediaAsset, int64, error) {
+		return []*entity.MediaAsset{
+			{ID: "a1", URL: "https://cdn/a1.jpg"},
+		}, 5, nil
+	}
+	h := handler.NewMediaHandler(uc)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/media?page=1&limit=10", nil)
+	w := httptest.NewRecorder()
+	h.List(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("List() status = %d, want 200", w.Code)
+	}
+	var out map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&out); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	if _, ok := out["items"]; !ok {
+		t.Error("List() response missing 'items' key")
+	}
+	if out["total"] != float64(5) {
+		t.Errorf("List() total = %v, want 5", out["total"])
+	}
+	if out["page"] != float64(1) {
+		t.Errorf("List() page = %v, want 1", out["page"])
+	}
 }
 
 func TestMediaHandler_Upload_MissingFile_BadRequest(t *testing.T) {

@@ -123,6 +123,29 @@ func TestUpload_StorageError_ReturnsError(t *testing.T) {
 	}
 }
 
+func TestList_ReturnsPaginatedAssets(t *testing.T) {
+	assetRepo := &repomock.MediaAssetRepository{}
+	assetRepo.FindAllFn = func(_ context.Context, page, limit int) ([]*entity.MediaAsset, int64, error) {
+		return []*entity.MediaAsset{
+			{ID: "a1", URL: "https://cdn/a1.jpg"},
+			{ID: "a2", URL: "https://cdn/a2.jpg"},
+		}, 10, nil
+	}
+	storage := &repomock.StorageAdapter{}
+	uc := mediauc.New(assetRepo, storage, false)
+
+	items, total, err := uc.List(ctx, 1, 2)
+	if err != nil {
+		t.Fatalf("List() error = %v", err)
+	}
+	if total != 10 {
+		t.Errorf("List() total = %d, want 10", total)
+	}
+	if len(items) != 2 {
+		t.Errorf("List() items count = %d, want 2", len(items))
+	}
+}
+
 func TestUpload_BuildsHashedFilename(t *testing.T) {
 	content := []byte("deterministic content")
 	sum := sha256.Sum256(content)

@@ -23,6 +23,10 @@ func New(assetRepo repository.MediaAssetRepository, storage repository.StorageAd
 	return &UseCase{assetRepo: assetRepo, storage: storage, mediaAutoThumbnail: mediaAutoThumbnail}
 }
 
+func (uc *UseCase) List(ctx context.Context, page, limit int) ([]*entity.MediaAsset, int64, error) {
+	return uc.assetRepo.FindAll(ctx, page, limit)
+}
+
 func (uc *UseCase) Upload(ctx context.Context, file io.Reader, filename, documentRef, contentTypeID string) (*entity.MediaAsset, error) {
 	data, err := io.ReadAll(file)
 	if err != nil {

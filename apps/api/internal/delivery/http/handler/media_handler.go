@@ -4,12 +4,14 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"strconv"
 
 	"project-abyssoftime-cms-v2/api/internal/domain/entity"
 )
 
 type mediaUseCase interface {
 	Upload(ctx context.Context, file io.Reader, filename, documentRef, contentTypeID string) (*entity.MediaAsset, error)
+	List(ctx context.Context, page, limit int) ([]*entity.MediaAsset, int64, error)
 }
 
 type MediaHandler struct {
@@ -18,6 +20,28 @@ type MediaHandler struct {
 
 func NewMediaHandler(uc mediaUseCase) *MediaHandler {
 	return &MediaHandler{uc: uc}
+}
+
+func (h *MediaHandler) List(w http.ResponseWriter, r *http.Request) {
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 20
+	}
+	items, total, err := h.uc.List(r.Context(), page, limit)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"items": items,
+		"total": total,
+		"page":  page,
+		"limit": limit,
+	})
 }
 
 func (h *MediaHandler) Upload(w http.ResponseWriter, r *http.Request) {

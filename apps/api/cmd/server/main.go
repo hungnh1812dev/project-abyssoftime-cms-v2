@@ -144,6 +144,7 @@ func main() {
 	// Public/content read path: no auth, resolves the published record only.
 	mux.HandleFunc("GET /api/public/documents/{id}", docHandler.GetPublic)
 
+	mux.Handle("GET /api/media", adminOnly(mediaHandler.List))
 	mux.Handle("POST /api/media/upload", adminOnly(mediaHandler.Upload))
 
 	mux.HandleFunc("GET /api/locales", localeHandler.List)
