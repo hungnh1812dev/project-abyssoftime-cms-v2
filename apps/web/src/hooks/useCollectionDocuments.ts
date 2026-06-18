@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { AxiosError } from 'axios'
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
-import type { Document } from '@/types/cms'
+import type { Document, PaginatedResponse } from '@/types/cms'
 
 function onMutationError(err: unknown) {
   const msg = (err as AxiosError<{ error: string }>).response?.data?.error ?? 'Something went wrong'
@@ -10,55 +10,51 @@ function onMutationError(err: unknown) {
 }
 
 const KEYS = {
-  list: (contentTypeSlug: string) => ['documents', contentTypeSlug] as const,
-  detail: (contentTypeSlug: string, id: string, locale: string) =>
-    ['documents', 'detail', contentTypeSlug, id, locale] as const,
-  locales: ['locales'] as const,
+  list: (slug: string) => ['documents', 'collection-type', slug] as const,
+  detail: (slug: string, id: string, locale: string) =>
+    ['documents', 'collection-type', 'detail', slug, id, locale] as const,
 }
 
-export function useDocuments(contentTypeSlug: string) {
+export function useCollectionDocuments(slug: string, start: number, size: number, locale: string) {
   return useQuery({
-    queryKey: KEYS.list(contentTypeSlug),
+    queryKey: [...KEYS.list(slug), start, size, locale] as const,
     queryFn: () =>
       api
-        .get<Document[]>(`/api/document-manager/${contentTypeSlug}`)
+        .get<PaginatedResponse<Document>>(`/api/document-manager/collection-type/${slug}`, {
+          params: { start, size, locale },
+        })
         .then((r) => r.data),
-    enabled: Boolean(contentTypeSlug),
+    enabled: Boolean(slug),
   })
 }
 
-export function useDocument(contentTypeSlug: string, id: string, locale: string) {
+export function useCollectionDocument(slug: string, documentId: string, locale: string) {
   return useQuery({
-    queryKey: KEYS.detail(contentTypeSlug, id, locale),
+    queryKey: KEYS.detail(slug, documentId, locale),
     queryFn: () =>
       api
-        .get<Document>(`/api/document-manager/${contentTypeSlug}/${id}`, {
+        .get<Document>(`/api/document-manager/collection-type/${slug}/${documentId}`, {
           params: { locale },
         })
         .then((r) => r.data),
-    enabled: Boolean(id),
+    enabled: Boolean(documentId),
   })
 }
 
-export function useLocales() {
-  return useQuery({
-    queryKey: KEYS.locales,
-    queryFn: () => api.get<string[]>('/api/locales').then((r) => r.data),
-  })
-}
-
-export function useCreateDocument() {
+export function useCreateCollectionDocument() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({
       contentTypeSlug,
+      locale,
       data,
     }: {
       contentTypeSlug: string
+      locale?: string
       data: Record<string, unknown>
     }) =>
       api
-        .post<Document>(`/api/document-manager/${contentTypeSlug}`, { data })
+        .post<Document>(`/api/document-manager/collection-type/${contentTypeSlug}`, { data }, { params: { locale } })
         .then((r) => r.data),
     onSuccess: (_, { contentTypeSlug }) =>
       qc.invalidateQueries({ queryKey: KEYS.list(contentTypeSlug) }),
@@ -66,7 +62,7 @@ export function useCreateDocument() {
   })
 }
 
-export function useUpdateDocument() {
+export function useUpdateCollectionDocument() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({
@@ -81,19 +77,23 @@ export function useUpdateDocument() {
       locale?: string
     }) =>
       api
-        .put<Document>(`/api/document-manager/${contentTypeSlug}/${id}`, { data }, { params: { locale } })
+        .put<Document>(
+          `/api/document-manager/collection-type/${contentTypeSlug}/${id}`,
+          { data },
+          { params: { locale } },
+        )
         .then((r) => r.data),
-    onSuccess: (data, { contentTypeSlug }) => {
+    onSuccess: (result, { contentTypeSlug }) => {
       qc.invalidateQueries({ queryKey: KEYS.list(contentTypeSlug) })
       qc.invalidateQueries({
-        queryKey: KEYS.detail(contentTypeSlug, data.documentId, data.locale),
+        queryKey: KEYS.detail(contentTypeSlug, result.documentId, result.locale),
       })
     },
     onError: onMutationError,
   })
 }
 
-export function useDeleteDocument() {
+export function useDeleteCollectionDocument() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({
@@ -102,14 +102,14 @@ export function useDeleteDocument() {
     }: {
       contentTypeSlug: string
       id: string
-    }) => api.delete(`/api/document-manager/${contentTypeSlug}/${id}`),
+    }) => api.delete(`/api/document-manager/collection-type/${contentTypeSlug}/${id}`),
     onSuccess: (_, { contentTypeSlug }) =>
       qc.invalidateQueries({ queryKey: KEYS.list(contentTypeSlug) }),
     onError: onMutationError,
   })
 }
 
-export function usePublishDocument() {
+export function usePublishCollectionDocument() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({
@@ -123,7 +123,7 @@ export function usePublishDocument() {
     }) =>
       api
         .post<{ status: string }>(
-          `/api/document-manager/${contentTypeSlug}/${id}/publish`,
+          `/api/document-manager/collection-type/${contentTypeSlug}/${id}/publish`,
           undefined,
           { params: { locale } },
         )
@@ -138,7 +138,7 @@ export function usePublishDocument() {
   })
 }
 
-export function useUnpublishDocument() {
+export function useUnpublishCollectionDocument() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({
@@ -152,7 +152,7 @@ export function useUnpublishDocument() {
     }) =>
       api
         .post<{ status: string }>(
-          `/api/document-manager/${contentTypeSlug}/${id}/unpublish`,
+          `/api/document-manager/collection-type/${contentTypeSlug}/${id}/unpublish`,
           undefined,
           { params: { locale } },
         )

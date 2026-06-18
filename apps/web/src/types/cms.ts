@@ -14,8 +14,16 @@ export interface ContentTypeSummary {
 
 export interface ContentType extends ContentTypeSummary {
   Fields?: FieldDefinition[]
+  listFields?: string[]
   CreatedAt: string
   UpdatedAt: string
+}
+
+export interface PaginatedResponse<T> {
+  items: T[]
+  total: number
+  start: number
+  size: number
 }
 
 export type EntryStatus = 'draft' | 'modified' | 'published'
