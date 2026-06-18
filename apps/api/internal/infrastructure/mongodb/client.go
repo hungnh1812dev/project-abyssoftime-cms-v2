@@ -2,19 +2,17 @@ package mongodb
 
 import (
 	"context"
-	"os"
+	"fmt"
 	"time"
 
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-func NewClient(ctx context.Context) (*mongo.Client, error) {
-	uri := os.Getenv("MONGODB_URI")
+func NewClient(ctx context.Context, uri string) (*mongo.Client, error) {
 	if uri == "" {
-		uri = "mongodb://localhost:27017"
+		return nil, fmt.Errorf("mongodb: uri is required")
 	}
-
 	opts := options.Client().ApplyURI(uri).SetConnectTimeout(10 * time.Second)
 	client, err := mongo.Connect(ctx, opts)
 	if err != nil {
@@ -30,10 +28,6 @@ func NewClient(ctx context.Context) (*mongo.Client, error) {
 	return client, nil
 }
 
-func Database(client *mongo.Client) *mongo.Database {
-	name := os.Getenv("MONGODB_DB")
-	if name == "" {
-		name = "cms"
-	}
+func Database(client *mongo.Client, name string) *mongo.Database {
 	return client.Database(name)
 }

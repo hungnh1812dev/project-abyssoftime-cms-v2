@@ -14,6 +14,7 @@ func TestSentinelErrors(t *testing.T) {
 		pkgerr.ErrForbidden,
 		pkgerr.ErrConflict,
 		pkgerr.ErrBadRequest,
+		pkgerr.ErrValidation,
 	}
 	for _, e := range errs {
 		if e == nil {

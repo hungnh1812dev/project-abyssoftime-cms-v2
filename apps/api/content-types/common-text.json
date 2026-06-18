@@ -1,0 +1,6 @@
+{
+  "slug": "common-text",
+  "name": "Common Text",
+  "kind": "single",
+  "fields": [{ "name": "text", "type": "json" }]
+}

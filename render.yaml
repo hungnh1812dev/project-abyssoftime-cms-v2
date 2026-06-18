@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: cms-api
+    runtime: docker
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: ./apps/api
+    envVars:
+      - key: PORT
+        value: "8080"
+      - key: MONGODB_URI
+        fromDatabase:
+          name: cms-mongo
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+
+  - type: web
+    name: cms-web
+    runtime: docker
+    dockerfilePath: ./apps/web/Dockerfile
+    dockerContext: ./apps/web
+    envVars:
+      - key: VITE_API_URL
+        value: ""
+
+databases:
+  - name: cms-mongo
+    plan: free
+    databaseName: cms
+    user: cms

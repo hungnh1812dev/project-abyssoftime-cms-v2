@@ -8,6 +8,7 @@ var (
 	ErrForbidden    = errors.New("forbidden")
 	ErrConflict     = errors.New("conflict")
 	ErrBadRequest   = errors.New("bad request")
+	ErrValidation   = errors.New("validation error")
 )
 
 func Is(err, target error) bool {

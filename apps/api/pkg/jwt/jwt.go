@@ -2,7 +2,6 @@ package jwt
 
 import (
 	"errors"
-	"os"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -19,12 +18,19 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
+// signingSecret defaults to a dev-only value so unit tests can exercise
+// this package without calling SetSecret. Production startup always calls
+// SetSecret with the validated config.Config.JWTSecret.
+var signingSecret = []byte("dev-secret-change-in-production")
+
+// SetSecret configures the key used to sign and verify tokens. Call once
+// at startup with the value loaded by internal/config.
+func SetSecret(s string) {
+	signingSecret = []byte(s)
+}
+
 func secret() []byte {
-	s := os.Getenv("JWT_SECRET")
-	if s == "" {
-		s = "dev-secret-change-in-production"
-	}
-	return []byte(s)
+	return signingSecret
 }
 
 func GenerateAccessToken(userID, role string) (string, error) {

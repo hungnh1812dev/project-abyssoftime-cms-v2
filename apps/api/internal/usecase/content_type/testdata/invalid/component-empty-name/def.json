@@ -1,0 +1,10 @@
+{
+  "slug": "bad-component-name",
+  "name": "Bad Component Name",
+  "kind": "single",
+  "fields": [
+    { "name": "", "type": "component", "fields": [
+      { "name": "title", "type": "text" }
+    ]}
+  ]
+}
