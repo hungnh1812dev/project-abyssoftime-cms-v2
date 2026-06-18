@@ -107,7 +107,7 @@ func main() {
 	// handlers
 	authHandler := deliveryhandler.NewAuthHandler(authUC)
 	ctHandler := deliveryhandler.NewContentTypeHandler(ctUC)
-	docHandler := deliveryhandler.NewDocumentHandler(documentUC)
+	docHandler := deliveryhandler.NewDocumentHandler(documentUC, ctUC)
 	mediaHandler := deliveryhandler.NewMediaHandler(mediaUC)
 	localeHandler := deliveryhandler.NewLocaleHandler(cfg.SupportedLocales)
 
@@ -133,17 +133,23 @@ func main() {
 	mux.Handle("GET /api/content-types", adminOnly(ctHandler.ListSummary))
 	mux.Handle("GET /api/content-types/{identifier}", adminOnly(ctHandler.Get))
 
-	// document routes
+	// document routes — single-type
 	authRequired := func(h http.HandlerFunc) http.Handler {
 		return middleware.Auth(http.HandlerFunc(h))
 	}
-	mux.Handle("GET /api/document-manager/{slug}", authRequired(docHandler.List))
-	mux.Handle("GET /api/document-manager/{slug}/{documentId}", authRequired(docHandler.GetByID))
-	mux.Handle("POST /api/document-manager/{slug}", adminOnly(docHandler.Create))
-	mux.Handle("PUT /api/document-manager/{slug}/{documentId}", adminOnly(docHandler.Update))
-	mux.Handle("DELETE /api/document-manager/{slug}/{documentId}", adminOnly(docHandler.Delete))
-	mux.Handle("POST /api/document-manager/{slug}/{documentId}/publish", adminOnly(docHandler.Publish))
-	mux.Handle("POST /api/document-manager/{slug}/{documentId}/unpublish", adminOnly(docHandler.Unpublish))
+	mux.Handle("GET /api/document-manager/single-type/{slug}", authRequired(docHandler.GetSingleType))
+	mux.Handle("PUT /api/document-manager/single-type/{slug}", adminOnly(docHandler.SaveSingleType))
+	mux.Handle("POST /api/document-manager/single-type/{slug}/publish", adminOnly(docHandler.PublishSingleType))
+	mux.Handle("POST /api/document-manager/single-type/{slug}/unpublish", adminOnly(docHandler.UnpublishSingleType))
+
+	// document routes — collection-type
+	mux.Handle("GET /api/document-manager/collection-type/{slug}", authRequired(docHandler.ListCollection))
+	mux.Handle("GET /api/document-manager/collection-type/{slug}/{documentId}", authRequired(docHandler.GetCollection))
+	mux.Handle("POST /api/document-manager/collection-type/{slug}", adminOnly(docHandler.CreateCollection))
+	mux.Handle("PUT /api/document-manager/collection-type/{slug}/{documentId}", adminOnly(docHandler.UpdateCollection))
+	mux.Handle("DELETE /api/document-manager/collection-type/{slug}/{documentId}", adminOnly(docHandler.DeleteCollection))
+	mux.Handle("POST /api/document-manager/collection-type/{slug}/{documentId}/publish", adminOnly(docHandler.PublishCollection))
+	mux.Handle("POST /api/document-manager/collection-type/{slug}/{documentId}/unpublish", adminOnly(docHandler.UnpublishCollection))
 
 	// public document route, no auth, only returns published documents
 	mux.HandleFunc("GET /api/public/document-manager/{slug}/{documentId}", docHandler.GetPublic)
