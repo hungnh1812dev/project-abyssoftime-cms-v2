@@ -59,6 +59,28 @@
 
 ---
 
+## Phase Y — Document Manager API Restructure & Paginated Collections (SPEC §10)
+
+### BE Foundation
+- [x] Y1 Entity + Schema + JSON: `ListFields` on ContentType entity, schema loader parse + validate, sync carry-through, blog-posts.json listFields
+- [x] Y2 Repository: `FindDraftsByContentTypePaginated` + `FindPublishedByDocumentIDs` interface + mock + MongoDB impl
+
+### BE Single-Type + Collection-Type Flow
+- [x] Y3+Y4 Usecase: single-type methods + `GetAllPaginated` (paginated drafts + batch status) + tests
+
+### BE Handler + Routes
+- [x] Y5 Handler rewrite (11 kind-specific methods + `ctUC` dep + `projectData`) + route migration in main.go + tests
+- [x] ✅ Checkpoint A: all Go tests pass, new routes respond correctly, old flat routes removed
+
+### FE Migration
+- [x] Y6+Y7 Types + hooks + components: kind-specific hooks, paginated CollectionListPage, schema-derived columns, delete old useDocuments.ts
+- [x] ✅ Checkpoint B: FE build passes, stale refs cleaned
+
+### Cleanup
+- [x] Y8 Final cleanup: grep stale refs, full test suite green, clean build
+
+---
+
 ## Archived: Original Plan (Phases 0–5) — already built, see tasks/plan.md for context
 
 ## Phase M — Media + Schema-Driven Forms
