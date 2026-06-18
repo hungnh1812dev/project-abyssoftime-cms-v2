@@ -128,6 +128,7 @@ func main() {
 		return middleware.Auth(middleware.RequireRole("admin", h))
 	}
 	mux.Handle("GET /api/content-types", adminOnly(ctHandler.List))
+	mux.Handle("GET /api/content-types/by-slug/{slug}", adminOnly(ctHandler.GetBySlug))
 	mux.Handle("GET /api/content-types/{id}", adminOnly(ctHandler.GetByID))
 
 	authRequired := func(h http.HandlerFunc) http.Handler {

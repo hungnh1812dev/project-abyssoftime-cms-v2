@@ -5,7 +5,7 @@ import MockAdapter from 'axios-mock-adapter'
 import type { ReactNode } from 'react'
 import { createElement } from 'react'
 import { api } from '@/lib/api'
-import { useContentTypes, useContentType } from '@/hooks/useContentTypes'
+import { useContentTypes, useContentType, useContentTypeBySlug } from '@/hooks/useContentTypes'
 import type { ContentType } from '@/types/cms'
 
 let mock: MockAdapter
@@ -56,6 +56,20 @@ describe('useContentType', () => {
 
   it('is disabled when id is empty', () => {
     const { result } = renderHook(() => useContentType(''), { wrapper: createWrapper() })
+    expect(result.current.fetchStatus).toBe('idle')
+  })
+})
+
+describe('useContentTypeBySlug', () => {
+  it('returns a content type from GET /api/content-types/by-slug/{slug}', async () => {
+    mock.onGet('/api/content-types/by-slug/blog').reply(200, ct)
+    const { result } = renderHook(() => useContentTypeBySlug('blog'), { wrapper: createWrapper() })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(result.current.data).toEqual(ct)
+  })
+
+  it('is disabled when slug is empty', () => {
+    const { result } = renderHook(() => useContentTypeBySlug(''), { wrapper: createWrapper() })
     expect(result.current.fetchStatus).toBe('idle')
   })
 })

@@ -5,6 +5,7 @@ import type { ContentType } from '@/types/cms'
 const KEYS = {
   all: ['content-types'] as const,
   detail: (id: string) => ['content-types', id] as const,
+  bySlug: (slug: string) => ['content-types', 'by-slug', slug] as const,
 }
 
 export function useContentTypes() {
@@ -19,5 +20,13 @@ export function useContentType(id: string) {
     queryKey: KEYS.detail(id),
     queryFn: () => api.get<ContentType>(`/api/content-types/${id}`).then((r) => r.data),
     enabled: Boolean(id),
+  })
+}
+
+export function useContentTypeBySlug(slug: string) {
+  return useQuery({
+    queryKey: KEYS.bySlug(slug),
+    queryFn: () => api.get<ContentType>(`/api/content-types/by-slug/${slug}`).then((r) => r.data),
+    enabled: Boolean(slug),
   })
 }

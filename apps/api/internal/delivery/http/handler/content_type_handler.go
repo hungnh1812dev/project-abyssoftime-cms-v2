@@ -9,6 +9,7 @@ import (
 
 type contentTypeUseCase interface {
 	FindByID(ctx context.Context, id string) (*entity.ContentType, error)
+	FindBySlug(ctx context.Context, slug string) (*entity.ContentType, error)
 	FindAll(ctx context.Context) ([]*entity.ContentType, error)
 }
 
@@ -31,6 +32,15 @@ func (h *ContentTypeHandler) List(w http.ResponseWriter, r *http.Request) {
 
 func (h *ContentTypeHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	ct, err := h.uc.FindByID(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, ct)
+}
+
+func (h *ContentTypeHandler) GetBySlug(w http.ResponseWriter, r *http.Request) {
+	ct, err := h.uc.FindBySlug(r.Context(), r.PathValue("slug"))
 	if err != nil {
 		writeErr(w, err)
 		return
