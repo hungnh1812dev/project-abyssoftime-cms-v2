@@ -540,3 +540,157 @@ src/
 - `SingleTypePanel.tsx` stays on disk until W7 is complete. Do not delete it before `SingleTypePage` is wired into the router.
 - `CollectionDetailPanel` is refactored in-place (not replaced) since `CollectionDetailPage` delegates to it.
 - Use `axios-mock-adapter` (already in devDependencies) for API mocking in component tests — no MSW setup exists in this project.
+
+---
+
+# Plan — Delete Media Asset in MediaLibrary (Phase X)
+
+## Context
+
+SPEC.md §8 specifies a delete-media feature. The full infrastructure already exists (`MediaAssetRepository.FindByID`+`Delete`, `StorageAdapter.Delete`, all mocks with stub fields). Only the `UseCase.Delete` method, the HTTP handler+route, the frontend hook, and the MediaLibrary UI are missing.
+
+## Dependency Graph
+
+```
+X1 (UseCase.Delete)
+     ↓
+X2 (MediaHandler.Delete + main.go route)   ← part of same task as X1
+     ↓
+X3 (useDeleteMedia hook)
+     ↓
+X4 (MediaLibrary delete UX + tests)
+```
+
+Tasks X1+X2 are implemented together. X3 and X4 are sequential. **No new files** — all changes go into existing files. **No mock changes** — `repomock.MediaAssetRepository` and `repomock.StorageAdapter` already have `FindByIDFn` and `DeleteFn`.
+
+---
+
+## Task X1 — Backend: UseCase + Handler + Route
+
+### UseCase (`media_usecase.go`)
+
+```go
+func (uc *UseCase) Delete(ctx context.Context, id string) error {
+    asset, err := uc.assetRepo.FindByID(ctx, id)
+    if err != nil { return err }
+    if err := uc.storage.Delete(ctx, asset.PublicID); err != nil { return err }
+    return uc.assetRepo.Delete(ctx, id)
+}
+```
+
+Storage-first ordering: if storage fails, DB record is not removed.
+
+### Handler (`media_handler.go`)
+
+1. Extend `mediaUseCase` interface with `Delete(ctx context.Context, id string) error`
+2. Add `Delete` handler using `r.PathValue("id")` — return 204 on success, `writeErr` on error
+
+### Route (`main.go`)
+
+```go
+mux.Handle("DELETE /api/media/{id}", adminOnly(mediaHandler.Delete))
+```
+
+### Tests
+
+**UseCase** — 4 cases in `media_usecase_test.go`:
+- Happy path: FindByID returns asset → storage.Delete(publicID) called → repo.Delete(id) called
+- FindByID not-found → storage.Delete never called
+- Storage error → repo.Delete never called
+- Repo Delete error → propagated
+
+**Handler** — 3 cases in `media_handler_test.go`:
+- Add `deleteFn` field + `Delete` method to existing `mockMediaUC`
+- 204 on nil error / 404 on not-found / 500 on generic error
+- Use `http.NewServeMux` with `DELETE /api/media/{id}` so `r.PathValue("id")` resolves
+
+**Acceptance:** `go test ./internal/usecase/media/... ./internal/delivery/http/handler/...` passes; `go build ./...` succeeds.
+
+---
+
+## Task X2 — Frontend: useDeleteMedia Hook (`useMedia.ts`)
+
+```ts
+export function useDeleteMedia() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/api/media/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['media', 'list'] }),
+    onError: (err: unknown) => {
+      const msg = (err as AxiosError<{ error: string }>).response?.data?.error ?? 'Delete failed'
+      toast.error(msg)
+    },
+  })
+}
+```
+
+Pattern mirrors `useUploadMedia` exactly.
+
+**Acceptance:** TypeScript strict; `npm run build` clean.
+
+---
+
+## Task X3 — Frontend: MediaLibrary Delete UX + Tests
+
+### `MediaLibrary.tsx` changes
+
+- Add `pendingDeleteId: string | null` state
+- Add `const deleteMedia = useDeleteMedia()`
+- Wrap each grid tile in `<div className="relative group">` so the trash button can be positioned absolutely and shown on hover via `group-hover:flex`
+- Trash button: first click → `setPendingDeleteId(asset.ID)` (arms, icon turns red); second click → `deleteMedia.mutate(asset.ID)` (fires); `onMouseLeave` on the wrapper → `setPendingDeleteId(null)` (disarms)
+- Tile's select button disabled when `deleteMedia.isPending`
+- Use `Trash2` from `lucide-react` (already available in the project)
+
+### `MediaLibrary.test.tsx` — 5 new cases (added to existing describe block)
+
+Uses existing `MockAdapter` + `renderWithProviders` patterns already in the file:
+
+1. Trash button present with `aria-label="Delete asset"` after load
+2. First trash click arms confirm (label becomes `"Confirm delete"`)
+3. Mouseout after arming disarms (label reverts to `"Delete asset"`)
+4. Second trash click fires `DELETE /api/media/a1`; list query invalidated (re-fetches)
+5. Select button is disabled while `deleteMedia.isPending`
+
+**Acceptance:** `vitest run MediaLibrary.test.tsx` passes (all existing + new); `npm run build` clean.
+
+---
+
+## ✅ Checkpoint X
+
+```
+# Backend
+cd apps/api
+go test ./internal/usecase/media/... ./internal/delivery/http/handler/...
+go build ./... && go vet ./...
+
+# Frontend
+cd apps/web
+npx vitest run src/components/media/__tests__/MediaLibrary.test.tsx
+npm run build
+```
+
+Manual smoke: `make dev` → log in → open Media Library → hover tile → trash icon appears → first click arms red → second click fires DELETE → tile disappears.
+
+---
+
+## File Map
+
+```
+apps/api/internal/usecase/media/
+  media_usecase.go          ← add Delete method          (X1)
+  media_usecase_test.go     ← add 4 Delete tests         (X1)
+
+apps/api/internal/delivery/http/handler/
+  media_handler.go          ← extend interface + handler  (X1)
+  media_handler_test.go     ← extend mock + 3 tests      (X1)
+
+apps/api/cmd/server/main.go
+  → add DELETE /api/media/{id} route                      (X1)
+
+apps/web/src/hooks/
+  useMedia.ts               ← add useDeleteMedia()        (X2)
+
+apps/web/src/components/media/
+  MediaLibrary.tsx          ← add delete UX               (X3)
+  __tests__/MediaLibrary.test.tsx  ← add 5 delete tests   (X3)
+```

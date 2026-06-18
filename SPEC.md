@@ -533,3 +533,156 @@ Applies identically to `SingleTypePage` and `CollectionDetailPage`:
 - Any API changes
 - New input types beyond existing six (`TextInput`, `BooleanInput`, `NumberInput`, `MediaInput`, `RichTextInput`, `JsonInput`)
 - Publish/Unpublish mutation logic (only layout wrapper changes; mutations are unchanged)
+
+---
+
+## 8. Delete Media Asset in MediaLibrary
+
+### 8.1 Objective
+
+Allow CMS admins to delete a media asset from the MediaLibrary grid. Deletion removes the record from MongoDB **and** the file from the Cloudinary storage provider. The UI provides a single-asset, inline-confirm flow — a trash icon visible on tile hover, requiring a second click to confirm before the delete is sent.
+
+Target users: CMS administrators managing media assets.
+
+---
+
+### 8.2 API Contract
+
+```
+DELETE /api/media/{id}
+Authorization: Bearer <access_token>
+```
+
+| Status | Body | Condition |
+|---|---|---|
+| `204 No Content` | — | Successfully deleted from storage and DB |
+| `404 Not Found` | `{"error": "not found"}` | Asset ID does not exist |
+| `500 Internal Server Error` | `{"error": "..."}` | Storage or DB failure |
+
+---
+
+### 8.3 Files Changed
+
+**Backend — modify only, no new files:**
+
+```
+apps/api/internal/usecase/media/
+  media_usecase.go          ← add Delete(ctx, id string) error method
+  media_usecase_test.go     ← add Delete test cases
+
+apps/api/internal/delivery/http/handler/
+  media_handler.go          ← extend mediaUseCase interface + add Delete handler + route
+  media_handler_test.go     ← add Delete handler test cases
+```
+
+Both `MediaAssetRepository.Delete(ctx, id)` and `StorageAdapter.Delete(ctx, publicID)` already exist — no changes to entity, repository interface, or infrastructure layer.
+
+**Frontend — modify only, no new files:**
+
+```
+apps/web/src/hooks/
+  useMedia.ts               ← add useDeleteMedia() mutation
+
+apps/web/src/components/media/
+  MediaLibrary.tsx          ← add hover trash icon + inline confirm UX
+  __tests__/MediaLibrary.test.tsx  ← add delete interaction tests
+```
+
+---
+
+### 8.4 Delete Flow
+
+#### UseCase (`media_usecase.go`)
+
+```
+Delete(ctx, id):
+  1. asset ← assetRepo.FindByID(ctx, id)    // propagate not-found as-is
+  2. storage.Delete(ctx, asset.PublicID)     // remove from Cloudinary
+  3. assetRepo.Delete(ctx, id)              // remove DB record
+  return error
+```
+
+If `storage.Delete` fails, do **not** call `assetRepo.Delete` — storage is the source of truth; orphaned DB records are harder to clean up than orphaned Cloudinary files.
+
+#### HTTP Handler (`media_handler.go`)
+
+Extend the `mediaUseCase` interface with:
+```go
+Delete(ctx context.Context, id string) error
+```
+
+Handler method:
+```
+DELETE /api/media/{id}
+  id ← r.PathValue("id")
+  err ← h.uc.Delete(r.Context(), id)
+  nil  → 204 No Content
+  err  → writeErr(w, err)
+```
+
+#### Frontend Hook (`useMedia.ts`)
+
+```ts
+export function useDeleteMedia() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/api/media/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['media', 'list'] }),
+    onError: (err: unknown) => {
+      const msg = (err as AxiosError<{ error: string }>).response?.data?.error ?? 'Delete failed'
+      toast.error(msg)
+    },
+  })
+}
+```
+
+#### Frontend UI (`MediaLibrary.tsx`)
+
+New local state: `pendingDeleteId: string | null = null`
+
+Per-tile behavior:
+- On hover: show trash icon button (absolute top-right corner)
+- Trash icon — first click: `setPendingDeleteId(asset.ID)` (arm)
+- Trash icon — second click (when `pendingDeleteId === asset.ID`): call `deleteMedia(asset.ID)` (fire)
+- `onMouseLeave` on the tile: `setPendingDeleteId(null)` (disarm)
+- Armed state: trash icon turns red to signal one more click confirms
+- While mutation `isPending`: disable the tile
+
+---
+
+### 8.5 Testing
+
+#### Backend unit tests
+
+**UseCase — `media_usecase_test.go`:**
+- `TestDelete_CallsStorageAndRepo` — FindByID returns asset, storage.Delete called with correct PublicID, assetRepo.Delete called with id
+- `TestDelete_AssetNotFound_ReturnsError` — FindByID returns not-found error; storage.Delete never called
+- `TestDelete_StorageError_DoesNotDeleteFromRepo` — storage.Delete fails; assetRepo.Delete never called
+- `TestDelete_RepoDeleteError_ReturnsError` — storage succeeds, assetRepo.Delete fails; error propagated
+
+**Handler — `media_handler_test.go`:**
+- `TestMediaHandler_Delete_Returns204` — mock usecase Delete returns nil → expect 204
+- `TestMediaHandler_Delete_NotFound_Returns404` — mock returns not-found sentinel → expect 404
+- `TestMediaHandler_Delete_UseCaseError_Returns500` — mock returns generic error → expect 500
+
+#### Frontend unit tests (`MediaLibrary.test.tsx`)
+
+- Trash icon is not visible without hover; appears on tile hover
+- First click arms the confirm state (icon turns red) but does not call the delete API
+- Second click on the armed tile fires the delete mutation
+- `mouseLeave` on a tile disarms confirm state
+- Tile is disabled/non-interactive while delete mutation `isPending`
+
+---
+
+### 8.6 Boundaries
+
+| Rule | Detail |
+|---|---|
+| **Always** | Call `storage.Delete` before `assetRepo.Delete` |
+| **Always** | Return 404 (not 500) when asset ID is not found |
+| **Always** | Invalidate `['media', 'list']` query on successful delete |
+| **Never** | Bulk-delete — single asset at a time only |
+| **Never** | A confirmation modal — inline hover-confirm is the specified UX |
+| **Never** | Skip storage delete (no DB-only or soft-delete removal) |
+| **Ask first** | Cascade-deleting assets referenced by documents touches `DeleteByDocumentRef` — out of scope here |

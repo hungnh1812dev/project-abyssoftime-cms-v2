@@ -50,6 +50,15 @@
 
 ---
 
+## Phase X — Delete Media Asset in MediaLibrary
+
+- [x] X1 Backend: `UseCase.Delete` (storage-first) + `MediaHandler.Delete` + `DELETE /api/media/{id}` route + 4 usecase tests + 3 handler tests
+- [x] X2 Frontend: `useDeleteMedia()` mutation hook in `useMedia.ts` (mirrors `useUploadMedia` pattern)
+- [x] X3 Frontend: MediaLibrary delete UX (hover trash + `pendingDeleteId` inline confirm) + 4 component tests
+- [x] ✅ Checkpoint X: `go test ./...` all green (14 packages), `vitest run` 156/156 green
+
+---
+
 ## Archived: Original Plan (Phases 0–5) — already built, see tasks/plan.md for context
 
 ## Phase M — Media + Schema-Driven Forms
