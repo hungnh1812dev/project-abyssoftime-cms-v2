@@ -22,7 +22,7 @@ type ContentType struct {
 	Name       string            `bson:"name"`
 	Slug       string            `bson:"slug"`
 	Kind       ContentKind       `bson:"kind"`
-	Fields     []FieldDefinition `json:"fields,omitempty" bson:"fields,omitempty"`
+	Fields     []FieldDefinition `json:"Fields,omitempty" bson:"fields,omitempty"`
 	CreatedAt  time.Time         `bson:"createdAt"`
 	UpdatedAt  time.Time         `bson:"updatedAt"`
 }

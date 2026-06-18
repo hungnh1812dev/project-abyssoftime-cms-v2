@@ -22,7 +22,7 @@ export function JsonInput({ name, control }: JsonInputProps) {
       }}
       render={({ field }) => (
         <div>
-          <div data-testid="json-editor-wrapper" className="min-h-[15em]">
+          <div data-testid="json-editor-wrapper" className="min-h-[15em] border border-input rounded-md overflow-hidden">
             <CodeMirror
               value={rawValue}
               extensions={[json()]}

@@ -39,18 +39,20 @@ export function MediaInput({
               aria-label={ariaLabel ?? name}
               role="button"
               tabIndex={0}
-              className="cursor-pointer border border-input rounded-md transition-colors hover:border-ring relative"
+              className="cursor-pointer border border-input rounded-md transition-colors hover:border-ring relative min-h-28 max-h-28 overflow-hidden"
               onClick={() => setIsLibraryOpen(true)}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setIsLibraryOpen(true) }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") setIsLibraryOpen(true);
+              }}
             >
               {displayUrl ? (
                 <img
                   src={displayUrl}
                   alt="media preview"
-                  className="w-full h-auto object-contain"
+                  className="w-full max-h-28 object-contain inline-block"
                 />
               ) : (
-                <div className="flex flex-col items-center justify-center min-h-[7.5rem] gap-2 text-muted-foreground">
+                <div className="flex flex-col items-center justify-center min-h-28 gap-2 text-muted-foreground">
                   <span className="text-2xl">↑</span>
                   <span className="text-sm">Click to select media</span>
                 </div>
