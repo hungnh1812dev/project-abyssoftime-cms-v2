@@ -61,8 +61,8 @@ describe('useContentType', () => {
 })
 
 describe('useContentTypeBySlug', () => {
-  it('returns a content type from GET /api/content-types/by-slug/{slug}', async () => {
-    mock.onGet('/api/content-types/by-slug/blog').reply(200, ct)
+  it('returns a content type from GET /api/content-types/{slug}', async () => {
+    mock.onGet('/api/content-types/blog').reply(200, ct)
     const { result } = renderHook(() => useContentTypeBySlug('blog'), { wrapper: createWrapper() })
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(result.current.data).toEqual(ct)

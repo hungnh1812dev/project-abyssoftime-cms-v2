@@ -26,7 +26,7 @@ export function useContentType(id: string) {
 export function useContentTypeBySlug(slug: string) {
   return useQuery({
     queryKey: KEYS.bySlug(slug),
-    queryFn: () => api.get<ContentType>(`/api/content-types/by-slug/${slug}`).then((r) => r.data),
+    queryFn: () => api.get<ContentType>(`/api/content-types/${slug}`).then((r) => r.data),
     enabled: Boolean(slug),
   })
 }

@@ -3,9 +3,12 @@ package handler
 import (
 	"context"
 	"net/http"
+	"regexp"
 
 	"project-abyssoftime-cms-v2/api/internal/domain/entity"
 )
+
+var objectIDRe = regexp.MustCompile(`^[a-f0-9]{24}$`)
 
 type contentTypeUseCase interface {
 	FindByID(ctx context.Context, id string) (*entity.ContentType, error)
@@ -30,17 +33,17 @@ func (h *ContentTypeHandler) List(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, cts)
 }
 
-func (h *ContentTypeHandler) GetByID(w http.ResponseWriter, r *http.Request) {
-	ct, err := h.uc.FindByID(r.Context(), r.PathValue("id"))
-	if err != nil {
-		writeErr(w, err)
-		return
+func (h *ContentTypeHandler) Get(w http.ResponseWriter, r *http.Request) {
+	identifier := r.PathValue("identifier")
+	var (
+		ct  *entity.ContentType
+		err error
+	)
+	if objectIDRe.MatchString(identifier) {
+		ct, err = h.uc.FindByID(r.Context(), identifier)
+	} else {
+		ct, err = h.uc.FindBySlug(r.Context(), identifier)
 	}
-	writeJSON(w, http.StatusOK, ct)
-}
-
-func (h *ContentTypeHandler) GetBySlug(w http.ResponseWriter, r *http.Request) {
-	ct, err := h.uc.FindBySlug(r.Context(), r.PathValue("slug"))
 	if err != nil {
 		writeErr(w, err)
 		return

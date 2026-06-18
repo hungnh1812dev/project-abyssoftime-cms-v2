@@ -103,18 +103,18 @@ func TestContentTypeHandler_List_IncludesFields(t *testing.T) {
 	}
 }
 
-// ---- GetByID ---------------------------------------------------------------
+// ---- Get (unified: ObjectID → FindByID, otherwise → FindBySlug) -----------
 
-func TestContentTypeHandler_GetByID(t *testing.T) {
+func TestContentTypeHandler_Get(t *testing.T) {
 	tests := []struct {
 		name       string
-		id         string
+		identifier string
 		setupUC    func(*mockContentTypeUC)
 		wantStatus int
 	}{
 		{
-			name: "200 found",
-			id:   "abc",
+			name:       "200 found by ObjectID",
+			identifier: "aabbccddeeff00112233aabb",
 			setupUC: func(m *mockContentTypeUC) {
 				m.findByIDFn = func(_ context.Context, id string) (*entity.ContentType, error) {
 					return &entity.ContentType{ID: id, Slug: "blog"}, nil
@@ -123,47 +123,8 @@ func TestContentTypeHandler_GetByID(t *testing.T) {
 			wantStatus: http.StatusOK,
 		},
 		{
-			name: "404 not found",
-			id:   "missing",
-			setupUC: func(m *mockContentTypeUC) {
-				m.findByIDFn = func(_ context.Context, _ string) (*entity.ContentType, error) {
-					return nil, pkgerrors.ErrNotFound
-				}
-			},
-			wantStatus: http.StatusNotFound,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			uc := &mockContentTypeUC{}
-			tt.setupUC(uc)
-			h := handler.NewContentTypeHandler(uc)
-
-			req := httptest.NewRequest(http.MethodGet, "/api/content-types/"+tt.id, nil)
-			req.SetPathValue("id", tt.id)
-			w := httptest.NewRecorder()
-			h.GetByID(w, req)
-
-			if w.Code != tt.wantStatus {
-				t.Errorf("GetByID() status = %d, want %d", w.Code, tt.wantStatus)
-			}
-		})
-	}
-}
-
-// ---- GetBySlug -------------------------------------------------------------
-
-func TestContentTypeHandler_GetBySlug(t *testing.T) {
-	tests := []struct {
-		name       string
-		slug       string
-		setupUC    func(*mockContentTypeUC)
-		wantStatus int
-	}{
-		{
-			name: "200 found",
-			slug: "blog",
+			name:       "200 found by slug",
+			identifier: "blog",
 			setupUC: func(m *mockContentTypeUC) {
 				m.findBySlugFn = func(_ context.Context, slug string) (*entity.ContentType, error) {
 					return &entity.ContentType{ID: "abc", Slug: slug}, nil
@@ -172,8 +133,18 @@ func TestContentTypeHandler_GetBySlug(t *testing.T) {
 			wantStatus: http.StatusOK,
 		},
 		{
-			name: "404 not found",
-			slug: "missing",
+			name:       "404 not found by ObjectID",
+			identifier: "aabbccddeeff00112233aabb",
+			setupUC: func(m *mockContentTypeUC) {
+				m.findByIDFn = func(_ context.Context, _ string) (*entity.ContentType, error) {
+					return nil, pkgerrors.ErrNotFound
+				}
+			},
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name:       "404 not found by slug",
+			identifier: "missing",
 			setupUC: func(m *mockContentTypeUC) {
 				m.findBySlugFn = func(_ context.Context, _ string) (*entity.ContentType, error) {
 					return nil, pkgerrors.ErrNotFound
@@ -189,13 +160,13 @@ func TestContentTypeHandler_GetBySlug(t *testing.T) {
 			tt.setupUC(uc)
 			h := handler.NewContentTypeHandler(uc)
 
-			req := httptest.NewRequest(http.MethodGet, "/api/content-types/by-slug/"+tt.slug, nil)
-			req.SetPathValue("slug", tt.slug)
+			req := httptest.NewRequest(http.MethodGet, "/api/content-types/"+tt.identifier, nil)
+			req.SetPathValue("identifier", tt.identifier)
 			w := httptest.NewRecorder()
-			h.GetBySlug(w, req)
+			h.Get(w, req)
 
 			if w.Code != tt.wantStatus {
-				t.Errorf("GetBySlug() status = %d, want %d", w.Code, tt.wantStatus)
+				t.Errorf("Get() status = %d, want %d", w.Code, tt.wantStatus)
 			}
 		})
 	}
