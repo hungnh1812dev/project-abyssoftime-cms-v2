@@ -9,7 +9,7 @@ interface Props {
 }
 
 function cellValue(doc: Document, col: CollectionColumnDef): React.ReactNode {
-  const raw = doc.Data[col.key]
+  const raw = doc.data[col.key]
   switch (col.type) {
     case 'boolean':
       return raw ? '✓' : '—'
@@ -33,12 +33,12 @@ export function CollectionListPage({ contentType }: Props) {
 
   async function handleCreate() {
     const newDoc = await createDoc({ contentTypeSlug: contentType.Slug, data: {} })
-    navigate(`/admin/content-type/collection-type/${contentType.Slug}/${newDoc.DocumentID}`)
+    navigate(`/admin/content-type/collection-type/${contentType.Slug}/${newDoc.documentId}`)
   }
 
   function handleDelete(doc: Document) {
     if (!window.confirm('Delete this entry?')) return
-    deleteDoc({ contentTypeSlug: contentType.Slug, id: doc.DocumentID })
+    deleteDoc({ contentTypeSlug: contentType.Slug, id: doc.documentId })
   }
 
   if (isLoading) {
@@ -75,7 +75,7 @@ export function CollectionListPage({ contentType }: Props) {
           </thead>
           <tbody>
             {docs.map((doc) => (
-              <tr key={doc.DocumentID} className="border-b">
+              <tr key={doc.documentId} className="border-b">
                 {columns ? (
                   columns.map((col) => (
                     <td key={col.key} className="py-2 pr-4">
@@ -85,14 +85,14 @@ export function CollectionListPage({ contentType }: Props) {
                 ) : (
                   <>
                     <td className="py-2 pr-4">
-                      {String(Object.values(doc.Data)[0] ?? doc.DocumentID)}
+                      {String(Object.values(doc.data)[0] ?? doc.documentId)}
                     </td>
-                    <td className="py-2 pr-4 capitalize">{doc.Status}</td>
+                    <td className="py-2 pr-4 capitalize">{doc.status}</td>
                   </>
                 )}
                 <td className="py-2 flex gap-2">
                   <Link
-                    to={`/admin/content-type/collection-type/${contentType.Slug}/${doc.DocumentID}`}
+                    to={`/admin/content-type/collection-type/${contentType.Slug}/${doc.documentId}`}
                     className="text-primary underline-offset-4 hover:underline"
                   >
                     Edit

@@ -38,8 +38,8 @@ const ct: ContentType = {
 }
 
 describe('useContentTypes', () => {
-  it('returns list of content types from GET /api/content-types', async () => {
-    mock.onGet('/api/content-types').reply(200, [ct])
+  it('returns list of content types from GET /api/content-types/all', async () => {
+    mock.onGet('/api/content-types/all').reply(200, [ct])
     const { result } = renderHook(() => useContentTypes(), { wrapper: createWrapper() })
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(result.current.data).toEqual([ct])
@@ -47,7 +47,7 @@ describe('useContentTypes', () => {
 })
 
 describe('useContentType', () => {
-  it('returns a single content type from GET /api/content-types/{id}', async () => {
+  it('returns a single content type from GET /api/content-types/all/{id}', async () => {
     mock.onGet('/api/content-types/1').reply(200, ct)
     const { result } = renderHook(() => useContentType('1'), { wrapper: createWrapper() })
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
@@ -61,7 +61,7 @@ describe('useContentType', () => {
 })
 
 describe('useContentTypeBySlug', () => {
-  it('returns a content type from GET /api/content-types/{slug}', async () => {
+  it('returns a content type from GET /api/content-types/all/{slug}', async () => {
     mock.onGet('/api/content-types/blog').reply(200, ct)
     const { result } = renderHook(() => useContentTypeBySlug('blog'), { wrapper: createWrapper() })
     await waitFor(() => expect(result.current.isSuccess).toBe(true))

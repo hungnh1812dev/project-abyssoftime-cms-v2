@@ -33,15 +33,15 @@ type documentRequest struct {
 }
 
 type entrySummary struct {
-	DocumentID    string
-	ContentTypeID string
-	Data          map[string]any
-	Status        string
-	Locale        string
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
-	CreatedBy     string
-	UpdatedBy     string
+	DocumentID    string         `json:"documentId"`
+	ContentTypeID string         `json:"contentTypeId"`
+	Data          map[string]any `json:"data"`
+	Status        string         `json:"status"`
+	Locale        string         `json:"locale"`
+	CreatedAt     time.Time      `json:"createdAt"`
+	UpdatedAt     time.Time      `json:"updatedAt"`
+	CreatedBy     string         `json:"createdBy"`
+	UpdatedBy     string         `json:"updatedBy"`
 }
 
 func localeParam(r *http.Request) string {

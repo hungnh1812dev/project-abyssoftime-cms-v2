@@ -24,13 +24,29 @@ func NewContentTypeHandler(uc contentTypeUseCase) *ContentTypeHandler {
 	return &ContentTypeHandler{uc: uc}
 }
 
-func (h *ContentTypeHandler) List(w http.ResponseWriter, r *http.Request) {
+type contentTypeSummary struct {
+	ID   string             `json:"ID"`
+	Name string             `json:"Name"`
+	Slug string             `json:"Slug"`
+	Kind entity.ContentKind `json:"Kind"`
+}
+
+func (h *ContentTypeHandler) ListSummary(w http.ResponseWriter, r *http.Request) {
 	cts, err := h.uc.FindAll(r.Context())
 	if err != nil {
 		writeErr(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, cts)
+	summaries := make([]contentTypeSummary, len(cts))
+	for i, ct := range cts {
+		summaries[i] = contentTypeSummary{
+			ID:   ct.ID,
+			Name: ct.Name,
+			Slug: ct.Slug,
+			Kind: ct.Kind,
+		}
+	}
+	writeJSON(w, http.StatusOK, summaries)
 }
 
 func (h *ContentTypeHandler) Get(w http.ResponseWriter, r *http.Request) {

@@ -39,20 +39,20 @@ function createWrapper() {
 const contentTypeSlug = 'articles'
 
 const doc: Document = {
-  DocumentID: '1',
-  ContentTypeID: 'ct-1',
-  Status: 'draft',
-  Data: { title: 'Hello' },
-  Locale: 'en',
-  CreatedAt: '2024-01-01T00:00:00Z',
-  UpdatedAt: '2024-01-01T00:00:00Z',
-  CreatedBy: 'user-1',
-  UpdatedBy: 'user-1',
+  documentId: '1',
+  contentTypeId: 'ct-1',
+  status: 'draft',
+  data: { title: 'Hello' },
+  locale: 'en',
+  createdAt: '2024-01-01T00:00:00Z',
+  updatedAt: '2024-01-01T00:00:00Z',
+  createdBy: 'user-1',
+  updatedBy: 'user-1',
 }
 
 describe('useDocuments', () => {
-  it('returns documents for a content type from GET /api/content-types/{slug}/documents', async () => {
-    mock.onGet(`/api/content-types/${contentTypeSlug}/documents`).reply(200, [doc])
+  it('returns documents for a content type from GET /api/document-manager/{slug}', async () => {
+    mock.onGet(`/api/document-manager/${contentTypeSlug}`).reply(200, [doc])
     const { result } = renderHook(() => useDocuments(contentTypeSlug), { wrapper: createWrapper() })
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(result.current.data).toEqual([doc])
@@ -65,8 +65,8 @@ describe('useDocuments', () => {
 })
 
 describe('useDocument', () => {
-  it('returns a single document from GET /api/content-types/{slug}/documents/{id}', async () => {
-    mock.onGet(`/api/content-types/${contentTypeSlug}/documents/1`).reply(200, doc)
+  it('returns a single document from GET /api/document-manager/{slug}/{id}', async () => {
+    mock.onGet(`/api/document-manager/${contentTypeSlug}/1`).reply(200, doc)
     const { result } = renderHook(() => useDocument(contentTypeSlug, '1', 'en'), { wrapper: createWrapper() })
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(result.current.data).toEqual(doc)
@@ -78,14 +78,14 @@ describe('useDocument', () => {
   })
 
   it('sends locale as a query param and includes it in the query key', async () => {
-    mock.onGet(`/api/content-types/${contentTypeSlug}/documents/1`).reply(200, doc)
+    mock.onGet(`/api/document-manager/${contentTypeSlug}/1`).reply(200, doc)
     const { result } = renderHook(() => useDocument(contentTypeSlug, '1', 'vi'), { wrapper: createWrapper() })
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(mock.history.get[0].params).toEqual({ locale: 'vi' })
   })
 
   it('refetches when locale changes (different query key)', async () => {
-    mock.onGet(`/api/content-types/${contentTypeSlug}/documents/1`).reply(200, doc)
+    mock.onGet(`/api/document-manager/${contentTypeSlug}/1`).reply(200, doc)
     const { result, rerender } = renderHook(({ locale }: { locale: string }) => useDocument(contentTypeSlug, '1', locale), {
       wrapper: createWrapper(),
       initialProps: { locale: 'en' },
@@ -107,8 +107,8 @@ describe('useLocales', () => {
 })
 
 describe('useCreateDocument', () => {
-  it('posts to /api/content-types/{slug}/documents and succeeds', async () => {
-    mock.onPost(`/api/content-types/${contentTypeSlug}/documents`).reply(201, doc)
+  it('posts to /api/document-manager/{slug} and succeeds', async () => {
+    mock.onPost(`/api/document-manager/${contentTypeSlug}`).reply(201, doc)
     const { result } = renderHook(() => useCreateDocument(), { wrapper: createWrapper() })
     await act(async () => {
       result.current.mutate({ contentTypeSlug, data: { title: 'Hello' } })
@@ -119,8 +119,8 @@ describe('useCreateDocument', () => {
 })
 
 describe('useUpdateDocument', () => {
-  it('puts to /api/content-types/{slug}/documents/{id} and succeeds', async () => {
-    mock.onPut(`/api/content-types/${contentTypeSlug}/documents/1`).reply(200, doc)
+  it('puts to /api/document-manager/{slug}/{id} and succeeds', async () => {
+    mock.onPut(`/api/document-manager/${contentTypeSlug}/1`).reply(200, doc)
     const { result } = renderHook(() => useUpdateDocument(), { wrapper: createWrapper() })
     await act(async () => {
       result.current.mutate({ contentTypeSlug, id: '1', data: { title: 'Updated' } })
@@ -130,7 +130,7 @@ describe('useUpdateDocument', () => {
   })
 
   it('sends locale as a query param', async () => {
-    mock.onPut(`/api/content-types/${contentTypeSlug}/documents/1`).reply(200, doc)
+    mock.onPut(`/api/document-manager/${contentTypeSlug}/1`).reply(200, doc)
     const { result } = renderHook(() => useUpdateDocument(), { wrapper: createWrapper() })
     await act(async () => {
       result.current.mutate({ contentTypeSlug, id: '1', data: { title: 'Updated' }, locale: 'vi' })
@@ -141,8 +141,8 @@ describe('useUpdateDocument', () => {
 })
 
 describe('useDeleteDocument', () => {
-  it('deletes /api/content-types/{slug}/documents/{id} and succeeds', async () => {
-    mock.onDelete(`/api/content-types/${contentTypeSlug}/documents/1`).reply(204)
+  it('deletes /api/document-manager/{slug}/{id} and succeeds', async () => {
+    mock.onDelete(`/api/document-manager/${contentTypeSlug}/1`).reply(204)
     const { result } = renderHook(() => useDeleteDocument(), { wrapper: createWrapper() })
     await act(async () => {
       result.current.mutate({ contentTypeSlug, id: '1' })
@@ -152,8 +152,8 @@ describe('useDeleteDocument', () => {
 })
 
 describe('usePublishDocument', () => {
-  it('posts to /api/content-types/{slug}/documents/{id}/publish and succeeds', async () => {
-    mock.onPost(`/api/content-types/${contentTypeSlug}/documents/1/publish`).reply(200, { status: 'published' })
+  it('posts to /api/document-manager/{slug}/{id}/publish and succeeds', async () => {
+    mock.onPost(`/api/document-manager/${contentTypeSlug}/1/publish`).reply(200, { status: 'published' })
     const { result } = renderHook(() => usePublishDocument(), { wrapper: createWrapper() })
     await act(async () => {
       result.current.mutate({ contentTypeSlug, id: '1' })
@@ -163,7 +163,7 @@ describe('usePublishDocument', () => {
   })
 
   it('sends locale as a query param', async () => {
-    mock.onPost(`/api/content-types/${contentTypeSlug}/documents/1/publish`).reply(200, { status: 'published' })
+    mock.onPost(`/api/document-manager/${contentTypeSlug}/1/publish`).reply(200, { status: 'published' })
     const { result } = renderHook(() => usePublishDocument(), { wrapper: createWrapper() })
     await act(async () => {
       result.current.mutate({ contentTypeSlug, id: '1', locale: 'vi' })
@@ -174,8 +174,8 @@ describe('usePublishDocument', () => {
 })
 
 describe('useUnpublishDocument', () => {
-  it('posts to /api/content-types/{slug}/documents/{id}/unpublish and succeeds', async () => {
-    mock.onPost(`/api/content-types/${contentTypeSlug}/documents/1/unpublish`).reply(200, { status: 'draft' })
+  it('posts to /api/document-manager/{slug}/{id}/unpublish and succeeds', async () => {
+    mock.onPost(`/api/document-manager/${contentTypeSlug}/1/unpublish`).reply(200, { status: 'draft' })
     const { result } = renderHook(() => useUnpublishDocument(), { wrapper: createWrapper() })
     await act(async () => {
       result.current.mutate({ contentTypeSlug, id: '1' })
@@ -185,7 +185,7 @@ describe('useUnpublishDocument', () => {
   })
 
   it('sends locale as a query param', async () => {
-    mock.onPost(`/api/content-types/${contentTypeSlug}/documents/1/unpublish`).reply(200, { status: 'draft' })
+    mock.onPost(`/api/document-manager/${contentTypeSlug}/1/unpublish`).reply(200, { status: 'draft' })
     const { result } = renderHook(() => useUnpublishDocument(), { wrapper: createWrapper() })
     await act(async () => {
       result.current.mutate({ contentTypeSlug, id: '1', locale: 'vi' })

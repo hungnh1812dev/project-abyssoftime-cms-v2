@@ -127,22 +127,21 @@ func main() {
 	adminOnly := func(h http.HandlerFunc) http.Handler {
 		return middleware.Auth(middleware.RequireRole("admin", h))
 	}
-	mux.Handle("GET /api/content-types", adminOnly(ctHandler.List))
+	mux.Handle("GET /api/content-types/all", adminOnly(ctHandler.ListSummary))
 	mux.Handle("GET /api/content-types/{identifier}", adminOnly(ctHandler.Get))
 
 	authRequired := func(h http.HandlerFunc) http.Handler {
 		return middleware.Auth(http.HandlerFunc(h))
 	}
-	mux.Handle("GET /api/content-types/{slug}/documents", authRequired(docHandler.List))
-	mux.Handle("GET /api/content-types/{slug}/documents/{documentId}", authRequired(docHandler.GetByID))
-	mux.Handle("POST /api/content-types/{slug}/documents", adminOnly(docHandler.Create))
-	mux.Handle("PUT /api/content-types/{slug}/documents/{documentId}", adminOnly(docHandler.Update))
-	mux.Handle("DELETE /api/content-types/{slug}/documents/{documentId}", adminOnly(docHandler.Delete))
-	mux.Handle("POST /api/content-types/{slug}/documents/{documentId}/publish", adminOnly(docHandler.Publish))
-	mux.Handle("POST /api/content-types/{slug}/documents/{documentId}/unpublish", adminOnly(docHandler.Unpublish))
+	mux.Handle("GET /api/document-manager/{slug}", authRequired(docHandler.List))
+	mux.Handle("GET /api/document-manager/{slug}/{documentId}", authRequired(docHandler.GetByID))
+	mux.Handle("POST /api/document-manager/{slug}", adminOnly(docHandler.Create))
+	mux.Handle("PUT /api/document-manager/{slug}/{documentId}", adminOnly(docHandler.Update))
+	mux.Handle("DELETE /api/document-manager/{slug}/{documentId}", adminOnly(docHandler.Delete))
+	mux.Handle("POST /api/document-manager/{slug}/{documentId}/publish", adminOnly(docHandler.Publish))
+	mux.Handle("POST /api/document-manager/{slug}/{documentId}/unpublish", adminOnly(docHandler.Unpublish))
 
-	// Public/content read path: no auth, resolves the published record only.
-	mux.HandleFunc("GET /api/public/content-types/{slug}/documents/{documentId}", docHandler.GetPublic)
+	mux.HandleFunc("GET /api/public/document-manager/{slug}/{documentId}", docHandler.GetPublic)
 
 	mux.Handle("GET /api/media", adminOnly(mediaHandler.List))
 	mux.Handle("POST /api/media/upload", adminOnly(mediaHandler.Upload))

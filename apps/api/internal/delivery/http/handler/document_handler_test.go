@@ -59,7 +59,7 @@ func TestDocumentHandler_List(t *testing.T) {
 	}
 	h := handler.NewDocumentHandler(uc)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/content-types/articles/documents", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/document-manager/articles", nil)
 	req.SetPathValue("slug", "articles")
 	w := httptest.NewRecorder()
 	h.List(w, req)
@@ -74,8 +74,8 @@ func TestDocumentHandler_List(t *testing.T) {
 	if len(out) != 1 {
 		t.Errorf("List() count = %d, want 1", len(out))
 	}
-	if out[0]["Status"] != "draft" {
-		t.Errorf("List() Status field = %v, want draft", out[0]["Status"])
+	if out[0]["status"] != "draft" {
+		t.Errorf("List() status field = %v, want draft", out[0]["status"])
 	}
 }
 
@@ -115,7 +115,7 @@ func TestDocumentHandler_Create(t *testing.T) {
 
 			var buf bytes.Buffer
 			_ = json.NewEncoder(&buf).Encode(tt.body)
-			req := httptest.NewRequest(http.MethodPost, "/api/content-types/articles/documents", &buf)
+			req := httptest.NewRequest(http.MethodPost, "/api/document-manager/articles", &buf)
 			req.SetPathValue("slug", "articles")
 			w := httptest.NewRecorder()
 			h.Create(w, req)
@@ -164,7 +164,7 @@ func TestDocumentHandler_GetByID(t *testing.T) {
 			tt.setupUC(uc)
 			h := handler.NewDocumentHandler(uc)
 
-			req := httptest.NewRequest(http.MethodGet, "/api/content-types/articles/documents/"+tt.id, nil)
+			req := httptest.NewRequest(http.MethodGet, "/api/document-manager/articles/"+tt.id, nil)
 			req.SetPathValue("slug", "articles")
 			req.SetPathValue("documentId", tt.id)
 			w := httptest.NewRecorder()
@@ -186,7 +186,7 @@ func TestDocumentHandler_GetByID_ForwardsLocaleQueryParam(t *testing.T) {
 	}
 	h := handler.NewDocumentHandler(uc)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/content-types/articles/documents/abc?locale=vi", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/document-manager/articles/abc?locale=vi", nil)
 	req.SetPathValue("slug", "articles")
 	req.SetPathValue("documentId", "abc")
 	w := httptest.NewRecorder()
@@ -231,7 +231,7 @@ func TestDocumentHandler_GetPublic(t *testing.T) {
 			tt.setupUC(uc)
 			h := handler.NewDocumentHandler(uc)
 
-			req := httptest.NewRequest(http.MethodGet, "/api/public/content-types/articles/documents/abc", nil)
+			req := httptest.NewRequest(http.MethodGet, "/api/public/document-manager/articles/abc", nil)
 			req.SetPathValue("slug", "articles")
 			req.SetPathValue("documentId", "abc")
 			w := httptest.NewRecorder()
@@ -253,7 +253,7 @@ func TestDocumentHandler_GetPublic_ForwardsLocaleQueryParam(t *testing.T) {
 	}
 	h := handler.NewDocumentHandler(uc)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/public/content-types/articles/documents/abc?locale=vi", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/public/document-manager/articles/abc?locale=vi", nil)
 	req.SetPathValue("slug", "articles")
 	req.SetPathValue("documentId", "abc")
 	w := httptest.NewRecorder()
@@ -279,7 +279,7 @@ func TestDocumentHandler_Update(t *testing.T) {
 	body := map[string]any{"data": map[string]any{"title": "Updated"}}
 	var buf bytes.Buffer
 	_ = json.NewEncoder(&buf).Encode(body)
-	req := httptest.NewRequest(http.MethodPut, "/api/content-types/articles/documents/abc", &buf)
+	req := httptest.NewRequest(http.MethodPut, "/api/document-manager/articles/abc", &buf)
 	req.SetPathValue("slug", "articles")
 	req.SetPathValue("documentId", "abc")
 	w := httptest.NewRecorder()
@@ -305,7 +305,7 @@ func TestDocumentHandler_Update_ForwardsLocaleQueryParamToSavedDoc(t *testing.T)
 	body := map[string]any{"data": map[string]any{"title": "Updated"}}
 	var buf bytes.Buffer
 	_ = json.NewEncoder(&buf).Encode(body)
-	req := httptest.NewRequest(http.MethodPut, "/api/content-types/articles/documents/abc?locale=vi", &buf)
+	req := httptest.NewRequest(http.MethodPut, "/api/document-manager/articles/abc?locale=vi", &buf)
 	req.SetPathValue("slug", "articles")
 	req.SetPathValue("documentId", "abc")
 	w := httptest.NewRecorder()
@@ -323,7 +323,7 @@ func TestDocumentHandler_Delete(t *testing.T) {
 	uc.deleteFn = func(_ context.Context, _, _ string) error { return nil }
 	h := handler.NewDocumentHandler(uc)
 
-	req := httptest.NewRequest(http.MethodDelete, "/api/content-types/articles/documents/abc", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/api/document-manager/articles/abc", nil)
 	req.SetPathValue("slug", "articles")
 	req.SetPathValue("documentId", "abc")
 	w := httptest.NewRecorder()
@@ -341,7 +341,7 @@ func TestDocumentHandler_Publish(t *testing.T) {
 	uc.publishFn = func(_ context.Context, _, _, _, _ string) error { return nil }
 	h := handler.NewDocumentHandler(uc)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/content-types/articles/documents/abc/publish", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/document-manager/articles/abc/publish", nil)
 	req.SetPathValue("slug", "articles")
 	req.SetPathValue("documentId", "abc")
 	w := httptest.NewRecorder()
@@ -361,7 +361,7 @@ func TestDocumentHandler_Publish_ForwardsLocaleQueryParam(t *testing.T) {
 	}
 	h := handler.NewDocumentHandler(uc)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/content-types/articles/documents/abc/publish?locale=vi", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/document-manager/articles/abc/publish?locale=vi", nil)
 	req.SetPathValue("slug", "articles")
 	req.SetPathValue("documentId", "abc")
 	w := httptest.NewRecorder()
@@ -377,7 +377,7 @@ func TestDocumentHandler_Unpublish(t *testing.T) {
 	uc.unpublishFn = func(_ context.Context, _, _, _ string) error { return nil }
 	h := handler.NewDocumentHandler(uc)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/content-types/articles/documents/abc/unpublish", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/document-manager/articles/abc/unpublish", nil)
 	req.SetPathValue("slug", "articles")
 	req.SetPathValue("documentId", "abc")
 	w := httptest.NewRecorder()
@@ -397,7 +397,7 @@ func TestDocumentHandler_Unpublish_ForwardsLocaleQueryParam(t *testing.T) {
 	}
 	h := handler.NewDocumentHandler(uc)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/content-types/articles/documents/abc/unpublish?locale=vi", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/document-manager/articles/abc/unpublish?locale=vi", nil)
 	req.SetPathValue("slug", "articles")
 	req.SetPathValue("documentId", "abc")
 	w := httptest.NewRecorder()

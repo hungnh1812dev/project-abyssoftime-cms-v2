@@ -21,7 +21,7 @@ export function useDocuments(contentTypeSlug: string) {
     queryKey: KEYS.list(contentTypeSlug),
     queryFn: () =>
       api
-        .get<Document[]>(`/api/content-types/${contentTypeSlug}/documents`)
+        .get<Document[]>(`/api/document-manager/${contentTypeSlug}`)
         .then((r) => r.data),
     enabled: Boolean(contentTypeSlug),
   })
@@ -32,7 +32,7 @@ export function useDocument(contentTypeSlug: string, id: string, locale: string)
     queryKey: KEYS.detail(contentTypeSlug, id, locale),
     queryFn: () =>
       api
-        .get<Document>(`/api/content-types/${contentTypeSlug}/documents/${id}`, {
+        .get<Document>(`/api/document-manager/${contentTypeSlug}/${id}`, {
           params: { locale },
         })
         .then((r) => r.data),
@@ -58,7 +58,7 @@ export function useCreateDocument() {
       data: Record<string, unknown>
     }) =>
       api
-        .post<Document>(`/api/content-types/${contentTypeSlug}/documents`, { data })
+        .post<Document>(`/api/document-manager/${contentTypeSlug}`, { data })
         .then((r) => r.data),
     onSuccess: (_, { contentTypeSlug }) =>
       qc.invalidateQueries({ queryKey: KEYS.list(contentTypeSlug) }),
@@ -81,12 +81,12 @@ export function useUpdateDocument() {
       locale?: string
     }) =>
       api
-        .put<Document>(`/api/content-types/${contentTypeSlug}/documents/${id}`, { data }, { params: { locale } })
+        .put<Document>(`/api/document-manager/${contentTypeSlug}/${id}`, { data }, { params: { locale } })
         .then((r) => r.data),
     onSuccess: (data, { contentTypeSlug }) => {
       qc.invalidateQueries({ queryKey: KEYS.list(contentTypeSlug) })
       qc.invalidateQueries({
-        queryKey: KEYS.detail(contentTypeSlug, data.DocumentID, data.Locale),
+        queryKey: KEYS.detail(contentTypeSlug, data.documentId, data.locale),
       })
     },
     onError: onMutationError,
@@ -102,7 +102,7 @@ export function useDeleteDocument() {
     }: {
       contentTypeSlug: string
       id: string
-    }) => api.delete(`/api/content-types/${contentTypeSlug}/documents/${id}`),
+    }) => api.delete(`/api/document-manager/${contentTypeSlug}/${id}`),
     onSuccess: (_, { contentTypeSlug }) =>
       qc.invalidateQueries({ queryKey: KEYS.list(contentTypeSlug) }),
     onError: onMutationError,
@@ -123,7 +123,7 @@ export function usePublishDocument() {
     }) =>
       api
         .post<{ status: string }>(
-          `/api/content-types/${contentTypeSlug}/documents/${id}/publish`,
+          `/api/document-manager/${contentTypeSlug}/${id}/publish`,
           undefined,
           { params: { locale } },
         )
@@ -152,7 +152,7 @@ export function useUnpublishDocument() {
     }) =>
       api
         .post<{ status: string }>(
-          `/api/content-types/${contentTypeSlug}/documents/${id}/unpublish`,
+          `/api/document-manager/${contentTypeSlug}/${id}/unpublish`,
           undefined,
           { params: { locale } },
         )

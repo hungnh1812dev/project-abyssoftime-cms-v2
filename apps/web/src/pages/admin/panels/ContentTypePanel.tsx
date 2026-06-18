@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
+  useCreateDocument,
   useDocuments,
   useLocales,
   usePublishDocument,
@@ -10,7 +11,7 @@ import {
 import { api } from "@/lib/api";
 import type { ContentType, Document as CmsDocument } from "@/types/cms";
 import { useState } from "react";
-import { ContentDetailLayout } from "./layout/ContentDetailLayout";
+import { ContentDetailLayout } from "../layout/ContentDetailLayout";
 import { ContentTypeBuilder } from "./ContentTypeBuilder";
 
 interface Props {
@@ -25,9 +26,10 @@ export function ContentTypePanel({ contentType, id }: Props) {
   const activeLocale = locale || locales[0] || "";
 
   const doc = id
-    ? docs.find((d) => d.DocumentID === id) ?? docs[0]
-    : docs.find((d) => d.Locale === activeLocale) ?? docs[0];
+    ? (docs.find((d) => d.documentId === id) ?? docs[0])
+    : (docs.find((d) => d.locale === activeLocale) ?? docs[0]);
 
+  const { mutateAsync: createDoc } = useCreateDocument();
   const { mutateAsync: updateDoc } = useUpdateDocument();
   const publish = usePublishDocument();
   const unpublish = useUnpublishDocument();
@@ -37,32 +39,41 @@ export function ContentTypePanel({ contentType, id }: Props) {
   }
 
   if (!doc) {
+    const schema = contentType.Fields ?? [];
+    const handleFirstSave = async (data: Record<string, unknown>) => {
+      await createDoc({ contentTypeSlug: contentType.Slug, data });
+    };
+
     return (
-      <p className="text-muted-foreground">
-        No document found for this content type.
-      </p>
+      <ContentDetailLayout title={contentType.Name}>
+        <ContentTypeBuilder schema={schema} mutationFn={handleFirstSave} />
+      </ContentDetailLayout>
     );
   }
 
   const mutationFn = (data: Record<string, unknown>) =>
     updateDoc({
       contentTypeSlug: contentType.Slug,
-      id: doc.DocumentID,
+      id: doc.documentId,
       data,
       locale: activeLocale,
     });
 
-  const canPublish = doc.Status !== "published";
-  const canUnpublish = doc.Status !== "draft";
+  const canPublish = doc.status !== "published";
+  const canUnpublish = doc.status !== "draft";
   const schema = contentType.Fields ?? [];
 
   return (
     <ContentDetailLayout
       title={contentType.Name}
-      status={doc.Status}
+      status={doc.status}
       backLink={
         id ? (
-          <Link to=".." relative="path" className="text-sm text-muted-foreground hover:underline">
+          <Link
+            to=".."
+            relative="path"
+            className="text-sm text-muted-foreground hover:underline"
+          >
             ← Go back
           </Link>
         ) : undefined
@@ -87,7 +98,7 @@ export function ContentTypePanel({ contentType, id }: Props) {
               onClick={() =>
                 publish.mutate({
                   contentTypeSlug: contentType.Slug,
-                  id: doc.DocumentID,
+                  id: doc.documentId,
                   locale: activeLocale,
                 })
               }
@@ -102,7 +113,7 @@ export function ContentTypePanel({ contentType, id }: Props) {
               onClick={() =>
                 unpublish.mutate({
                   contentTypeSlug: contentType.Slug,
-                  id: doc.DocumentID,
+                  id: doc.documentId,
                   locale: activeLocale,
                 })
               }
@@ -117,13 +128,23 @@ export function ContentTypePanel({ contentType, id }: Props) {
       <ContentTypeBuilder
         schema={schema}
         query={{
-          queryKey: ["documents", "detail", contentType.Slug, doc.DocumentID, activeLocale, "data"],
+          queryKey: [
+            "documents",
+            "detail",
+            contentType.Slug,
+            doc.documentId,
+            activeLocale,
+            "data",
+          ],
           queryFn: () =>
             api
-              .get<CmsDocument>(`/api/content-types/${contentType.Slug}/documents/${doc.DocumentID}`, {
-                params: { locale: activeLocale },
-              })
-              .then((r) => (r.data as CmsDocument).Data),
+              .get<CmsDocument>(
+                `/api/document-manager/${contentType.Slug}/${doc.documentId}`,
+                {
+                  params: { locale: activeLocale },
+                },
+              )
+              .then((r) => (r.data as CmsDocument).data),
         }}
         mutationFn={mutationFn}
       />

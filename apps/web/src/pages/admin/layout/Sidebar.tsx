@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import { useContentTypes } from '@/hooks/useContentTypes'
-import type { ContentType } from '@/types/cms'
+import type { ContentTypeSummary } from '@/types/cms'
 
 function navLinkClass({ isActive }: { isActive: boolean }) {
   return `block px-3 py-2 rounded-md text-sm transition-colors ${
@@ -10,7 +10,7 @@ function navLinkClass({ isActive }: { isActive: boolean }) {
   }`
 }
 
-function NavGroup({ title, items }: { title: string; items: ContentType[] }) {
+function NavGroup({ title, items }: { title: string; items: ContentTypeSummary[] }) {
   if (items.length === 0) {
     return null
   }

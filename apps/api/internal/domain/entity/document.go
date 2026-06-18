@@ -13,15 +13,15 @@ const (
 )
 
 type Document struct {
-	DocumentID    string          `bson:"documentId"`
-	Version       DocumentVersion `bson:"version"`
-	ContentTypeID string          `bson:"contentTypeId"`
-	Data          map[string]any  `bson:"data"`
-	Locale        string          `bson:"locale"`
-	CreatedAt     time.Time       `bson:"createdAt"`
-	UpdatedAt     time.Time       `bson:"updatedAt"`
-	PublishedAt   time.Time       `bson:"publishedAt,omitempty"`
-	CreatedBy     string          `bson:"createdBy"`
-	UpdatedBy     string          `bson:"updatedBy"`
-	PublishedBy   string          `bson:"publishedBy,omitempty"`
+	DocumentID    string          `bson:"documentId" json:"documentId"`
+	Version       DocumentVersion `bson:"version" json:"version"`
+	ContentTypeID string          `bson:"contentTypeId" json:"contentTypeId"`
+	Data          map[string]any  `bson:"data" json:"data"`
+	Locale        string          `bson:"locale" json:"locale"`
+	CreatedAt     time.Time       `bson:"createdAt" json:"createdAt"`
+	UpdatedAt     time.Time       `bson:"updatedAt" json:"updatedAt"`
+	PublishedAt   time.Time       `bson:"publishedAt,omitempty" json:"publishedAt,omitempty"`
+	CreatedBy     string          `bson:"createdBy" json:"createdBy"`
+	UpdatedBy     string          `bson:"updatedBy" json:"updatedBy"`
+	PublishedBy   string          `bson:"publishedBy,omitempty" json:"publishedBy,omitempty"`
 }

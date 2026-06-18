@@ -32,74 +32,74 @@ func (m *mockContentTypeUC) FindAll(ctx context.Context) ([]*entity.ContentType,
 
 // ---- List ------------------------------------------------------------------
 
-func TestContentTypeHandler_List(t *testing.T) {
+func TestContentTypeHandler_ListSummary(t *testing.T) {
 	uc := &mockContentTypeUC{}
 	uc.findAllFn = func(_ context.Context) ([]*entity.ContentType, error) {
 		return []*entity.ContentType{
-			{ID: "1", Slug: "blog"},
-			{ID: "2", Slug: "homepage"},
+			{ID: "1", Name: "Blog", Slug: "blog", Kind: "collection"},
+			{ID: "2", Name: "Homepage", Slug: "homepage", Kind: "single"},
 		}, nil
 	}
 	h := handler.NewContentTypeHandler(uc)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/content-types", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/content-types/all", nil)
 	w := httptest.NewRecorder()
-	h.List(w, req)
+	h.ListSummary(w, req)
 
 	if w.Code != http.StatusOK {
-		t.Fatalf("List() status = %d, want 200", w.Code)
+		t.Fatalf("ListSummary() status = %d, want 200", w.Code)
 	}
 	var out []map[string]any
 	if err := json.NewDecoder(w.Body).Decode(&out); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
 	if len(out) != 2 {
-		t.Errorf("List() count = %d, want 2", len(out))
+		t.Errorf("ListSummary() count = %d, want 2", len(out))
 	}
 }
 
-// ---- List includes fields --------------------------------------------------
+// ---- ListSummary excludes Fields and timestamps ----------------------------
 
-func TestContentTypeHandler_List_IncludesFields(t *testing.T) {
+func TestContentTypeHandler_ListSummary_ExcludesFieldsAndTimestamps(t *testing.T) {
 	uc := &mockContentTypeUC{}
 	uc.findAllFn = func(_ context.Context) ([]*entity.ContentType, error) {
 		return []*entity.ContentType{
 			{
 				ID:   "1",
+				Name: "Blog",
 				Slug: "blog",
+				Kind: "collection",
 				Fields: []entity.FieldDefinition{
 					{Name: "title", Type: "text"},
-					{Name: "body", Type: "richtext"},
 				},
 			},
 		}, nil
 	}
 	h := handler.NewContentTypeHandler(uc)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/content-types", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/content-types/all", nil)
 	w := httptest.NewRecorder()
-	h.List(w, req)
+	h.ListSummary(w, req)
 
 	if w.Code != http.StatusOK {
-		t.Fatalf("List() status = %d, want 200", w.Code)
+		t.Fatalf("ListSummary() status = %d, want 200", w.Code)
 	}
 	var out []map[string]any
 	if err := json.NewDecoder(w.Body).Decode(&out); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
 	if len(out) != 1 {
-		t.Fatalf("List() count = %d, want 1", len(out))
+		t.Fatalf("ListSummary() count = %d, want 1", len(out))
 	}
-	fields, ok := out[0]["Fields"]
-	if !ok {
-		t.Fatal("List() response item missing 'fields' key")
+	for _, key := range []string{"Fields", "CreatedAt", "UpdatedAt"} {
+		if _, ok := out[0][key]; ok {
+			t.Errorf("ListSummary() should not contain %q", key)
+		}
 	}
-	fieldsSlice, ok := fields.([]any)
-	if !ok {
-		t.Fatalf("List() 'fields' is not an array, got %T", fields)
-	}
-	if len(fieldsSlice) != 2 {
-		t.Errorf("List() fields count = %d, want 2", len(fieldsSlice))
+	for _, key := range []string{"ID", "Name", "Slug", "Kind"} {
+		if _, ok := out[0][key]; !ok {
+			t.Errorf("ListSummary() missing expected key %q", key)
+		}
 	}
 }
 

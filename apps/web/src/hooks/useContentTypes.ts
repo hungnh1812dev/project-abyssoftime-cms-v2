@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
-import type { ContentType } from '@/types/cms'
+import type { ContentType, ContentTypeSummary } from '@/types/cms'
 
 const KEYS = {
   all: ['content-types'] as const,
@@ -11,7 +11,7 @@ const KEYS = {
 export function useContentTypes() {
   return useQuery({
     queryKey: KEYS.all,
-    queryFn: () => api.get<ContentType[]>('/api/content-types').then((r) => r.data),
+    queryFn: () => api.get<ContentTypeSummary[]>('/api/content-types/all').then((r) => r.data),
   })
 }
 

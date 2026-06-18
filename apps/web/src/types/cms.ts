@@ -5,11 +5,14 @@ export interface FieldDefinition {
   fields?: FieldDefinition[]
 }
 
-export interface ContentType {
+export interface ContentTypeSummary {
   ID: string
   Name: string
   Slug: string
   Kind: 'single' | 'collection'
+}
+
+export interface ContentType extends ContentTypeSummary {
   Fields?: FieldDefinition[]
   CreatedAt: string
   UpdatedAt: string
@@ -18,15 +21,15 @@ export interface ContentType {
 export type EntryStatus = 'draft' | 'modified' | 'published'
 
 export interface Document {
-  DocumentID: string
-  ContentTypeID: string
-  Data: Record<string, unknown>
-  Status: EntryStatus
-  Locale: string
-  CreatedAt: string
-  UpdatedAt: string
-  CreatedBy: string
-  UpdatedBy: string
+  documentId: string
+  contentTypeId: string
+  data: Record<string, unknown>
+  status: EntryStatus
+  locale: string
+  createdAt: string
+  updatedAt: string
+  createdBy: string
+  updatedBy: string
 }
 
 export interface MediaAsset {
