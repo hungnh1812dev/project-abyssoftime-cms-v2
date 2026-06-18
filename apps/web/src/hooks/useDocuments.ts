@@ -10,26 +10,32 @@ function onMutationError(err: unknown) {
 }
 
 const KEYS = {
-  list: (contentTypeId: string) => ['documents', contentTypeId] as const,
-  detail: (id: string, locale: string) => ['documents', 'detail', id, locale] as const,
+  list: (contentTypeSlug: string) => ['documents', contentTypeSlug] as const,
+  detail: (contentTypeSlug: string, id: string, locale: string) =>
+    ['documents', 'detail', contentTypeSlug, id, locale] as const,
   locales: ['locales'] as const,
 }
 
-export function useDocuments(contentTypeId: string) {
+export function useDocuments(contentTypeSlug: string) {
   return useQuery({
-    queryKey: KEYS.list(contentTypeId),
+    queryKey: KEYS.list(contentTypeSlug),
     queryFn: () =>
       api
-        .get<Document[]>('/api/documents', { params: { contentType: contentTypeId } })
+        .get<Document[]>(`/api/content-types/${contentTypeSlug}/documents`)
         .then((r) => r.data),
-    enabled: Boolean(contentTypeId),
+    enabled: Boolean(contentTypeSlug),
   })
 }
 
-export function useDocument(id: string, locale: string) {
+export function useDocument(contentTypeSlug: string, id: string, locale: string) {
   return useQuery({
-    queryKey: KEYS.detail(id, locale),
-    queryFn: () => api.get<Document>(`/api/documents/${id}`, { params: { locale } }).then((r) => r.data),
+    queryKey: KEYS.detail(contentTypeSlug, id, locale),
+    queryFn: () =>
+      api
+        .get<Document>(`/api/content-types/${contentTypeSlug}/documents/${id}`, {
+          params: { locale },
+        })
+        .then((r) => r.data),
     enabled: Boolean(id),
   })
 }
@@ -44,9 +50,18 @@ export function useLocales() {
 export function useCreateDocument() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (body: { contentTypeId: string; data: Record<string, unknown> }) =>
-      api.post<Document>('/api/documents', body).then((r) => r.data),
-    onSuccess: (data) => qc.invalidateQueries({ queryKey: KEYS.list(data.ContentTypeID) }),
+    mutationFn: ({
+      contentTypeSlug,
+      data,
+    }: {
+      contentTypeSlug: string
+      data: Record<string, unknown>
+    }) =>
+      api
+        .post<Document>(`/api/content-types/${contentTypeSlug}/documents`, { data })
+        .then((r) => r.data),
+    onSuccess: (_, { contentTypeSlug }) =>
+      qc.invalidateQueries({ queryKey: KEYS.list(contentTypeSlug) }),
     onError: onMutationError,
   })
 }
@@ -55,18 +70,24 @@ export function useUpdateDocument() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({
+      contentTypeSlug,
       id,
       locale,
-      ...body
+      data,
     }: {
+      contentTypeSlug: string
       id: string
-      contentTypeId: string
       data: Record<string, unknown>
       locale?: string
-    }) => api.put<Document>(`/api/documents/${id}`, body, { params: { locale } }).then((r) => r.data),
-    onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: KEYS.list(data.ContentTypeID) })
-      qc.invalidateQueries({ queryKey: KEYS.detail(data.EntryID, data.Locale) })
+    }) =>
+      api
+        .put<Document>(`/api/content-types/${contentTypeSlug}/documents/${id}`, { data }, { params: { locale } })
+        .then((r) => r.data),
+    onSuccess: (data, { contentTypeSlug }) => {
+      qc.invalidateQueries({ queryKey: KEYS.list(contentTypeSlug) })
+      qc.invalidateQueries({
+        queryKey: KEYS.detail(contentTypeSlug, data.DocumentID, data.Locale),
+      })
     },
     onError: onMutationError,
   })
@@ -75,10 +96,15 @@ export function useUpdateDocument() {
 export function useDeleteDocument() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id }: { id: string; contentTypeId: string }) =>
-      api.delete(`/api/documents/${id}`),
-    onSuccess: (_, { contentTypeId }) =>
-      qc.invalidateQueries({ queryKey: KEYS.list(contentTypeId) }),
+    mutationFn: ({
+      contentTypeSlug,
+      id,
+    }: {
+      contentTypeSlug: string
+      id: string
+    }) => api.delete(`/api/content-types/${contentTypeSlug}/documents/${id}`),
+    onSuccess: (_, { contentTypeSlug }) =>
+      qc.invalidateQueries({ queryKey: KEYS.list(contentTypeSlug) }),
     onError: onMutationError,
   })
 }
@@ -86,13 +112,27 @@ export function useDeleteDocument() {
 export function usePublishDocument() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, locale }: { id: string; contentTypeId: string; locale?: string }) =>
+    mutationFn: ({
+      contentTypeSlug,
+      id,
+      locale,
+    }: {
+      contentTypeSlug: string
+      id: string
+      locale?: string
+    }) =>
       api
-        .post<{ status: string }>(`/api/documents/${id}/publish`, undefined, { params: { locale } })
+        .post<{ status: string }>(
+          `/api/content-types/${contentTypeSlug}/documents/${id}/publish`,
+          undefined,
+          { params: { locale } },
+        )
         .then((r) => r.data),
-    onSuccess: (_, { id, contentTypeId, locale }) => {
-      qc.invalidateQueries({ queryKey: KEYS.detail(id, locale ?? '') })
-      qc.invalidateQueries({ queryKey: KEYS.list(contentTypeId) })
+    onSuccess: (_, { contentTypeSlug, id, locale }) => {
+      qc.invalidateQueries({
+        queryKey: KEYS.detail(contentTypeSlug, id, locale ?? ''),
+      })
+      qc.invalidateQueries({ queryKey: KEYS.list(contentTypeSlug) })
     },
     onError: onMutationError,
   })
@@ -101,13 +141,27 @@ export function usePublishDocument() {
 export function useUnpublishDocument() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, locale }: { id: string; contentTypeId: string; locale?: string }) =>
+    mutationFn: ({
+      contentTypeSlug,
+      id,
+      locale,
+    }: {
+      contentTypeSlug: string
+      id: string
+      locale?: string
+    }) =>
       api
-        .post<{ status: string }>(`/api/documents/${id}/unpublish`, undefined, { params: { locale } })
+        .post<{ status: string }>(
+          `/api/content-types/${contentTypeSlug}/documents/${id}/unpublish`,
+          undefined,
+          { params: { locale } },
+        )
         .then((r) => r.data),
-    onSuccess: (_, { id, contentTypeId, locale }) => {
-      qc.invalidateQueries({ queryKey: KEYS.detail(id, locale ?? '') })
-      qc.invalidateQueries({ queryKey: KEYS.list(contentTypeId) })
+    onSuccess: (_, { contentTypeSlug, id, locale }) => {
+      qc.invalidateQueries({
+        queryKey: KEYS.detail(contentTypeSlug, id, locale ?? ''),
+      })
+      qc.invalidateQueries({ queryKey: KEYS.list(contentTypeSlug) })
     },
     onError: onMutationError,
   })

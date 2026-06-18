@@ -16,50 +16,51 @@ import (
 // ---- mock usecase ----------------------------------------------------------
 
 type mockDocumentUC struct {
-	saveFn         func(ctx context.Context, doc *entity.Document, userID string) (*entity.Document, error)
-	getForEditFn   func(ctx context.Context, entryID, locale string) (*entity.Document, string, error)
-	getPublishedFn func(ctx context.Context, entryID, locale string) (*entity.Document, error)
-	getAllFn       func(ctx context.Context, contentTypeID string) ([]*entity.Document, error)
-	deleteFn       func(ctx context.Context, entryID string) error
-	publishFn      func(ctx context.Context, entryID, locale, userID string) error
-	unpublishFn    func(ctx context.Context, entryID, locale string) error
+	saveFn         func(ctx context.Context, contentTypeSlug string, doc *entity.Document, userID string) (*entity.Document, error)
+	getForEditFn   func(ctx context.Context, contentTypeSlug, documentID, locale string) (*entity.Document, string, error)
+	getPublishedFn func(ctx context.Context, contentTypeSlug, documentID, locale string) (*entity.Document, error)
+	getAllFn       func(ctx context.Context, contentTypeSlug string) ([]*entity.Document, error)
+	deleteFn       func(ctx context.Context, contentTypeSlug, documentID string) error
+	publishFn      func(ctx context.Context, contentTypeSlug, documentID, locale, userID string) error
+	unpublishFn    func(ctx context.Context, contentTypeSlug, documentID, locale string) error
 }
 
-func (m *mockDocumentUC) Save(ctx context.Context, doc *entity.Document, userID string) (*entity.Document, error) {
-	return m.saveFn(ctx, doc, userID)
+func (m *mockDocumentUC) Save(ctx context.Context, contentTypeSlug string, doc *entity.Document, userID string) (*entity.Document, error) {
+	return m.saveFn(ctx, contentTypeSlug, doc, userID)
 }
-func (m *mockDocumentUC) GetForEdit(ctx context.Context, entryID, locale string) (*entity.Document, string, error) {
-	return m.getForEditFn(ctx, entryID, locale)
+func (m *mockDocumentUC) GetForEdit(ctx context.Context, contentTypeSlug, documentID, locale string) (*entity.Document, string, error) {
+	return m.getForEditFn(ctx, contentTypeSlug, documentID, locale)
 }
-func (m *mockDocumentUC) GetPublished(ctx context.Context, entryID, locale string) (*entity.Document, error) {
-	return m.getPublishedFn(ctx, entryID, locale)
+func (m *mockDocumentUC) GetPublished(ctx context.Context, contentTypeSlug, documentID, locale string) (*entity.Document, error) {
+	return m.getPublishedFn(ctx, contentTypeSlug, documentID, locale)
 }
-func (m *mockDocumentUC) GetAll(ctx context.Context, contentTypeID string) ([]*entity.Document, error) {
-	return m.getAllFn(ctx, contentTypeID)
+func (m *mockDocumentUC) GetAll(ctx context.Context, contentTypeSlug string) ([]*entity.Document, error) {
+	return m.getAllFn(ctx, contentTypeSlug)
 }
-func (m *mockDocumentUC) Delete(ctx context.Context, entryID string) error {
-	return m.deleteFn(ctx, entryID)
+func (m *mockDocumentUC) Delete(ctx context.Context, contentTypeSlug, documentID string) error {
+	return m.deleteFn(ctx, contentTypeSlug, documentID)
 }
-func (m *mockDocumentUC) Publish(ctx context.Context, entryID, locale, userID string) error {
-	return m.publishFn(ctx, entryID, locale, userID)
+func (m *mockDocumentUC) Publish(ctx context.Context, contentTypeSlug, documentID, locale, userID string) error {
+	return m.publishFn(ctx, contentTypeSlug, documentID, locale, userID)
 }
-func (m *mockDocumentUC) Unpublish(ctx context.Context, entryID, locale string) error {
-	return m.unpublishFn(ctx, entryID, locale)
+func (m *mockDocumentUC) Unpublish(ctx context.Context, contentTypeSlug, documentID, locale string) error {
+	return m.unpublishFn(ctx, contentTypeSlug, documentID, locale)
 }
 
 // ---- List ------------------------------------------------------------------
 
 func TestDocumentHandler_List(t *testing.T) {
 	uc := &mockDocumentUC{}
-	uc.getAllFn = func(_ context.Context, contentTypeID string) ([]*entity.Document, error) {
-		return []*entity.Document{{EntryID: "1", ContentTypeID: contentTypeID}}, nil
+	uc.getAllFn = func(_ context.Context, slug string) ([]*entity.Document, error) {
+		return []*entity.Document{{DocumentID: "1", ContentTypeID: "ct-1"}}, nil
 	}
-	uc.getForEditFn = func(_ context.Context, entryID, _ string) (*entity.Document, string, error) {
-		return &entity.Document{EntryID: entryID}, "draft", nil
+	uc.getForEditFn = func(_ context.Context, _, documentID, _ string) (*entity.Document, string, error) {
+		return &entity.Document{DocumentID: documentID}, "draft", nil
 	}
 	h := handler.NewDocumentHandler(uc)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/documents?contentType=ct-1", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/content-types/articles/documents", nil)
+	req.SetPathValue("slug", "articles")
 	w := httptest.NewRecorder()
 	h.List(w, req)
 
@@ -89,10 +90,10 @@ func TestDocumentHandler_Create(t *testing.T) {
 	}{
 		{
 			name: "201 on valid create",
-			body: map[string]any{"contentTypeId": "ct-1", "data": map[string]any{"title": "Hello"}},
+			body: map[string]any{"data": map[string]any{"title": "Hello"}},
 			setupUC: func(m *mockDocumentUC) {
-				m.saveFn = func(_ context.Context, doc *entity.Document, _ string) (*entity.Document, error) {
-					doc.EntryID = "new-entry"
+				m.saveFn = func(_ context.Context, _ string, doc *entity.Document, _ string) (*entity.Document, error) {
+					doc.DocumentID = "new-entry"
 					return doc, nil
 				}
 			},
@@ -114,7 +115,8 @@ func TestDocumentHandler_Create(t *testing.T) {
 
 			var buf bytes.Buffer
 			_ = json.NewEncoder(&buf).Encode(tt.body)
-			req := httptest.NewRequest(http.MethodPost, "/api/documents", &buf)
+			req := httptest.NewRequest(http.MethodPost, "/api/content-types/articles/documents", &buf)
+			req.SetPathValue("slug", "articles")
 			w := httptest.NewRecorder()
 			h.Create(w, req)
 
@@ -138,8 +140,8 @@ func TestDocumentHandler_GetByID(t *testing.T) {
 			name: "200 found",
 			id:   "abc",
 			setupUC: func(m *mockDocumentUC) {
-				m.getForEditFn = func(_ context.Context, entryID, _ string) (*entity.Document, string, error) {
-					return &entity.Document{EntryID: entryID}, "draft", nil
+				m.getForEditFn = func(_ context.Context, _, documentID, _ string) (*entity.Document, string, error) {
+					return &entity.Document{DocumentID: documentID}, "draft", nil
 				}
 			},
 			wantStatus: http.StatusOK,
@@ -148,7 +150,7 @@ func TestDocumentHandler_GetByID(t *testing.T) {
 			name: "404 not found",
 			id:   "missing",
 			setupUC: func(m *mockDocumentUC) {
-				m.getForEditFn = func(_ context.Context, _, _ string) (*entity.Document, string, error) {
+				m.getForEditFn = func(_ context.Context, _, _, _ string) (*entity.Document, string, error) {
 					return nil, "", pkgerrors.ErrNotFound
 				}
 			},
@@ -162,8 +164,9 @@ func TestDocumentHandler_GetByID(t *testing.T) {
 			tt.setupUC(uc)
 			h := handler.NewDocumentHandler(uc)
 
-			req := httptest.NewRequest(http.MethodGet, "/api/documents/"+tt.id, nil)
-			req.SetPathValue("id", tt.id)
+			req := httptest.NewRequest(http.MethodGet, "/api/content-types/articles/documents/"+tt.id, nil)
+			req.SetPathValue("slug", "articles")
+			req.SetPathValue("documentId", tt.id)
 			w := httptest.NewRecorder()
 			h.GetByID(w, req)
 
@@ -177,14 +180,15 @@ func TestDocumentHandler_GetByID(t *testing.T) {
 func TestDocumentHandler_GetByID_ForwardsLocaleQueryParam(t *testing.T) {
 	var gotLocale string
 	uc := &mockDocumentUC{}
-	uc.getForEditFn = func(_ context.Context, entryID, locale string) (*entity.Document, string, error) {
+	uc.getForEditFn = func(_ context.Context, _, documentID, locale string) (*entity.Document, string, error) {
 		gotLocale = locale
-		return &entity.Document{EntryID: entryID}, "draft", nil
+		return &entity.Document{DocumentID: documentID}, "draft", nil
 	}
 	h := handler.NewDocumentHandler(uc)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/documents/abc?locale=vi", nil)
-	req.SetPathValue("id", "abc")
+	req := httptest.NewRequest(http.MethodGet, "/api/content-types/articles/documents/abc?locale=vi", nil)
+	req.SetPathValue("slug", "articles")
+	req.SetPathValue("documentId", "abc")
 	w := httptest.NewRecorder()
 	h.GetByID(w, req)
 
@@ -204,8 +208,8 @@ func TestDocumentHandler_GetPublic(t *testing.T) {
 		{
 			name: "200 when published",
 			setupUC: func(m *mockDocumentUC) {
-				m.getPublishedFn = func(_ context.Context, entryID, _ string) (*entity.Document, error) {
-					return &entity.Document{EntryID: entryID}, nil
+				m.getPublishedFn = func(_ context.Context, _, documentID, _ string) (*entity.Document, error) {
+					return &entity.Document{DocumentID: documentID}, nil
 				}
 			},
 			wantStatus: http.StatusOK,
@@ -213,7 +217,7 @@ func TestDocumentHandler_GetPublic(t *testing.T) {
 		{
 			name: "404 when never published",
 			setupUC: func(m *mockDocumentUC) {
-				m.getPublishedFn = func(_ context.Context, _, _ string) (*entity.Document, error) {
+				m.getPublishedFn = func(_ context.Context, _, _, _ string) (*entity.Document, error) {
 					return nil, pkgerrors.ErrNotFound
 				}
 			},
@@ -227,8 +231,9 @@ func TestDocumentHandler_GetPublic(t *testing.T) {
 			tt.setupUC(uc)
 			h := handler.NewDocumentHandler(uc)
 
-			req := httptest.NewRequest(http.MethodGet, "/api/public/documents/abc", nil)
-			req.SetPathValue("id", "abc")
+			req := httptest.NewRequest(http.MethodGet, "/api/public/content-types/articles/documents/abc", nil)
+			req.SetPathValue("slug", "articles")
+			req.SetPathValue("documentId", "abc")
 			w := httptest.NewRecorder()
 			h.GetPublic(w, req)
 
@@ -242,14 +247,15 @@ func TestDocumentHandler_GetPublic(t *testing.T) {
 func TestDocumentHandler_GetPublic_ForwardsLocaleQueryParam(t *testing.T) {
 	var gotLocale string
 	uc := &mockDocumentUC{}
-	uc.getPublishedFn = func(_ context.Context, entryID, locale string) (*entity.Document, error) {
+	uc.getPublishedFn = func(_ context.Context, _, documentID, locale string) (*entity.Document, error) {
 		gotLocale = locale
-		return &entity.Document{EntryID: entryID}, nil
+		return &entity.Document{DocumentID: documentID}, nil
 	}
 	h := handler.NewDocumentHandler(uc)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/public/documents/abc?locale=vi", nil)
-	req.SetPathValue("id", "abc")
+	req := httptest.NewRequest(http.MethodGet, "/api/public/content-types/articles/documents/abc?locale=vi", nil)
+	req.SetPathValue("slug", "articles")
+	req.SetPathValue("documentId", "abc")
 	w := httptest.NewRecorder()
 	h.GetPublic(w, req)
 
@@ -262,19 +268,20 @@ func TestDocumentHandler_GetPublic_ForwardsLocaleQueryParam(t *testing.T) {
 
 func TestDocumentHandler_Update(t *testing.T) {
 	uc := &mockDocumentUC{}
-	uc.saveFn = func(_ context.Context, doc *entity.Document, _ string) (*entity.Document, error) {
+	uc.saveFn = func(_ context.Context, _ string, doc *entity.Document, _ string) (*entity.Document, error) {
 		return doc, nil
 	}
-	uc.getForEditFn = func(_ context.Context, entryID, _ string) (*entity.Document, string, error) {
-		return &entity.Document{EntryID: entryID}, "modified", nil
+	uc.getForEditFn = func(_ context.Context, _, documentID, _ string) (*entity.Document, string, error) {
+		return &entity.Document{DocumentID: documentID}, "modified", nil
 	}
 	h := handler.NewDocumentHandler(uc)
 
 	body := map[string]any{"data": map[string]any{"title": "Updated"}}
 	var buf bytes.Buffer
 	_ = json.NewEncoder(&buf).Encode(body)
-	req := httptest.NewRequest(http.MethodPut, "/api/documents/abc", &buf)
-	req.SetPathValue("id", "abc")
+	req := httptest.NewRequest(http.MethodPut, "/api/content-types/articles/documents/abc", &buf)
+	req.SetPathValue("slug", "articles")
+	req.SetPathValue("documentId", "abc")
 	w := httptest.NewRecorder()
 	h.Update(w, req)
 
@@ -286,20 +293,21 @@ func TestDocumentHandler_Update(t *testing.T) {
 func TestDocumentHandler_Update_ForwardsLocaleQueryParamToSavedDoc(t *testing.T) {
 	var savedLocale string
 	uc := &mockDocumentUC{}
-	uc.saveFn = func(_ context.Context, doc *entity.Document, _ string) (*entity.Document, error) {
+	uc.saveFn = func(_ context.Context, _ string, doc *entity.Document, _ string) (*entity.Document, error) {
 		savedLocale = doc.Locale
 		return doc, nil
 	}
-	uc.getForEditFn = func(_ context.Context, entryID, _ string) (*entity.Document, string, error) {
-		return &entity.Document{EntryID: entryID}, "modified", nil
+	uc.getForEditFn = func(_ context.Context, _, documentID, _ string) (*entity.Document, string, error) {
+		return &entity.Document{DocumentID: documentID}, "modified", nil
 	}
 	h := handler.NewDocumentHandler(uc)
 
 	body := map[string]any{"data": map[string]any{"title": "Updated"}}
 	var buf bytes.Buffer
 	_ = json.NewEncoder(&buf).Encode(body)
-	req := httptest.NewRequest(http.MethodPut, "/api/documents/abc?locale=vi", &buf)
-	req.SetPathValue("id", "abc")
+	req := httptest.NewRequest(http.MethodPut, "/api/content-types/articles/documents/abc?locale=vi", &buf)
+	req.SetPathValue("slug", "articles")
+	req.SetPathValue("documentId", "abc")
 	w := httptest.NewRecorder()
 	h.Update(w, req)
 
@@ -312,11 +320,12 @@ func TestDocumentHandler_Update_ForwardsLocaleQueryParamToSavedDoc(t *testing.T)
 
 func TestDocumentHandler_Delete(t *testing.T) {
 	uc := &mockDocumentUC{}
-	uc.deleteFn = func(_ context.Context, _ string) error { return nil }
+	uc.deleteFn = func(_ context.Context, _, _ string) error { return nil }
 	h := handler.NewDocumentHandler(uc)
 
-	req := httptest.NewRequest(http.MethodDelete, "/api/documents/abc", nil)
-	req.SetPathValue("id", "abc")
+	req := httptest.NewRequest(http.MethodDelete, "/api/content-types/articles/documents/abc", nil)
+	req.SetPathValue("slug", "articles")
+	req.SetPathValue("documentId", "abc")
 	w := httptest.NewRecorder()
 	h.Delete(w, req)
 
@@ -329,11 +338,12 @@ func TestDocumentHandler_Delete(t *testing.T) {
 
 func TestDocumentHandler_Publish(t *testing.T) {
 	uc := &mockDocumentUC{}
-	uc.publishFn = func(_ context.Context, _, _, _ string) error { return nil }
+	uc.publishFn = func(_ context.Context, _, _, _, _ string) error { return nil }
 	h := handler.NewDocumentHandler(uc)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/documents/abc/publish", nil)
-	req.SetPathValue("id", "abc")
+	req := httptest.NewRequest(http.MethodPost, "/api/content-types/articles/documents/abc/publish", nil)
+	req.SetPathValue("slug", "articles")
+	req.SetPathValue("documentId", "abc")
 	w := httptest.NewRecorder()
 	h.Publish(w, req)
 
@@ -345,14 +355,15 @@ func TestDocumentHandler_Publish(t *testing.T) {
 func TestDocumentHandler_Publish_ForwardsLocaleQueryParam(t *testing.T) {
 	var gotLocale string
 	uc := &mockDocumentUC{}
-	uc.publishFn = func(_ context.Context, _, locale, _ string) error {
+	uc.publishFn = func(_ context.Context, _, _, locale, _ string) error {
 		gotLocale = locale
 		return nil
 	}
 	h := handler.NewDocumentHandler(uc)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/documents/abc/publish?locale=vi", nil)
-	req.SetPathValue("id", "abc")
+	req := httptest.NewRequest(http.MethodPost, "/api/content-types/articles/documents/abc/publish?locale=vi", nil)
+	req.SetPathValue("slug", "articles")
+	req.SetPathValue("documentId", "abc")
 	w := httptest.NewRecorder()
 	h.Publish(w, req)
 
@@ -363,11 +374,12 @@ func TestDocumentHandler_Publish_ForwardsLocaleQueryParam(t *testing.T) {
 
 func TestDocumentHandler_Unpublish(t *testing.T) {
 	uc := &mockDocumentUC{}
-	uc.unpublishFn = func(_ context.Context, _, _ string) error { return nil }
+	uc.unpublishFn = func(_ context.Context, _, _, _ string) error { return nil }
 	h := handler.NewDocumentHandler(uc)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/documents/abc/unpublish", nil)
-	req.SetPathValue("id", "abc")
+	req := httptest.NewRequest(http.MethodPost, "/api/content-types/articles/documents/abc/unpublish", nil)
+	req.SetPathValue("slug", "articles")
+	req.SetPathValue("documentId", "abc")
 	w := httptest.NewRecorder()
 	h.Unpublish(w, req)
 
@@ -379,14 +391,15 @@ func TestDocumentHandler_Unpublish(t *testing.T) {
 func TestDocumentHandler_Unpublish_ForwardsLocaleQueryParam(t *testing.T) {
 	var gotLocale string
 	uc := &mockDocumentUC{}
-	uc.unpublishFn = func(_ context.Context, _, locale string) error {
+	uc.unpublishFn = func(_ context.Context, _, _, locale string) error {
 		gotLocale = locale
 		return nil
 	}
 	h := handler.NewDocumentHandler(uc)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/documents/abc/unpublish?locale=vi", nil)
-	req.SetPathValue("id", "abc")
+	req := httptest.NewRequest(http.MethodPost, "/api/content-types/articles/documents/abc/unpublish?locale=vi", nil)
+	req.SetPathValue("slug", "articles")
+	req.SetPathValue("documentId", "abc")
 	w := httptest.NewRecorder()
 	h.Unpublish(w, req)
 

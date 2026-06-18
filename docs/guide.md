@@ -52,11 +52,11 @@ Content-type **structure** is defined as code, not through the UI or API — the
 }
 ```
 
-Restart the API (`make dev-api`). On boot, `content_type.Sync` reads every file in this directory and reconciles it into MongoDB — creating the `ContentType` (and, for `kind: "single"`, its singleton entry) automatically.
+Restart the API (`make dev-api`). On boot, `content_type.Sync` reads every file in this directory and reconciles it into MongoDB — creating the `ContentType` and its per-content-type document collection (`documents_site-settings`) automatically.
 
-The sidebar shows **Site Settings** once synced. Clicking it loads the generic panel. Steps 2–6 replace that with a custom one.
+The sidebar shows **Site Settings** once synced. Clicking it loads the generic panel. For single types, the page shows an empty form until the first explicit Save. Steps 2–6 replace the generic panel with a custom one.
 
-> Content **data** (the entries themselves) is unaffected by this — saving, publishing, and (for collection types) creating/deleting entries all still go through the normal UI and `/api/documents` endpoints. Only the type's structure is JSON-only.
+> Content **data** (the entries themselves) is unaffected by this — saving, publishing, and (for collection types) creating/deleting entries all still go through the normal UI and `/api/content-types/{slug}/documents` endpoints. Only the type's structure is JSON-only.
 
 ### Step 2 — Create the panel file
 
@@ -84,11 +84,11 @@ export function SiteSettingsPanel({ contentType }: Props) {
 import { useDocuments } from '@/hooks/useDocuments'
 
 export function SiteSettingsPanel({ contentType }: Props) {
-  const { data: docs, isLoading } = useDocuments(contentType.ID)
+  const { data: docs, isLoading } = useDocuments(contentType.Slug)
   const doc = docs?.[0]
 
   if (isLoading) return <p className="text-muted-foreground">Loading…</p>
-  if (!doc) return <p className="text-muted-foreground">No document found.</p>
+  if (!doc) return <p className="text-muted-foreground">No document yet — save to create one.</p>
 
   // continue in Step 4
 }
@@ -105,7 +105,7 @@ import {
 import { Button } from '@/components/ui/button'
 
 export function SiteSettingsPanel({ contentType }: Props) {
-  const { data: docs, isLoading } = useDocuments(contentType.ID)
+  const { data: docs, isLoading } = useDocuments(contentType.Slug)
   const doc = docs?.[0]
 
   const { mutateAsync: updateDoc } = useUpdateDocument()
@@ -113,10 +113,10 @@ export function SiteSettingsPanel({ contentType }: Props) {
   const unpublish = useUnpublishDocument()
 
   if (isLoading) return <p className="text-muted-foreground">Loading…</p>
-  if (!doc) return <p className="text-muted-foreground">No document found.</p>
+  if (!doc) return <p className="text-muted-foreground">No document yet — save to create one.</p>
 
   const mutationFn = (data: Record<string, unknown>) =>
-    updateDoc({ id: doc.EntryID, contentTypeId: contentType.ID, data })
+    updateDoc({ contentTypeSlug: contentType.Slug, id: doc.DocumentID, data })
 
   // continue in Step 5
 }
@@ -149,7 +149,7 @@ return (
       <div className="flex gap-2">
         {canPublish && (
           <Button
-            onClick={() => publish.mutate({ id: doc.EntryID, contentTypeId: contentType.ID })}
+            onClick={() => publish.mutate({ contentTypeSlug: contentType.Slug, id: doc.DocumentID })}
             disabled={publish.isPending}
           >
             Publish
@@ -158,7 +158,7 @@ return (
         {canUnpublish && (
           <Button
             variant="outline"
-            onClick={() => unpublish.mutate({ id: doc.EntryID, contentTypeId: contentType.ID })}
+            onClick={() => unpublish.mutate({ contentTypeSlug: contentType.Slug, id: doc.DocumentID })}
             disabled={unpublish.isPending}
           >
             Unpublish
@@ -169,9 +169,9 @@ return (
 
     <FormProvider
       query={{
-        queryKey: ['documents', 'detail', doc.EntryID, 'data'],
+        queryKey: ['documents', 'detail', contentType.Slug, doc.DocumentID, 'data'],
         queryFn: () =>
-          api.get<Document>(`/api/documents/${doc.EntryID}`).then((r) => r.data.Data),
+          api.get<Document>(`/api/content-types/${contentType.Slug}/documents/${doc.DocumentID}`).then((r) => r.data.Data),
       }}
       mutationFn={mutationFn}
     >
@@ -271,10 +271,10 @@ On every API startup, `usecase/content_type.Sync` reads all definition files and
 
 | Event | Sync action |
 |-------|-------------|
-| New file | Creates the `ContentType` (and, for `kind: "single"`, auto-creates its singleton entry) |
-| Changed file (fields added/changed) | Updates the `ContentType` schema in place |
+| New file | Creates the `ContentType` and its per-content-type document collection (`documents_<slug>`) with indexes |
+| Changed file (fields added/changed) | Updates the `ContentType` schema in place; ensures the collection exists |
 | Field removed from a file | Drops the field from the schema; existing entry data is untouched (orphaned key stays in MongoDB) |
-| File deleted | Deletes the `ContentType` and cascade-deletes all its entries (draft + published) |
+| File deleted | Deletes the `ContentType`, cascade-deletes all its entries (draft + published), and drops the collection |
 
 Sync is one-directional: JSON files → MongoDB. Nothing the UI or API does writes back to the files.
 
@@ -293,7 +293,7 @@ Sync is one-directional: JSON files → MongoDB. Nothing the UI or API does writ
 }
 ```
 
-`kind` is `"single"` (one auto-created entry) or `"collection"` (many entries).
+`kind` is `"single"` (at most one entry, created on first save) or `"collection"` (many entries).
 
 System fields (`createdAt`, `updatedAt`, `publishedAt`, `createdBy`, `updatedBy`, `publishedBy`, `locale`) are injected automatically on every record — never declared in the schema.
 
@@ -301,7 +301,7 @@ System fields (`createdAt`, `updatedAt`, `publishedAt`, `createdBy`, `updatedBy`
 
 ## Draft / publish workflow
 
-Every content entry follows a **draft → publish** model. Two separate MongoDB documents — a `draft` record and a `published` record — share the same `entryId`.
+Every content entry follows a **draft → publish** model. Two separate records — a `draft` record and a `published` record — share the same `documentId` within a per-content-type MongoDB collection (`documents_<slug>`).
 
 ### States (computed, never stored)
 
@@ -321,19 +321,19 @@ Unpublish is exposed in `SingleTypePanel` and `CollectionDetailPanel` whenever `
 
 ### Public read API
 
-`GET /api/public/documents/:entryId` resolves the `published` record only. If no published record exists for the requested `(entryId, locale)` pair, it returns 404 — the draft is never visible to readers.
+`GET /api/public/content-types/:slug/documents/:documentId` resolves the `published` record only. If no published record exists for the requested `(documentId, locale)` pair, it returns 404 — the draft is never visible to readers.
 
 ---
 
 ## Localization (i18n)
 
-Locale variants extend the draft/publish model: each `entryId` may have an independent draft+published pair **per locale**, sharing the same `entryId` but with distinct `locale` values.
+Locale variants extend the draft/publish model: each `documentId` may have an independent draft+published pair **per locale**, sharing the same `documentId` but with distinct `locale` values, within the same per-content-type collection.
 
 ### Key rules
 
 - Supported locales are fixed by `SUPPORTED_LOCALES` config (e.g. `en,vi`). Saving a draft with an unsupported locale is rejected.
 - Each locale variant has its own computed `status`. Publishing `en` never changes `vi`.
-- The public read API resolves `published` for a given `(entryId, locale)` pair. The 404-when-unpublished rule applies per locale.
+- The public read API resolves `published` for a given `(documentId, locale)` pair. The 404-when-unpublished rule applies per locale.
 - Localization is whole-entry — all fields are localized together. There is no per-field `localized` flag.
 
 ### Admin UI
@@ -345,9 +345,9 @@ A locale switcher appears in `SingleTypePanel`, `CollectionDetailPanel`, and `Co
 All document hooks accept a `locale` parameter:
 
 ```ts
-const { data } = useDocuments(contentTypeId, { locale: 'vi' })
+const { data } = useDocuments(contentTypeSlug)
 const { mutate } = useUpdateDocument()
-mutate({ id: entryId, contentTypeId, locale: 'vi', data })
+mutate({ contentTypeSlug, id: documentId, locale: 'vi', data })
 ```
 
 `useLocales()` fetches the supported locales list from `GET /api/locales` (public, no auth).
@@ -398,24 +398,26 @@ Mounted at `GRAPHQL_PATH` (default `/graphql`). Access via standard HTTP POST:
 ```sh
 curl -X POST http://localhost:8080/graphql \
   -H 'Content-Type: application/json' \
-  -d '{"query": "{ publishedDocument(entryId: \"abc\", locale: \"en\") { data } }"}'
+  -d '{"query": "{ publishedDocument(contentTypeSlug: \"blog\", documentId: \"abc\", locale: \"en\") { data } }"}'
 ```
 
 ### Schema overview
 
 ```graphql
 type Query {
-  publishedDocument(entryId: ID!, locale: String): Document
+  publishedDocument(contentTypeSlug: String!, documentId: ID!, locale: String): Document
   contentTypes: [ContentType!]!
 }
 
 type Mutation {
-  saveDocument(input: SaveDocumentInput!): Document! @auth
-  publishDocument(entryId: ID!, locale: String): Document! @auth
-  unpublishDocument(entryId: ID!, locale: String): Document! @auth
-  deleteDocument(entryId: ID!): Boolean! @auth
+  saveDocument(contentTypeSlug: String!, documentId: ID!, locale: String, data: JSON!): Document! @auth
+  publishDocument(contentTypeSlug: String!, documentId: ID!, locale: String): Document! @auth
+  unpublishDocument(contentTypeSlug: String!, documentId: ID!, locale: String): Document! @auth
+  deleteDocument(contentTypeSlug: String!, documentId: ID!): Boolean! @auth
 }
 ```
+
+All GraphQL operations require `contentTypeSlug` to route to the correct per-content-type collection, plus `documentId` to identify the specific entry.
 
 `Query` operations are public (no auth required). `Mutation` operations require the same JWT bearer auth as REST, enforced via the `@auth` directive.
 

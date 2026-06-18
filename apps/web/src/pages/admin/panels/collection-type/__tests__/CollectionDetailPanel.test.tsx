@@ -13,7 +13,6 @@ vi.mock('sonner', () => ({
 
 const ct: ContentType = {
   ID: 'ct-1',
-  DocumentID: 'ct-doc-1',
   Name: 'Blog Posts',
   Slug: 'blog-posts',
   Kind: 'collection',
@@ -26,7 +25,7 @@ const ct: ContentType = {
 }
 
 const doc: Document = {
-  EntryID: 'doc-1',
+  DocumentID: 'doc-1',
   ContentTypeID: 'ct-1',
   Status: 'draft',
   Data: { title: 'First Post', body: 'Some content' },
@@ -42,7 +41,7 @@ let mock: MockAdapter
 beforeEach(() => {
   mock = new MockAdapter(api)
   mock.onGet('/api/locales').reply(200, ['en'])
-  mock.onGet('/api/documents/doc-1').reply(200, doc)
+  mock.onGet('/api/content-types/blog-posts/documents/doc-1').reply(200, doc)
 })
 
 afterEach(() => {
@@ -84,7 +83,7 @@ describe('CollectionDetailPanel', () => {
   it('shows success toast and resets form to clean after successful save', async () => {
     const { toast } = await import('sonner')
     const user = userEvent.setup()
-    mock.onPut('/api/documents/doc-1').reply(200, { ...doc, Data: { title: 'Updated', body: 'Some content' } })
+    mock.onPut('/api/content-types/blog-posts/documents/doc-1').reply(200, { ...doc, Data: { title: 'Updated', body: 'Some content' } })
 
     renderWithProviders(<CollectionDetailPanel contentType={ct} documentId="doc-1" />)
     await waitFor(() => expect(screen.getByLabelText('title')).toHaveValue('First Post'))
@@ -103,7 +102,7 @@ describe('CollectionDetailPanel', () => {
   it('shows error toast and preserves values on failed save', async () => {
     const { toast } = await import('sonner')
     const user = userEvent.setup()
-    mock.onPut('/api/documents/doc-1').reply(422, { error: 'Validation failed' })
+    mock.onPut('/api/content-types/blog-posts/documents/doc-1').reply(422, { error: 'Validation failed' })
 
     renderWithProviders(<CollectionDetailPanel contentType={ct} documentId="doc-1" />)
     await waitFor(() => expect(screen.getByLabelText('title')).toHaveValue('First Post'))
@@ -125,7 +124,7 @@ describe('CollectionDetailPanel', () => {
   })
 
   it('shows Unpublish button when status is published', async () => {
-    mock.onGet('/api/documents/doc-1').reply(200, { ...doc, Status: 'published' })
+    mock.onGet('/api/content-types/blog-posts/documents/doc-1').reply(200, { ...doc, Status: 'published' })
     renderWithProviders(<CollectionDetailPanel contentType={ct} documentId="doc-1" />)
     await waitFor(() =>
       expect(screen.getByRole('button', { name: /unpublish/i })).toBeInTheDocument(),
@@ -135,7 +134,7 @@ describe('CollectionDetailPanel', () => {
 
   it('calls POST /publish when Publish button is clicked', async () => {
     const user = userEvent.setup()
-    mock.onPost('/api/documents/doc-1/publish').reply(200, { status: 'published' })
+    mock.onPost('/api/content-types/blog-posts/documents/doc-1/publish').reply(200, { status: 'published' })
     renderWithProviders(<CollectionDetailPanel contentType={ct} documentId="doc-1" />)
     await waitFor(() => screen.getByRole('button', { name: /^publish$/i }))
     await user.click(screen.getByRole('button', { name: /^publish$/i }))
@@ -145,7 +144,7 @@ describe('CollectionDetailPanel', () => {
   })
 
   it('shows both Publish and Unpublish buttons when status is modified', async () => {
-    mock.onGet('/api/documents/doc-1').reply(200, { ...doc, Status: 'modified' })
+    mock.onGet('/api/content-types/blog-posts/documents/doc-1').reply(200, { ...doc, Status: 'modified' })
     renderWithProviders(<CollectionDetailPanel contentType={ct} documentId="doc-1" />)
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /^publish$/i })).toBeInTheDocument()
@@ -170,7 +169,7 @@ describe('CollectionDetailPanel', () => {
   it('sends active locale as query param on publish', async () => {
     const user = userEvent.setup()
     mock.onGet('/api/locales').reply(200, ['en', 'vi'])
-    mock.onPost('/api/documents/doc-1/publish').reply(200, { status: 'published' })
+    mock.onPost('/api/content-types/blog-posts/documents/doc-1/publish').reply(200, { status: 'published' })
     renderWithProviders(<CollectionDetailPanel contentType={ct} documentId="doc-1" />)
     await waitFor(() => screen.getByRole('button', { name: /^publish$/i }))
     await user.click(screen.getByRole('button', { name: /^publish$/i }))

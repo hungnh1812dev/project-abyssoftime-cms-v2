@@ -52,8 +52,7 @@ type ComplexityRoot struct {
 		CreatedAt     func(childComplexity int) int
 		CreatedBy     func(childComplexity int) int
 		Data          func(childComplexity int) int
-		EntryID       func(childComplexity int) int
-		ID            func(childComplexity int) int
+		DocumentID    func(childComplexity int) int
 		Locale        func(childComplexity int) int
 		PublishedAt   func(childComplexity int) int
 		PublishedBy   func(childComplexity int) int
@@ -63,15 +62,15 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		DeleteDocument    func(childComplexity int, entryID string) int
-		PublishDocument   func(childComplexity int, entryID string, locale *string) int
-		SaveDocument      func(childComplexity int, entryID string, locale *string, data map[string]any) int
-		UnpublishDocument func(childComplexity int, entryID string, locale *string) int
+		DeleteDocument    func(childComplexity int, contentTypeSlug string, documentID string) int
+		PublishDocument   func(childComplexity int, contentTypeSlug string, documentID string, locale *string) int
+		SaveDocument      func(childComplexity int, contentTypeSlug string, documentID string, locale *string, data map[string]any) int
+		UnpublishDocument func(childComplexity int, contentTypeSlug string, documentID string, locale *string) int
 	}
 
 	Query struct {
 		ContentTypes      func(childComplexity int) int
-		PublishedDocument func(childComplexity int, entryID string, locale *string) int
+		PublishedDocument func(childComplexity int, contentTypeSlug string, documentID string, locale *string) int
 	}
 }
 
@@ -80,13 +79,13 @@ type ComplexityRoot struct {
 // region    ************************** generated!.gotpl **************************
 
 type MutationResolver interface {
-	SaveDocument(ctx context.Context, entryID string, locale *string, data map[string]any) (*model.Document, error)
-	PublishDocument(ctx context.Context, entryID string, locale *string) (*model.Document, error)
-	UnpublishDocument(ctx context.Context, entryID string, locale *string) (*model.Document, error)
-	DeleteDocument(ctx context.Context, entryID string) (bool, error)
+	SaveDocument(ctx context.Context, contentTypeSlug string, documentID string, locale *string, data map[string]any) (*model.Document, error)
+	PublishDocument(ctx context.Context, contentTypeSlug string, documentID string, locale *string) (*model.Document, error)
+	UnpublishDocument(ctx context.Context, contentTypeSlug string, documentID string, locale *string) (*model.Document, error)
+	DeleteDocument(ctx context.Context, contentTypeSlug string, documentID string) (bool, error)
 }
 type QueryResolver interface {
-	PublishedDocument(ctx context.Context, entryID string, locale *string) (*model.Document, error)
+	PublishedDocument(ctx context.Context, contentTypeSlug string, documentID string, locale *string) (*model.Document, error)
 	ContentTypes(ctx context.Context) ([]*model.ContentType, error)
 }
 
@@ -169,18 +168,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Document.Data(childComplexity), true
-	case "Document.entryId":
-		if e.ComplexityRoot.Document.EntryID == nil {
+	case "Document.documentId":
+		if e.ComplexityRoot.Document.DocumentID == nil {
 			break
 		}
 
-		return e.ComplexityRoot.Document.EntryID(childComplexity), true
-	case "Document.id":
-		if e.ComplexityRoot.Document.ID == nil {
-			break
-		}
-
-		return e.ComplexityRoot.Document.ID(childComplexity), true
+		return e.ComplexityRoot.Document.DocumentID(childComplexity), true
 	case "Document.locale":
 		if e.ComplexityRoot.Document.Locale == nil {
 			break
@@ -228,7 +221,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.ComplexityRoot.Mutation.DeleteDocument(childComplexity, args["entryId"].(string)), true
+		return e.ComplexityRoot.Mutation.DeleteDocument(childComplexity, args["contentTypeSlug"].(string), args["documentId"].(string)), true
 	case "Mutation.publishDocument":
 		if e.ComplexityRoot.Mutation.PublishDocument == nil {
 			break
@@ -239,7 +232,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.ComplexityRoot.Mutation.PublishDocument(childComplexity, args["entryId"].(string), args["locale"].(*string)), true
+		return e.ComplexityRoot.Mutation.PublishDocument(childComplexity, args["contentTypeSlug"].(string), args["documentId"].(string), args["locale"].(*string)), true
 	case "Mutation.saveDocument":
 		if e.ComplexityRoot.Mutation.SaveDocument == nil {
 			break
@@ -250,7 +243,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.ComplexityRoot.Mutation.SaveDocument(childComplexity, args["entryId"].(string), args["locale"].(*string), args["data"].(map[string]any)), true
+		return e.ComplexityRoot.Mutation.SaveDocument(childComplexity, args["contentTypeSlug"].(string), args["documentId"].(string), args["locale"].(*string), args["data"].(map[string]any)), true
 	case "Mutation.unpublishDocument":
 		if e.ComplexityRoot.Mutation.UnpublishDocument == nil {
 			break
@@ -261,7 +254,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.ComplexityRoot.Mutation.UnpublishDocument(childComplexity, args["entryId"].(string), args["locale"].(*string)), true
+		return e.ComplexityRoot.Mutation.UnpublishDocument(childComplexity, args["contentTypeSlug"].(string), args["documentId"].(string), args["locale"].(*string)), true
 
 	case "Query.contentTypes":
 		if e.ComplexityRoot.Query.ContentTypes == nil {
@@ -280,7 +273,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.ComplexityRoot.Query.PublishedDocument(childComplexity, args["entryId"].(string), args["locale"].(*string)), true
+		return e.ComplexityRoot.Query.PublishedDocument(childComplexity, args["contentTypeSlug"].(string), args["documentId"].(string), args["locale"].(*string)), true
 
 	}
 	return 0, false
@@ -370,8 +363,7 @@ scalar Time
 directive @auth on FIELD_DEFINITION
 
 type Document {
-  id: ID!
-  entryId: ID!
+  documentId: ID!
   version: String!
   contentTypeId: String!
   data: JSON!
@@ -394,15 +386,15 @@ type ContentType {
 }
 
 type Query {
-  publishedDocument(entryId: ID!, locale: String): Document
+  publishedDocument(contentTypeSlug: String!, documentId: ID!, locale: String): Document
   contentTypes: [ContentType!]!
 }
 
 type Mutation {
-  saveDocument(entryId: ID!, locale: String, data: JSON!): Document! @auth
-  publishDocument(entryId: ID!, locale: String): Document! @auth
-  unpublishDocument(entryId: ID!, locale: String): Document! @auth
-  deleteDocument(entryId: ID!): Boolean! @auth
+  saveDocument(contentTypeSlug: String!, documentId: ID!, locale: String, data: JSON!): Document! @auth
+  publishDocument(contentTypeSlug: String!, documentId: ID!, locale: String): Document! @auth
+  unpublishDocument(contentTypeSlug: String!, documentId: ID!, locale: String): Document! @auth
+  deleteDocument(contentTypeSlug: String!, documentId: ID!): Boolean! @auth
 }
 `, BuiltIn: false},
 }
@@ -432,10 +424,8 @@ func (ec *executionContext) childFields_ContentType(ctx context.Context, field g
 
 func (ec *executionContext) childFields_Document(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 	switch field.Name {
-	case "id":
-		return ec.fieldContext_Document_id(ctx, field)
-	case "entryId":
-		return ec.fieldContext_Document_entryId(ctx, field)
+	case "documentId":
+		return ec.fieldContext_Document_documentId(ctx, field)
 	case "version":
 		return ec.fieldContext_Document_version(ctx, field)
 	case "contentTypeId":
@@ -579,88 +569,120 @@ func (ec *executionContext) childFields___Type(ctx context.Context, field graphq
 func (ec *executionContext) field_Mutation_deleteDocument_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "entryId",
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "contentTypeSlug",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["contentTypeSlug"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "documentId",
 		func(ctx context.Context, v any) (string, error) {
 			return ec.unmarshalNID2string(ctx, v)
 		})
 	if err != nil {
 		return nil, err
 	}
-	args["entryId"] = arg0
+	args["documentId"] = arg1
 	return args, nil
 }
 
 func (ec *executionContext) field_Mutation_publishDocument_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "entryId",
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "contentTypeSlug",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["contentTypeSlug"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "documentId",
 		func(ctx context.Context, v any) (string, error) {
 			return ec.unmarshalNID2string(ctx, v)
 		})
 	if err != nil {
 		return nil, err
 	}
-	args["entryId"] = arg0
-	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "locale",
+	args["documentId"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "locale",
 		func(ctx context.Context, v any) (*string, error) {
 			return ec.unmarshalOString2ᚖstring(ctx, v)
 		})
 	if err != nil {
 		return nil, err
 	}
-	args["locale"] = arg1
+	args["locale"] = arg2
 	return args, nil
 }
 
 func (ec *executionContext) field_Mutation_saveDocument_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "entryId",
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "contentTypeSlug",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["contentTypeSlug"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "documentId",
 		func(ctx context.Context, v any) (string, error) {
 			return ec.unmarshalNID2string(ctx, v)
 		})
 	if err != nil {
 		return nil, err
 	}
-	args["entryId"] = arg0
-	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "locale",
+	args["documentId"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "locale",
 		func(ctx context.Context, v any) (*string, error) {
 			return ec.unmarshalOString2ᚖstring(ctx, v)
 		})
 	if err != nil {
 		return nil, err
 	}
-	args["locale"] = arg1
-	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "data",
+	args["locale"] = arg2
+	arg3, err := graphql.ProcessArgField(ctx, rawArgs, "data",
 		func(ctx context.Context, v any) (map[string]any, error) {
 			return ec.unmarshalNJSON2map(ctx, v)
 		})
 	if err != nil {
 		return nil, err
 	}
-	args["data"] = arg2
+	args["data"] = arg3
 	return args, nil
 }
 
 func (ec *executionContext) field_Mutation_unpublishDocument_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "entryId",
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "contentTypeSlug",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["contentTypeSlug"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "documentId",
 		func(ctx context.Context, v any) (string, error) {
 			return ec.unmarshalNID2string(ctx, v)
 		})
 	if err != nil {
 		return nil, err
 	}
-	args["entryId"] = arg0
-	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "locale",
+	args["documentId"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "locale",
 		func(ctx context.Context, v any) (*string, error) {
 			return ec.unmarshalOString2ᚖstring(ctx, v)
 		})
 	if err != nil {
 		return nil, err
 	}
-	args["locale"] = arg1
+	args["locale"] = arg2
 	return args, nil
 }
 
@@ -681,22 +703,30 @@ func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs
 func (ec *executionContext) field_Query_publishedDocument_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "entryId",
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "contentTypeSlug",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["contentTypeSlug"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "documentId",
 		func(ctx context.Context, v any) (string, error) {
 			return ec.unmarshalNID2string(ctx, v)
 		})
 	if err != nil {
 		return nil, err
 	}
-	args["entryId"] = arg0
-	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "locale",
+	args["documentId"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "locale",
 		func(ctx context.Context, v any) (*string, error) {
 			return ec.unmarshalOString2ᚖstring(ctx, v)
 		})
 	if err != nil {
 		return nil, err
 	}
-	args["locale"] = arg1
+	args["locale"] = arg2
 	return args, nil
 }
 
@@ -898,16 +928,16 @@ func (ec *executionContext) fieldContext_ContentType_updatedAt(_ context.Context
 	return graphql.NewScalarFieldContext("ContentType", field, false, false, errors.New("field of type Time does not have child fields"))
 }
 
-func (ec *executionContext) _Document_id(ctx context.Context, field graphql.CollectedField, obj *model.Document) (ret graphql.Marshaler) {
+func (ec *executionContext) _Document_documentId(ctx context.Context, field graphql.CollectedField, obj *model.Document) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
 		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_Document_id(ctx, field)
+			return ec.fieldContext_Document_documentId(ctx, field)
 		},
 		func(ctx context.Context) (any, error) {
-			return obj.ID, nil
+			return obj.DocumentID, nil
 		},
 		nil,
 		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
@@ -917,30 +947,7 @@ func (ec *executionContext) _Document_id(ctx context.Context, field graphql.Coll
 		true,
 	)
 }
-func (ec *executionContext) fieldContext_Document_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	return graphql.NewScalarFieldContext("Document", field, false, false, errors.New("field of type ID does not have child fields"))
-}
-
-func (ec *executionContext) _Document_entryId(ctx context.Context, field graphql.CollectedField, obj *model.Document) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_Document_entryId(ctx, field)
-		},
-		func(ctx context.Context) (any, error) {
-			return obj.EntryID, nil
-		},
-		nil,
-		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
-			return ec.marshalNID2string(ctx, selections, v)
-		},
-		true,
-		true,
-	)
-}
-func (ec *executionContext) fieldContext_Document_entryId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Document_documentId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("Document", field, false, false, errors.New("field of type ID does not have child fields"))
 }
 
@@ -1184,7 +1191,7 @@ func (ec *executionContext) _Mutation_saveDocument(ctx context.Context, field gr
 		},
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.Mutation().SaveDocument(ctx, fc.Args["entryId"].(string), fc.Args["locale"].(*string), fc.Args["data"].(map[string]any))
+			return ec.Resolvers.Mutation().SaveDocument(ctx, fc.Args["contentTypeSlug"].(string), fc.Args["documentId"].(string), fc.Args["locale"].(*string), fc.Args["data"].(map[string]any))
 		},
 		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
 			directive0 := next
@@ -1241,7 +1248,7 @@ func (ec *executionContext) _Mutation_publishDocument(ctx context.Context, field
 		},
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.Mutation().PublishDocument(ctx, fc.Args["entryId"].(string), fc.Args["locale"].(*string))
+			return ec.Resolvers.Mutation().PublishDocument(ctx, fc.Args["contentTypeSlug"].(string), fc.Args["documentId"].(string), fc.Args["locale"].(*string))
 		},
 		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
 			directive0 := next
@@ -1298,7 +1305,7 @@ func (ec *executionContext) _Mutation_unpublishDocument(ctx context.Context, fie
 		},
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.Mutation().UnpublishDocument(ctx, fc.Args["entryId"].(string), fc.Args["locale"].(*string))
+			return ec.Resolvers.Mutation().UnpublishDocument(ctx, fc.Args["contentTypeSlug"].(string), fc.Args["documentId"].(string), fc.Args["locale"].(*string))
 		},
 		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
 			directive0 := next
@@ -1355,7 +1362,7 @@ func (ec *executionContext) _Mutation_deleteDocument(ctx context.Context, field 
 		},
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.Mutation().DeleteDocument(ctx, fc.Args["entryId"].(string))
+			return ec.Resolvers.Mutation().DeleteDocument(ctx, fc.Args["contentTypeSlug"].(string), fc.Args["documentId"].(string))
 		},
 		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
 			directive0 := next
@@ -1412,7 +1419,7 @@ func (ec *executionContext) _Query_publishedDocument(ctx context.Context, field 
 		},
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.Query().PublishedDocument(ctx, fc.Args["entryId"].(string), fc.Args["locale"].(*string))
+			return ec.Resolvers.Query().PublishedDocument(ctx, fc.Args["contentTypeSlug"].(string), fc.Args["documentId"].(string), fc.Args["locale"].(*string))
 		},
 		nil,
 		func(ctx context.Context, selections ast.SelectionSet, v *model.Document) graphql.Marshaler {
@@ -2696,13 +2703,8 @@ func (ec *executionContext) _Document(ctx context.Context, sel ast.SelectionSet,
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("Document")
-		case "id":
-			out.Values[i] = ec._Document_id(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		case "entryId":
-			out.Values[i] = ec._Document_entryId(ctx, field, obj)
+		case "documentId":
+			out.Values[i] = ec._Document_documentId(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}

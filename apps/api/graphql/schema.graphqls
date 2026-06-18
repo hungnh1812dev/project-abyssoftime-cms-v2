@@ -4,8 +4,7 @@ scalar Time
 directive @auth on FIELD_DEFINITION
 
 type Document {
-  id: ID!
-  entryId: ID!
+  documentId: ID!
   version: String!
   contentTypeId: String!
   data: JSON!
@@ -28,13 +27,13 @@ type ContentType {
 }
 
 type Query {
-  publishedDocument(entryId: ID!, locale: String): Document
+  publishedDocument(contentTypeSlug: String!, documentId: ID!, locale: String): Document
   contentTypes: [ContentType!]!
 }
 
 type Mutation {
-  saveDocument(entryId: ID!, locale: String, data: JSON!): Document! @auth
-  publishDocument(entryId: ID!, locale: String): Document! @auth
-  unpublishDocument(entryId: ID!, locale: String): Document! @auth
-  deleteDocument(entryId: ID!): Boolean! @auth
+  saveDocument(contentTypeSlug: String!, documentId: ID!, locale: String, data: JSON!): Document! @auth
+  publishDocument(contentTypeSlug: String!, documentId: ID!, locale: String): Document! @auth
+  unpublishDocument(contentTypeSlug: String!, documentId: ID!, locale: String): Document! @auth
+  deleteDocument(contentTypeSlug: String!, documentId: ID!): Boolean! @auth
 }

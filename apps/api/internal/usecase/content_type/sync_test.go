@@ -10,30 +10,19 @@ import (
 	pkgerrors "project-abyssoftime-cms-v2/api/pkg/errors"
 )
 
-// fakeEntryManager is a minimal test double for content_type.EntryManager.
 type fakeEntryManager struct {
-	saveFn   func(ctx context.Context, doc *entity.Document, userID string) (*entity.Document, error)
-	getAllFn func(ctx context.Context, contentTypeID string) ([]*entity.Document, error)
-	deleteFn func(ctx context.Context, id string) error
-	saved    []*entity.Document
+	getAllFn func(ctx context.Context, contentTypeSlug string) ([]*entity.Document, error)
+	deleteFn func(ctx context.Context, contentTypeSlug, documentID string) error
 	deleted  []string
 }
 
-func (f *fakeEntryManager) Save(ctx context.Context, doc *entity.Document, userID string) (*entity.Document, error) {
-	f.saved = append(f.saved, doc)
-	if f.saveFn != nil {
-		return f.saveFn(ctx, doc, userID)
-	}
-	return doc, nil
+func (f *fakeEntryManager) GetAll(ctx context.Context, contentTypeSlug string) ([]*entity.Document, error) {
+	return f.getAllFn(ctx, contentTypeSlug)
 }
 
-func (f *fakeEntryManager) GetAll(ctx context.Context, contentTypeID string) ([]*entity.Document, error) {
-	return f.getAllFn(ctx, contentTypeID)
-}
-
-func (f *fakeEntryManager) Delete(ctx context.Context, id string) error {
-	f.deleted = append(f.deleted, id)
-	return f.deleteFn(ctx, id)
+func (f *fakeEntryManager) Delete(ctx context.Context, contentTypeSlug, documentID string) error {
+	f.deleted = append(f.deleted, documentID)
+	return f.deleteFn(ctx, contentTypeSlug, documentID)
 }
 
 func TestSync_CreatesNewDefinitions(t *testing.T) {
@@ -50,7 +39,8 @@ func TestSync_CreatesNewDefinitions(t *testing.T) {
 	}
 
 	entries := &fakeEntryManager{}
-	syncer := contenttype.NewSyncer(contenttype.New(repo), entries)
+	docRepo := &repomock.DocumentRepository{}
+	syncer := contenttype.NewSyncer(contenttype.New(repo), entries, docRepo)
 
 	defs := []contenttype.ContentTypeDefinition{
 		{Slug: "homepage", Name: "Homepage", Kind: "single"},
@@ -64,7 +54,7 @@ func TestSync_CreatesNewDefinitions(t *testing.T) {
 	}
 }
 
-func TestSync_CreatesSingletonEntryForNewSingleType(t *testing.T) {
+func TestSync_DoesNotCreateSingletonForSingleType(t *testing.T) {
 	repo := &repomock.ContentTypeRepository{}
 	repo.FindAllFn = func(_ context.Context) ([]*entity.ContentType, error) { return nil, nil }
 	repo.FindBySlugFn = func(_ context.Context, _ string) (*entity.ContentType, error) {
@@ -76,7 +66,8 @@ func TestSync_CreatesSingletonEntryForNewSingleType(t *testing.T) {
 	}
 
 	entries := &fakeEntryManager{}
-	syncer := contenttype.NewSyncer(contenttype.New(repo), entries)
+	docRepo := &repomock.DocumentRepository{}
+	syncer := contenttype.NewSyncer(contenttype.New(repo), entries, docRepo)
 
 	defs := []contenttype.ContentTypeDefinition{
 		{Slug: "homepage", Name: "Homepage", Kind: "single"},
@@ -84,36 +75,8 @@ func TestSync_CreatesSingletonEntryForNewSingleType(t *testing.T) {
 	if err := syncer.Sync(ctx, defs); err != nil {
 		t.Fatalf("Sync() error = %v", err)
 	}
-	if len(entries.saved) != 1 {
-		t.Fatalf("Sync() saved %d singleton entries, want 1", len(entries.saved))
-	}
-	if entries.saved[0].EntryID != "ct-homepage" {
-		t.Errorf("Sync() singleton EntryID = %q, want ct-homepage (= contentTypeID)", entries.saved[0].EntryID)
-	}
-}
-
-func TestSync_DoesNotCreateSingletonForNewCollectionType(t *testing.T) {
-	repo := &repomock.ContentTypeRepository{}
-	repo.FindAllFn = func(_ context.Context) ([]*entity.ContentType, error) { return nil, nil }
-	repo.FindBySlugFn = func(_ context.Context, _ string) (*entity.ContentType, error) {
-		return nil, pkgerrors.ErrNotFound
-	}
-	repo.CreateFn = func(_ context.Context, ct *entity.ContentType) error {
-		ct.ID = "ct-blog"
-		return nil
-	}
-
-	entries := &fakeEntryManager{}
-	syncer := contenttype.NewSyncer(contenttype.New(repo), entries)
-
-	defs := []contenttype.ContentTypeDefinition{
-		{Slug: "blog-post", Name: "Blog Post", Kind: "collection"},
-	}
-	if err := syncer.Sync(ctx, defs); err != nil {
-		t.Fatalf("Sync() error = %v", err)
-	}
-	if len(entries.saved) != 0 {
-		t.Errorf("Sync() saved %d entries for a collection type, want 0", len(entries.saved))
+	if len(entries.deleted) != 0 {
+		t.Errorf("Sync() should not auto-create entries for single types, deleted %d", len(entries.deleted))
 	}
 }
 
@@ -137,7 +100,8 @@ func TestSync_UpdatesChangedDefinitions(t *testing.T) {
 	}
 
 	entries := &fakeEntryManager{}
-	syncer := contenttype.NewSyncer(contenttype.New(repo), entries)
+	docRepo := &repomock.DocumentRepository{}
+	syncer := contenttype.NewSyncer(contenttype.New(repo), entries, docRepo)
 
 	defs := []contenttype.ContentTypeDefinition{
 		{Slug: "homepage", Name: "New Name", Kind: "single"},
@@ -147,9 +111,6 @@ func TestSync_UpdatesChangedDefinitions(t *testing.T) {
 	}
 	if updated == nil || updated.Name != "New Name" {
 		t.Fatalf("Sync() did not update content type, got %+v", updated)
-	}
-	if len(entries.saved) != 0 {
-		t.Errorf("Sync() should not create a singleton when updating an already-existing content type, saved %d", len(entries.saved))
 	}
 }
 
@@ -173,7 +134,8 @@ func TestSync_UnchangedDefinition_NoOp(t *testing.T) {
 	}
 
 	entries := &fakeEntryManager{}
-	syncer := contenttype.NewSyncer(contenttype.New(repo), entries)
+	docRepo := &repomock.DocumentRepository{}
+	syncer := contenttype.NewSyncer(contenttype.New(repo), entries, docRepo)
 
 	defs := []contenttype.ContentTypeDefinition{
 		{Slug: "homepage", Name: "Homepage", Kind: "single"},
@@ -197,7 +159,8 @@ func TestSync_CreatesContentTypeWithFields(t *testing.T) {
 	}
 
 	entries := &fakeEntryManager{}
-	syncer := contenttype.NewSyncer(contenttype.New(repo), entries)
+	docRepo := &repomock.DocumentRepository{}
+	syncer := contenttype.NewSyncer(contenttype.New(repo), entries, docRepo)
 
 	fields := []entity.FieldDefinition{
 		{Name: "title", Type: "text"},
@@ -245,7 +208,8 @@ func TestSync_UpdatesFieldsWhenChanged(t *testing.T) {
 	}
 
 	entries := &fakeEntryManager{}
-	syncer := contenttype.NewSyncer(contenttype.New(repo), entries)
+	docRepo := &repomock.DocumentRepository{}
+	syncer := contenttype.NewSyncer(contenttype.New(repo), entries, docRepo)
 
 	newFields := []entity.FieldDefinition{
 		{Name: "title", Type: "text"},
@@ -279,18 +243,22 @@ func TestSync_RemovesMissingDefinitions_CascadesEntries(t *testing.T) {
 	}
 
 	entries := &fakeEntryManager{
-		getAllFn: func(_ context.Context, contentTypeID string) ([]*entity.Document, error) {
-			// EntryID, not ID (the record's own Mongo _id), is what Delete must receive.
+		getAllFn: func(_ context.Context, slug string) ([]*entity.Document, error) {
 			return []*entity.Document{
-				{ID: "rec-1", EntryID: "entry-1", ContentTypeID: contentTypeID},
-				{ID: "rec-2", EntryID: "entry-2", ContentTypeID: contentTypeID},
+				{DocumentID: "doc-1", ContentTypeID: "ct-stale"},
+				{DocumentID: "doc-2", ContentTypeID: "ct-stale"},
 			}, nil
 		},
-		deleteFn: func(_ context.Context, _ string) error { return nil },
+		deleteFn: func(_ context.Context, _, _ string) error { return nil },
 	}
-	syncer := contenttype.NewSyncer(contenttype.New(repo), entries)
+	docRepo := &repomock.DocumentRepository{}
+	var droppedSlug string
+	docRepo.DropCollectionFn = func(_ context.Context, slug string) error {
+		droppedSlug = slug
+		return nil
+	}
+	syncer := contenttype.NewSyncer(contenttype.New(repo), entries, docRepo)
 
-	// No definitions at all → "old-type" is no longer defined anywhere.
 	if err := syncer.Sync(ctx, nil); err != nil {
 		t.Fatalf("Sync() error = %v", err)
 	}
@@ -300,7 +268,10 @@ func TestSync_RemovesMissingDefinitions_CascadesEntries(t *testing.T) {
 	if len(entries.deleted) != 2 {
 		t.Fatalf("Sync() cascaded to %d entries, want 2", len(entries.deleted))
 	}
-	if entries.deleted[0] != "entry-1" || entries.deleted[1] != "entry-2" {
-		t.Errorf("Sync() deleted entry IDs = %v, want [entry-1 entry-2] (must use EntryID, not ID)", entries.deleted)
+	if entries.deleted[0] != "doc-1" || entries.deleted[1] != "doc-2" {
+		t.Errorf("Sync() deleted document IDs = %v, want [doc-1 doc-2]", entries.deleted)
+	}
+	if droppedSlug != "old-type" {
+		t.Errorf("Sync() dropped collection for slug = %q, want old-type", droppedSlug)
 	}
 }

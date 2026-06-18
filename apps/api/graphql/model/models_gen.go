@@ -16,8 +16,7 @@ type ContentType struct {
 }
 
 type Document struct {
-	ID            string         `json:"id"`
-	EntryID       string         `json:"entryId"`
+	DocumentID    string         `json:"documentId"`
 	Version       string         `json:"version"`
 	ContentTypeID string         `json:"contentTypeId"`
 	Data          map[string]any `json:"data"`

@@ -7,7 +7,6 @@ export interface FieldDefinition {
 
 export interface ContentType {
   ID: string
-  DocumentID: string
   Name: string
   Slug: string
   Kind: 'single' | 'collection'
@@ -19,7 +18,7 @@ export interface ContentType {
 export type EntryStatus = 'draft' | 'modified' | 'published'
 
 export interface Document {
-  EntryID: string
+  DocumentID: string
   ContentTypeID: string
   Data: Record<string, unknown>
   Status: EntryStatus

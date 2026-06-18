@@ -98,7 +98,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("load content-type definitions: %v", err)
 	}
-	if err := contenttype.NewSyncer(ctUC, documentUC).Sync(ctx, defs); err != nil {
+	if err := contenttype.NewSyncer(ctUC, documentUC, docRepo).Sync(ctx, defs); err != nil {
 		log.Fatalf("sync content types: %v", err)
 	}
 	log.Printf("synced %d content-type definitions from %s", len(defs), defsDir)
@@ -134,16 +134,16 @@ func main() {
 	authRequired := func(h http.HandlerFunc) http.Handler {
 		return middleware.Auth(http.HandlerFunc(h))
 	}
-	mux.Handle("GET /api/documents", authRequired(docHandler.List))
-	mux.Handle("GET /api/documents/{id}", authRequired(docHandler.GetByID))
-	mux.Handle("POST /api/documents", adminOnly(docHandler.Create))
-	mux.Handle("PUT /api/documents/{id}", adminOnly(docHandler.Update))
-	mux.Handle("DELETE /api/documents/{id}", adminOnly(docHandler.Delete))
-	mux.Handle("POST /api/documents/{id}/publish", adminOnly(docHandler.Publish))
-	mux.Handle("POST /api/documents/{id}/unpublish", adminOnly(docHandler.Unpublish))
+	mux.Handle("GET /api/content-types/{slug}/documents", authRequired(docHandler.List))
+	mux.Handle("GET /api/content-types/{slug}/documents/{documentId}", authRequired(docHandler.GetByID))
+	mux.Handle("POST /api/content-types/{slug}/documents", adminOnly(docHandler.Create))
+	mux.Handle("PUT /api/content-types/{slug}/documents/{documentId}", adminOnly(docHandler.Update))
+	mux.Handle("DELETE /api/content-types/{slug}/documents/{documentId}", adminOnly(docHandler.Delete))
+	mux.Handle("POST /api/content-types/{slug}/documents/{documentId}/publish", adminOnly(docHandler.Publish))
+	mux.Handle("POST /api/content-types/{slug}/documents/{documentId}/unpublish", adminOnly(docHandler.Unpublish))
 
 	// Public/content read path: no auth, resolves the published record only.
-	mux.HandleFunc("GET /api/public/documents/{id}", docHandler.GetPublic)
+	mux.HandleFunc("GET /api/public/content-types/{slug}/documents/{documentId}", docHandler.GetPublic)
 
 	mux.Handle("GET /api/media", adminOnly(mediaHandler.List))
 	mux.Handle("POST /api/media/upload", adminOnly(mediaHandler.Upload))

@@ -12,7 +12,7 @@ Every content entry follows a **draft → publish** workflow: editors save chang
 
 Content-**type structure** (the schema: which fields exist, their types) is defined as code — JSON definition files checked into the repo — never through the API or UI. On API startup, a sync step reads every definition file and creates, updates, or removes the corresponding `ContentType` records in MongoDB. The web UI is for content **data** only (create/edit/delete entries); it never defines or edits the structure itself.
 
-**Not in scope (v1):** GraphQL, PostgreSQL support, Localization/i18n.
+**Not in scope (v1):** PostgreSQL support (document storage is designed for future migration), Localization/i18n beyond basic locale field.
 
 ---
 
@@ -177,7 +177,7 @@ personal-cms/
 - **Architecture**: Strict Clean Architecture — `usecase` layer must import only `domain`; `delivery` and `infrastructure` import `usecase` and `domain`. Zero cross-layer leakage.
 - **Error handling**: Wrap errors at the usecase boundary; handlers map domain errors to HTTP status codes. No naked `error` strings in HTTP responses.
 - **Naming**: `PascalCase` for exported identifiers; `camelCase` for unexported. Repository interfaces use `<Entity>Repository` (e.g., `DocumentRepository`).
-- **Database IDs**: All entities use a `documentId` string field (mirrors MongoDB `_id`) for future PostgreSQL compatibility.
+- **Database IDs**: Document entities use `documentId` as the primary domain identifier (replaces `entryId` and MongoDB `_id`). Higher layers (usecase, handler, frontend) only work with `documentId` and content-type `slug` — never with MongoDB `_id` or generic `id`. ContentType entities retain their MongoDB `_id` as `ID`.
 - **Cascade deletion**: Implemented in the usecase layer, not as DB-level triggers, to remain DB-agnostic.
 - **No `init()` functions** in business logic packages.
 
@@ -199,7 +199,8 @@ All server state is managed exclusively through **TanStack Query** (`@tanstack/r
 **Pattern: query hooks in `src/hooks/`**
 - One `useQuery` hook per resource (e.g., `useDocument`, `useDocumentList`, `useContentType`).
 - One `useMutation` hook per write operation (e.g., `useUpdateDocument`, `usePublishDocument`, `useDeleteDocument`).
-- Query keys are namespaced by resource: `['documents', panelId]`, `['documents', panelId, documentId]`.
+- Query keys are namespaced by resource: `['documents', contentTypeSlug]`, `['documents', 'detail', contentTypeSlug, documentId, locale]`.
+- All document hooks accept `contentTypeSlug` (not `contentTypeId`) as the primary identifier for routing to the correct per-content-type collection.
 
 **Refetch after mutation — mandatory rule:**
 Every `useMutation` that changes data **must** call `queryClient.invalidateQueries` in its `onSuccess` callback to invalidate all affected query keys. The frontend must never display stale data after a successful write.
@@ -207,9 +208,9 @@ Every `useMutation` that changes data **must** call `queryClient.invalidateQueri
 ```ts
 // Example pattern
 const { mutate } = useMutation({
-  mutationFn: (data) => api.updateDocument(panelId, documentId, data),
+  mutationFn: (data) => api.put(`/api/content-types/${slug}/documents/${documentId}`, { data }),
   onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ['documents', panelId] });
+    queryClient.invalidateQueries({ queryKey: ['documents', slug] });
   },
 });
 ```
@@ -224,10 +225,12 @@ const { mutate } = useMutation({
 - Roles: `admin` (full access) and `guest` (read-only).
 
 ### Domain Rules: Draft & Publish
-- Every content entry is identified by a shared `entryId` and stored as **two separate MongoDB documents in the same collection**: a `draft` record and a `published` record (`version: "draft" | "published"`).
+- Every content entry is identified by a `documentId` and stored as **two separate records in a per-content-type MongoDB collection** (`documents_<content_type_slug>`): a `draft` record and a `published` record (`version: "draft" | "published"`).
+- Each content type's documents live in their own standalone collection, created automatically during content-type sync on API boot. This design prepares for future PostgreSQL migration where each content type maps to its own table.
 - `draft` record: holds the latest edits, `createdAt`/`updatedAt`/`createdBy`/`updatedBy`, **no** `publishedAt`/`publishedBy`.
 - `published` record: only exists once the entry has been published at least once; additionally carries `publishedAt`/`publishedBy`.
 - Every record (draft and published) also carries `locale` (defaults to `"en"`) — set automatically by the system, not authored by editors in v1.
+- **Documents are only created on explicit save.** No document exists until the user performs a Save action. Publish/unpublish buttons are only active when a document has been saved at least once.
 - **Save** (`usecase/document.Save`): upserts the `draft` record's `data`, `updatedAt`, and `updatedBy` (current user). Never touches the `published` record. Never returned by the public read API.
 - **Publish** (`usecase/document.Publish`): copies `draft.data` → `published` record (creating it if absent), sets `published.updatedAt = draft.updatedAt`, `published.publishedAt = now()`, and `published.publishedBy = current user`.
 - Entry `status` is **computed, never stored**: `draft` (no published record exists), `modified` (`draft.updatedAt > published.updatedAt`), `published` (timestamps match).
@@ -237,17 +240,17 @@ const { mutate } = useMutation({
 
 ### Domain Rules: Content Type Kinds
 - `ContentType.kind: "single" | "collection"`.
-- **Single-type**: exactly one entry per content type, auto-created as a singleton (`entryId = contentTypeId`) when the content type is created. No create/delete UI — only edit, Save (draft), and Publish.
-- **Collection-type**: zero or more entries, each with its own `entryId`. Standard list + create/edit/delete, each entry carrying its own independent draft/published pair and status.
+- **Single-type**: at most one entry per content type. **No auto-created singleton** — the entry is created on the user's first explicit Save. The UI shows an empty form until then; Publish/Unpublish buttons are disabled until a document exists. No create/delete UI — only edit, Save (draft), and Publish.
+- **Collection-type**: zero or more entries, each with its own `documentId`. Standard list + create/edit/delete, each entry carrying its own independent draft/published pair and status.
 - The admin sidebar groups navigation into two sections — **Single Types** and **Collection Types** — driven by `ContentType.kind`, not by folder location.
 
 ### Domain Rules: Content-Type Schema as Code
 - Content-type **structure** (fields, types, `kind`) is defined in JSON files under `apps/api/content-types/*.json` — never created or edited via the API or UI. The UI only manages content **data** (entries).
 - On every API startup, `usecase/content_type.Sync` reads all definition files and reconciles them against the `ContentType` records in MongoDB:
-  - **New file** → create the `ContentType` (and, if `kind: "single"`, auto-create its singleton entry per the Single-Type rule above).
+  - **New file** → create the `ContentType` and its per-content-type document collection (`documents_<slug>`) with indexes.
   - **Changed file** (fields added/changed) → update the `ContentType` record's schema in place.
   - **Field removed from a file** → drop the field from the `ContentType` schema, but leave already-stored entry data untouched (the orphaned key stays in MongoDB, simply no longer shown or editable).
-  - **File deleted** → delete the `ContentType` and cascade-delete all its entries (draft + published), per the existing cascade-deletion rule.
+  - **File deleted** → delete the `ContentType`, cascade-delete all its entries (draft + published), and drop the per-content-type collection.
 - Sync is one-directional: JSON definitions are always the source of truth; nothing the UI or API does ever writes back to the definition files.
 - JSON schema files declare only content fields. The system fields (`createdAt`, `updatedAt`, `publishedAt`, `createdBy`, `updatedBy`, `publishedBy`, `locale` — see Draft & Publish rules above) are never declared in the schema; they're injected automatically on every record.
 - **This restriction applies only to content-type *structure*, never to content *data*.** Creating, updating, deleting, saving, and publishing entries (documents) stays fully available through the existing API and UI for every content type — schema-as-code only removes the ability to create/edit/delete the *type itself* (its name, slug, kind, field list).
@@ -259,8 +262,8 @@ const { mutate } = useMutation({
 ### Backend
 - **Unit tests**: Every usecase tested in isolation with mock repositories (interface-based). Located in `internal/usecase/<name>/<name>_test.go`.
 - **Draft/Publish tests**: cover all three computed statuses (`draft`, `modified`, `published`), Save never mutating the published record, Publish syncing `updatedAt`/`publishedAt`, and the public read API returning 404 for entries with no published record yet.
-- **Single-type tests**: auto-creation of the singleton entry on content type creation, and that create/delete operations are rejected for single-type content.
-- **Schema sync tests**: new definition file creates a `ContentType`; changed file updates its schema in place; removed field drops from schema but leaves stored entry data untouched; deleted file cascades-deletes the `ContentType` and all its entries. Run against a mock repository, not real files, except for one integration test reading actual fixture JSON files.
+- **Single-type tests**: single-type content types do not auto-create a singleton entry; documents are only created on explicit save. Create/delete operations are rejected for single-type content.
+- **Schema sync tests**: new definition file creates a `ContentType` and its per-content-type document collection; changed file updates its schema in place; removed field drops from schema but leaves stored entry data untouched; deleted file cascades-deletes the `ContentType`, all its entries, and drops the per-content-type collection. Run against a mock repository, not real files, except for one integration test reading actual fixture JSON files.
 - **Integration tests**: MongoDB repository implementations tested against a real MongoDB instance spun up via Docker in CI. Located in `internal/infrastructure/mongodb/`.
 - **HTTP handler tests**: Use `httptest` to test handlers with mock usecases.
 - **Coverage target**: ≥ 80% on `internal/usecase/` packages.
@@ -294,9 +297,10 @@ jobs:
 - JWT access token is automatically refreshed via the refresh token before expiry.
 - Every `useMutation` that writes data must call `queryClient.invalidateQueries` on success — the UI always reflects the latest server state after any change.
 - Save always writes the draft record only; it never publishes implicitly.
-- A single-type content type's singleton entry is auto-created when the content type itself is created — no manual "create" step for editors.
+- A single-type content type starts with no document; the first Save creates it. Publish/Unpublish are only available after a document exists.
+- Each content type's documents are stored in a standalone MongoDB collection (`documents_<slug>`), created during schema sync on API startup.
 - Entry `status` (draft/modified/published) is always computed from timestamps, never persisted as a stored field.
-- Content-type schema sync runs automatically on every API startup — no manual trigger needed.
+- Content-type schema sync runs automatically on every API startup — no manual trigger needed. Sync also ensures per-content-type collections exist with proper indexes.
 - `createdAt`, `updatedAt`, `publishedAt`, `createdBy`, `updatedBy`, `publishedBy`, and `locale` are injected automatically on every record — never authored by editors or declared in a content-type's JSON schema.
 
 ### Ask before (require explicit approval)
@@ -313,7 +317,7 @@ jobs:
 - Never auto-choose an implementation path when multiple options exist — always ask.
 - Never add GraphQL or PostgreSQL support until REST + MongoDB are fully complete and the user authorizes the next phase.
 - Never let the public/content read API return draft data — it only ever resolves the `published` record.
-- Never expose create/delete actions for single-type content in the UI or API — only edit, Save, and Publish.
+- Never expose delete actions for single-type content in the UI or API — only edit, Save, and Publish. The first Save implicitly creates the document.
 - Never add an API or UI path to create, edit, or delete a `ContentType`'s **structure** — structure changes only ever come from editing JSON definition files and restarting/syncing. (Content **data**/entries are unaffected by this rule — see below.)
 - Never let content-type sync write back to the JSON definition files — sync is one-directional (files → DB).
 - Never remove or restrict create/update/delete/save/publish on content **data** (documents/entries) — every content type, single or collection, keeps full data CRUD via the API and UI. Only the type's *structure* is JSON-only.
@@ -434,7 +438,8 @@ interface FormState {
 ### 7.4 Single-Type Page (`SingleTypePage`)
 
 Replaces `SingleTypePanel`. Responsibilities:
-- Fetches document via `useDocuments(contentType.ID)`
+- Fetches document via `useDocuments(contentType.Slug)`
+- When no document exists (first visit), renders an empty form based on content-type fields; first Save creates the document
 - Maintains local `locale` state (defaults to first locale from `useLocales()`)
 - When `useLocales()` returns more than one locale, renders a locale `<select>` in `renderActions`
 - Switching locale resets the form to the new locale's document data; `isDirty` becomes `false`

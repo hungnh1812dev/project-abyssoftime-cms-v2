@@ -10,17 +10,17 @@ import (
 )
 
 func TestVersionFilter_IncludesLocale(t *testing.T) {
-	got := versionFilter("entry-1", entity.VersionDraft, "vi")
-	want := bson.M{"entryId": "entry-1", "version": entity.VersionDraft, "locale": "vi"}
+	got := versionFilter("doc-1", entity.VersionDraft, "vi")
+	want := bson.M{"documentId": "doc-1", "version": entity.VersionDraft, "locale": "vi"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("versionFilter() = %v, want %v", got, want)
 	}
 }
 
-func TestEntryLocaleFilter_ScopesToLocale(t *testing.T) {
-	got := entryLocaleFilter("entry-1", "en")
-	want := bson.M{"entryId": "entry-1", "locale": "en"}
+func TestDocumentLocaleFilter_ScopesToLocale(t *testing.T) {
+	got := documentLocaleFilter("doc-1", "en")
+	want := bson.M{"documentId": "doc-1", "locale": "en"}
 	if !reflect.DeepEqual(got, want) {
-		t.Errorf("entryLocaleFilter() = %v, want %v", got, want)
+		t.Errorf("documentLocaleFilter() = %v, want %v", got, want)
 	}
 }

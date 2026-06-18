@@ -9,7 +9,6 @@ import type { ContentType, Document } from '@/types/cms'
 
 const ct: ContentType = {
   ID: 'ct-1',
-  DocumentID: 'ct-doc-1',
   Name: 'Homepage',
   Slug: 'homepage',
   Kind: 'single',
@@ -18,7 +17,7 @@ const ct: ContentType = {
 }
 
 const doc: Document = {
-  EntryID: 'doc-1',
+  DocumentID: 'doc-1',
   ContentTypeID: 'ct-1',
   Status: 'draft',
   Data: { title: 'Hello World', body: 'Some text' },
@@ -41,8 +40,8 @@ afterEach(() => {
 
 describe('SingleTypePanel', () => {
   it('renders a form field for each key in document.Data', async () => {
-    mock.onGet('/api/documents').reply(200, [doc])
-    mock.onGet('/api/documents/doc-1').reply(200, doc)
+    mock.onGet('/api/content-types/homepage/documents').reply(200, [doc])
+    mock.onGet('/api/content-types/homepage/documents/doc-1').reply(200, doc)
 
     renderWithProviders(<SingleTypePanel contentType={ct} />)
 
@@ -53,8 +52,8 @@ describe('SingleTypePanel', () => {
   })
 
   it('shows Publish button when document status is draft', async () => {
-    mock.onGet('/api/documents').reply(200, [doc])
-    mock.onGet('/api/documents/doc-1').reply(200, doc)
+    mock.onGet('/api/content-types/homepage/documents').reply(200, [doc])
+    mock.onGet('/api/content-types/homepage/documents/doc-1').reply(200, doc)
 
     renderWithProviders(<SingleTypePanel contentType={ct} />)
 
@@ -66,8 +65,8 @@ describe('SingleTypePanel', () => {
 
   it('shows Unpublish button when document status is published', async () => {
     const published: Document = { ...doc, Status: 'published' }
-    mock.onGet('/api/documents').reply(200, [published])
-    mock.onGet('/api/documents/doc-1').reply(200, published)
+    mock.onGet('/api/content-types/homepage/documents').reply(200, [published])
+    mock.onGet('/api/content-types/homepage/documents/doc-1').reply(200, published)
 
     renderWithProviders(<SingleTypePanel contentType={ct} />)
 
@@ -79,9 +78,9 @@ describe('SingleTypePanel', () => {
 
   it('calls POST /publish when Publish button is clicked', async () => {
     const user = userEvent.setup()
-    mock.onGet('/api/documents').reply(200, [doc])
-    mock.onGet('/api/documents/doc-1').reply(200, doc)
-    mock.onPost('/api/documents/doc-1/publish').reply(200, { status: 'published' })
+    mock.onGet('/api/content-types/homepage/documents').reply(200, [doc])
+    mock.onGet('/api/content-types/homepage/documents/doc-1').reply(200, doc)
+    mock.onPost('/api/content-types/homepage/documents/doc-1/publish').reply(200, { status: 'published' })
 
     renderWithProviders(<SingleTypePanel contentType={ct} />)
 
@@ -93,18 +92,18 @@ describe('SingleTypePanel', () => {
     )
   })
 
-  it('shows empty state when no document exists', async () => {
-    mock.onGet('/api/documents').reply(200, [])
+  it('shows empty form with save button when no document exists', async () => {
+    mock.onGet('/api/content-types/homepage/documents').reply(200, [])
 
     renderWithProviders(<SingleTypePanel contentType={ct} />)
 
-    await waitFor(() => expect(screen.getByText(/no document/i)).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('button', { name: /save/i })).toBeInTheDocument())
   })
 
   it('shows both Publish and Unpublish buttons when status is modified', async () => {
     const modified: Document = { ...doc, Status: 'modified' }
-    mock.onGet('/api/documents').reply(200, [modified])
-    mock.onGet('/api/documents/doc-1').reply(200, modified)
+    mock.onGet('/api/content-types/homepage/documents').reply(200, [modified])
+    mock.onGet('/api/content-types/homepage/documents/doc-1').reply(200, modified)
 
     renderWithProviders(<SingleTypePanel contentType={ct} />)
 
@@ -116,8 +115,8 @@ describe('SingleTypePanel', () => {
 
   it('renders a locale selector when multiple locales are available', async () => {
     mock.onGet('/api/locales').reply(200, ['en', 'vi'])
-    mock.onGet('/api/documents').reply(200, [doc])
-    mock.onGet('/api/documents/doc-1').reply(200, doc)
+    mock.onGet('/api/content-types/homepage/documents').reply(200, [doc])
+    mock.onGet('/api/content-types/homepage/documents/doc-1').reply(200, doc)
 
     renderWithProviders(<SingleTypePanel contentType={ct} />)
 
@@ -129,9 +128,9 @@ describe('SingleTypePanel', () => {
   it('sends active locale as query param on publish', async () => {
     const user = userEvent.setup()
     mock.onGet('/api/locales').reply(200, ['en', 'vi'])
-    mock.onGet('/api/documents').reply(200, [doc])
-    mock.onGet('/api/documents/doc-1').reply(200, doc)
-    mock.onPost('/api/documents/doc-1/publish').reply(200, { status: 'published' })
+    mock.onGet('/api/content-types/homepage/documents').reply(200, [doc])
+    mock.onGet('/api/content-types/homepage/documents/doc-1').reply(200, doc)
+    mock.onPost('/api/content-types/homepage/documents/doc-1/publish').reply(200, { status: 'published' })
 
     renderWithProviders(<SingleTypePanel contentType={ct} />)
 

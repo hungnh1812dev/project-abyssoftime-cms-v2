@@ -9,47 +9,61 @@ import (
 
 var _ repository.DocumentRepository = (*DocumentRepository)(nil)
 
-// DocumentRepository is a test double for repository.DocumentRepository.
-// Set each Fn field to a stub before calling the method under test.
 type DocumentRepository struct {
-	FindDraftByEntryIDFn           func(ctx context.Context, entryID, locale string) (*entity.Document, error)
-	FindPublishedByEntryIDFn       func(ctx context.Context, entryID, locale string) (*entity.Document, error)
-	UpsertDraftFn                  func(ctx context.Context, doc *entity.Document) error
-	UpsertPublishedFn              func(ctx context.Context, doc *entity.Document) error
-	FindEntryDraftsByContentTypeFn func(ctx context.Context, contentTypeID string) ([]*entity.Document, error)
-	DeleteByEntryIDFn              func(ctx context.Context, entryID, locale string) error
-	DeletePublishedByEntryIDFn     func(ctx context.Context, entryID, locale string) error
-	DeleteByContentTypeFn          func(ctx context.Context, contentTypeID string) error
+	FindDraftByDocumentIDFn     func(ctx context.Context, contentTypeSlug, documentID, locale string) (*entity.Document, error)
+	FindPublishedByDocumentIDFn func(ctx context.Context, contentTypeSlug, documentID, locale string) (*entity.Document, error)
+	UpsertDraftFn               func(ctx context.Context, contentTypeSlug string, doc *entity.Document) error
+	UpsertPublishedFn           func(ctx context.Context, contentTypeSlug string, doc *entity.Document) error
+	FindDraftsByContentTypeFn   func(ctx context.Context, contentTypeSlug string) ([]*entity.Document, error)
+	DeleteByDocumentIDFn        func(ctx context.Context, contentTypeSlug, documentID, locale string) error
+	DeletePublishedByDocumentIDFn func(ctx context.Context, contentTypeSlug, documentID, locale string) error
+	DeleteAllByContentTypeFn    func(ctx context.Context, contentTypeSlug string) error
+	EnsureCollectionFn          func(ctx context.Context, contentTypeSlug string) error
+	DropCollectionFn            func(ctx context.Context, contentTypeSlug string) error
 }
 
-func (m *DocumentRepository) FindDraftByEntryID(ctx context.Context, entryID, locale string) (*entity.Document, error) {
-	return m.FindDraftByEntryIDFn(ctx, entryID, locale)
+func (m *DocumentRepository) FindDraftByDocumentID(ctx context.Context, contentTypeSlug, documentID, locale string) (*entity.Document, error) {
+	return m.FindDraftByDocumentIDFn(ctx, contentTypeSlug, documentID, locale)
 }
 
-func (m *DocumentRepository) FindPublishedByEntryID(ctx context.Context, entryID, locale string) (*entity.Document, error) {
-	return m.FindPublishedByEntryIDFn(ctx, entryID, locale)
+func (m *DocumentRepository) FindPublishedByDocumentID(ctx context.Context, contentTypeSlug, documentID, locale string) (*entity.Document, error) {
+	return m.FindPublishedByDocumentIDFn(ctx, contentTypeSlug, documentID, locale)
 }
 
-func (m *DocumentRepository) UpsertDraft(ctx context.Context, doc *entity.Document) error {
-	return m.UpsertDraftFn(ctx, doc)
+func (m *DocumentRepository) UpsertDraft(ctx context.Context, contentTypeSlug string, doc *entity.Document) error {
+	return m.UpsertDraftFn(ctx, contentTypeSlug, doc)
 }
 
-func (m *DocumentRepository) UpsertPublished(ctx context.Context, doc *entity.Document) error {
-	return m.UpsertPublishedFn(ctx, doc)
+func (m *DocumentRepository) UpsertPublished(ctx context.Context, contentTypeSlug string, doc *entity.Document) error {
+	return m.UpsertPublishedFn(ctx, contentTypeSlug, doc)
 }
 
-func (m *DocumentRepository) FindEntryDraftsByContentType(ctx context.Context, contentTypeID string) ([]*entity.Document, error) {
-	return m.FindEntryDraftsByContentTypeFn(ctx, contentTypeID)
+func (m *DocumentRepository) FindDraftsByContentType(ctx context.Context, contentTypeSlug string) ([]*entity.Document, error) {
+	return m.FindDraftsByContentTypeFn(ctx, contentTypeSlug)
 }
 
-func (m *DocumentRepository) DeleteByEntryID(ctx context.Context, entryID, locale string) error {
-	return m.DeleteByEntryIDFn(ctx, entryID, locale)
+func (m *DocumentRepository) DeleteByDocumentID(ctx context.Context, contentTypeSlug, documentID, locale string) error {
+	return m.DeleteByDocumentIDFn(ctx, contentTypeSlug, documentID, locale)
 }
 
-func (m *DocumentRepository) DeletePublishedByEntryID(ctx context.Context, entryID, locale string) error {
-	return m.DeletePublishedByEntryIDFn(ctx, entryID, locale)
+func (m *DocumentRepository) DeletePublishedByDocumentID(ctx context.Context, contentTypeSlug, documentID, locale string) error {
+	return m.DeletePublishedByDocumentIDFn(ctx, contentTypeSlug, documentID, locale)
 }
 
-func (m *DocumentRepository) DeleteByContentType(ctx context.Context, contentTypeID string) error {
-	return m.DeleteByContentTypeFn(ctx, contentTypeID)
+func (m *DocumentRepository) DeleteAllByContentType(ctx context.Context, contentTypeSlug string) error {
+	return m.DeleteAllByContentTypeFn(ctx, contentTypeSlug)
+}
+
+func (m *DocumentRepository) EnsureCollection(ctx context.Context, contentTypeSlug string) error {
+	if m.EnsureCollectionFn != nil {
+		return m.EnsureCollectionFn(ctx, contentTypeSlug)
+	}
+	return nil
+}
+
+func (m *DocumentRepository) DropCollection(ctx context.Context, contentTypeSlug string) error {
+	if m.DropCollectionFn != nil {
+		return m.DropCollectionFn(ctx, contentTypeSlug)
+	}
+	return nil
 }

@@ -13,7 +13,6 @@ vi.mock('@/content-type-registry', () => ({
 
 const ct: ContentType = {
   ID: 'ct-1',
-  DocumentID: 'ct-doc-1',
   Name: 'Blog Posts',
   Slug: 'blog-posts',
   Kind: 'collection',
@@ -22,7 +21,7 @@ const ct: ContentType = {
 }
 
 const doc1: Document = {
-  EntryID: 'doc-1',
+  DocumentID: 'doc-1',
   ContentTypeID: 'ct-1',
   Status: 'draft',
   Data: { title: 'First Post', active: true, views: 42 },
@@ -34,7 +33,7 @@ const doc1: Document = {
 }
 
 const doc2: Document = {
-  EntryID: 'doc-2',
+  DocumentID: 'doc-2',
   ContentTypeID: 'ct-1',
   Status: 'published',
   Data: { title: 'Second Post', active: false, views: 7 },
@@ -58,7 +57,7 @@ afterEach(() => {
 
 describe('CollectionListPage — fallback (no registry columns)', () => {
   it('renders a row for each document using the first Data field as display', async () => {
-    mock.onGet('/api/documents').reply(200, [doc1, doc2])
+    mock.onGet('/api/content-types/blog-posts/documents').reply(200, [doc1, doc2])
     renderWithProviders(<CollectionListPage contentType={ct} />)
     await waitFor(() => {
       expect(screen.getByText('First Post')).toBeInTheDocument()
@@ -67,7 +66,7 @@ describe('CollectionListPage — fallback (no registry columns)', () => {
   })
 
   it('shows the status for each document', async () => {
-    mock.onGet('/api/documents').reply(200, [doc1, doc2])
+    mock.onGet('/api/content-types/blog-posts/documents').reply(200, [doc1, doc2])
     renderWithProviders(<CollectionListPage contentType={ct} />)
     await waitFor(() => {
       expect(screen.getByText('draft')).toBeInTheDocument()
@@ -76,7 +75,7 @@ describe('CollectionListPage — fallback (no registry columns)', () => {
   })
 
   it('shows empty state when no documents exist', async () => {
-    mock.onGet('/api/documents').reply(200, [])
+    mock.onGet('/api/content-types/blog-posts/documents').reply(200, [])
     renderWithProviders(<CollectionListPage contentType={ct} />)
     await waitFor(() => expect(screen.getByText(/no entries/i)).toBeInTheDocument())
   })
@@ -95,7 +94,7 @@ describe('CollectionListPage — registry columns', () => {
       ],
     })
 
-    mock.onGet('/api/documents').reply(200, [doc1])
+    mock.onGet('/api/content-types/blog-posts/documents').reply(200, [doc1])
     renderWithProviders(<CollectionListPage contentType={ct} />)
 
     await waitFor(() => {
@@ -113,7 +112,7 @@ describe('CollectionListPage — registry columns', () => {
       columns: [{ key: 'active', label: 'Active', type: 'boolean' }],
     })
 
-    mock.onGet('/api/documents').reply(200, [doc1, doc2])
+    mock.onGet('/api/content-types/blog-posts/documents').reply(200, [doc1, doc2])
     renderWithProviders(<CollectionListPage contentType={ct} />)
 
     await waitFor(() => {
@@ -130,7 +129,7 @@ describe('CollectionListPage — registry columns', () => {
       columns: [{ key: 'views', label: 'Views', type: 'number' }],
     })
 
-    mock.onGet('/api/documents').reply(200, [doc1])
+    mock.onGet('/api/content-types/blog-posts/documents').reply(200, [doc1])
     renderWithProviders(<CollectionListPage contentType={ct} />)
 
     await waitFor(() => expect(screen.getByText('42')).toBeInTheDocument())
@@ -145,7 +144,7 @@ describe('CollectionListPage — registry columns', () => {
       columns: [{ key: 'cover', label: 'Cover', type: 'image' }],
     })
 
-    mock.onGet('/api/documents').reply(200, [imgDoc])
+    mock.onGet('/api/content-types/blog-posts/documents').reply(200, [imgDoc])
     renderWithProviders(<CollectionListPage contentType={ct} />)
 
     await waitFor(() => {
@@ -157,7 +156,7 @@ describe('CollectionListPage — registry columns', () => {
 
 describe('CollectionListPage — navigation', () => {
   it('Edit link points to the new collection-type detail path', async () => {
-    mock.onGet('/api/documents').reply(200, [doc1])
+    mock.onGet('/api/content-types/blog-posts/documents').reply(200, [doc1])
     renderWithProviders(<CollectionListPage contentType={ct} />, {
       initialEntries: ['/admin/content-type/collection-type/blog-posts'],
     })
@@ -169,8 +168,8 @@ describe('CollectionListPage — navigation', () => {
 
   it('Add entry button creates a document and navigates to detail page', async () => {
     const user = userEvent.setup()
-    mock.onGet('/api/documents').reply(200, [])
-    mock.onPost('/api/documents').reply(201, { ...doc1, EntryID: 'doc-new' })
+    mock.onGet('/api/content-types/blog-posts/documents').reply(200, [])
+    mock.onPost('/api/content-types/blog-posts/documents').reply(201, { ...doc1, DocumentID: 'doc-new' })
 
     renderWithProviders(<CollectionListPage contentType={ct} />, {
       initialEntries: ['/admin/content-type/collection-type/blog-posts'],
@@ -180,15 +179,15 @@ describe('CollectionListPage — navigation', () => {
     await user.click(screen.getByRole('button', { name: /add/i }))
 
     await waitFor(() =>
-      expect(mock.history.post.some((r) => r.url === '/api/documents')).toBe(true),
+      expect(mock.history.post.some((r) => r.url === '/api/content-types/blog-posts/documents')).toBe(true),
     )
   })
 
   it('Delete button shows confirm dialog and calls DELETE', async () => {
     const user = userEvent.setup()
     vi.spyOn(window, 'confirm').mockReturnValue(true)
-    mock.onGet('/api/documents').reply(200, [doc1])
-    mock.onDelete('/api/documents/doc-1').reply(204)
+    mock.onGet('/api/content-types/blog-posts/documents').reply(200, [doc1])
+    mock.onDelete('/api/content-types/blog-posts/documents/doc-1').reply(204)
 
     renderWithProviders(<CollectionListPage contentType={ct} />)
 
@@ -197,14 +196,14 @@ describe('CollectionListPage — navigation', () => {
 
     expect(window.confirm).toHaveBeenCalled()
     await waitFor(() =>
-      expect(mock.history.delete.some((r) => r.url === '/api/documents/doc-1')).toBe(true),
+      expect(mock.history.delete.some((r) => r.url === '/api/content-types/blog-posts/documents/doc-1')).toBe(true),
     )
   })
 
   it('Delete button does not call DELETE when user cancels confirm', async () => {
     const user = userEvent.setup()
     vi.spyOn(window, 'confirm').mockReturnValue(false)
-    mock.onGet('/api/documents').reply(200, [doc1])
+    mock.onGet('/api/content-types/blog-posts/documents').reply(200, [doc1])
 
     renderWithProviders(<CollectionListPage contentType={ct} />)
 

@@ -22,8 +22,6 @@ func New(repo repository.DocumentRepository, mediaRepo repository.MediaAssetRepo
 	return &UseCase{repo: repo, mediaRepo: mediaRepo, supportedLocales: supportedLocales}
 }
 
-// resolveLocale defaults an empty locale to the first supported one and
-// rejects any locale outside uc.supportedLocales.
 func (uc *UseCase) resolveLocale(locale string) (string, error) {
 	if locale == "" {
 		locale = uc.supportedLocales[0]
@@ -36,8 +34,6 @@ func (uc *UseCase) resolveLocale(locale string) (string, error) {
 	return "", fmt.Errorf("%w: unsupported locale %q", pkgerrors.ErrValidation, locale)
 }
 
-// Status computes an entry's lifecycle status from its draft and (possibly
-// nil, if never published) published record.
 func Status(draft, published *entity.Document) string {
 	if published == nil {
 		return "draft"
@@ -48,21 +44,17 @@ func Status(draft, published *entity.Document) string {
 	return "published"
 }
 
-// Save creates or updates the draft record for (doc.EntryID, doc.Locale)
-// (generating a new EntryID if empty). It never touches the published
-// record, so the public/content read API keeps serving the previous
-// published data.
-func (uc *UseCase) Save(ctx context.Context, doc *entity.Document, userID string) (*entity.Document, error) {
+func (uc *UseCase) Save(ctx context.Context, contentTypeSlug string, doc *entity.Document, userID string) (*entity.Document, error) {
 	locale, err := uc.resolveLocale(doc.Locale)
 	if err != nil {
 		return nil, err
 	}
 	doc.Locale = locale
 
-	if doc.EntryID == "" {
-		doc.EntryID = primitive.NewObjectID().Hex()
+	if doc.DocumentID == "" {
+		doc.DocumentID = primitive.NewObjectID().Hex()
 	}
-	existing, err := uc.repo.FindDraftByEntryID(ctx, doc.EntryID, doc.Locale)
+	existing, err := uc.repo.FindDraftByDocumentID(ctx, contentTypeSlug, doc.DocumentID, doc.Locale)
 	if err != nil && !pkgerrors.Is(err, pkgerrors.ErrNotFound) {
 		return nil, err
 	}
@@ -72,7 +64,6 @@ func (uc *UseCase) Save(ctx context.Context, doc *entity.Document, userID string
 	doc.UpdatedAt = now
 	doc.UpdatedBy = userID
 	if existing != nil {
-		doc.ID = existing.ID
 		doc.CreatedAt = existing.CreatedAt
 		doc.CreatedBy = existing.CreatedBy
 		if doc.ContentTypeID == "" {
@@ -83,25 +74,22 @@ func (uc *UseCase) Save(ctx context.Context, doc *entity.Document, userID string
 		doc.CreatedBy = userID
 	}
 
-	if err := uc.repo.UpsertDraft(ctx, doc); err != nil {
+	if err := uc.repo.UpsertDraft(ctx, contentTypeSlug, doc); err != nil {
 		return nil, err
 	}
 	return doc, nil
 }
 
-// GetForEdit returns the draft record plus its computed status, for admin
-// editing screens — editors always see their latest unpublished work for
-// the given locale.
-func (uc *UseCase) GetForEdit(ctx context.Context, entryID, locale string) (*entity.Document, string, error) {
+func (uc *UseCase) GetForEdit(ctx context.Context, contentTypeSlug, documentID, locale string) (*entity.Document, string, error) {
 	locale, err := uc.resolveLocale(locale)
 	if err != nil {
 		return nil, "", err
 	}
-	draft, err := uc.repo.FindDraftByEntryID(ctx, entryID, locale)
+	draft, err := uc.repo.FindDraftByDocumentID(ctx, contentTypeSlug, documentID, locale)
 	if err != nil {
 		return nil, "", err
 	}
-	published, err := uc.repo.FindPublishedByEntryID(ctx, entryID, locale)
+	published, err := uc.repo.FindPublishedByDocumentID(ctx, contentTypeSlug, documentID, locale)
 	if err != nil {
 		if !pkgerrors.Is(err, pkgerrors.ErrNotFound) {
 			return nil, "", err
@@ -111,39 +99,29 @@ func (uc *UseCase) GetForEdit(ctx context.Context, entryID, locale string) (*ent
 	return draft, Status(draft, published), nil
 }
 
-// GetPublished returns only the published record for (entryID, locale) —
-// the public/content read path. Returns ErrNotFound if that locale variant
-// has never been published, even if a draft exists.
-func (uc *UseCase) GetPublished(ctx context.Context, entryID, locale string) (*entity.Document, error) {
+func (uc *UseCase) GetPublished(ctx context.Context, contentTypeSlug, documentID, locale string) (*entity.Document, error) {
 	locale, err := uc.resolveLocale(locale)
 	if err != nil {
 		return nil, err
 	}
-	return uc.repo.FindPublishedByEntryID(ctx, entryID, locale)
+	return uc.repo.FindPublishedByDocumentID(ctx, contentTypeSlug, documentID, locale)
 }
 
-// GetAll returns the draft record of every entry for a content type — one
-// row per logical entry, regardless of locale. Used for list views and by
-// content_type.Sync's cascade-delete when a content type's definition file
-// is removed.
-func (uc *UseCase) GetAll(ctx context.Context, contentTypeID string) ([]*entity.Document, error) {
-	return uc.repo.FindEntryDraftsByContentType(ctx, contentTypeID)
+func (uc *UseCase) GetAll(ctx context.Context, contentTypeSlug string) ([]*entity.Document, error) {
+	return uc.repo.FindDraftsByContentType(ctx, contentTypeSlug)
 }
 
-// Publish copies the draft into the published record for (entryID, locale),
-// syncing UpdatedAt so the public read catches up to the latest saved
-// draft. Publishing one locale never touches another locale's record.
-func (uc *UseCase) Publish(ctx context.Context, entryID, locale, userID string) error {
+func (uc *UseCase) Publish(ctx context.Context, contentTypeSlug, documentID, locale, userID string) error {
 	locale, err := uc.resolveLocale(locale)
 	if err != nil {
 		return err
 	}
-	draft, err := uc.repo.FindDraftByEntryID(ctx, entryID, locale)
+	draft, err := uc.repo.FindDraftByDocumentID(ctx, contentTypeSlug, documentID, locale)
 	if err != nil {
 		return err
 	}
 	published := &entity.Document{
-		EntryID:       draft.EntryID,
+		DocumentID:    draft.DocumentID,
 		ContentTypeID: draft.ContentTypeID,
 		Data:          draft.Data,
 		Locale:        draft.Locale,
@@ -154,29 +132,23 @@ func (uc *UseCase) Publish(ctx context.Context, entryID, locale, userID string) 
 		PublishedAt:   time.Now().UTC(),
 		PublishedBy:   userID,
 	}
-	return uc.repo.UpsertPublished(ctx, published)
+	return uc.repo.UpsertPublished(ctx, contentTypeSlug, published)
 }
 
-// Unpublish removes the published record for (entryID, locale), reverting
-// that locale variant's computed status to draft. This is a CMS convenience
-// beyond SPEC.md's draft/publish model (see tasks/plan.md).
-func (uc *UseCase) Unpublish(ctx context.Context, entryID, locale string) error {
+func (uc *UseCase) Unpublish(ctx context.Context, contentTypeSlug, documentID, locale string) error {
 	locale, err := uc.resolveLocale(locale)
 	if err != nil {
 		return err
 	}
-	return uc.repo.DeletePublishedByEntryID(ctx, entryID, locale)
+	return uc.repo.DeletePublishedByDocumentID(ctx, contentTypeSlug, documentID, locale)
 }
 
-// Delete removes both the draft and published record for entryID across
-// every supported locale, cascading to any media assets that reference it
-// first.
-func (uc *UseCase) Delete(ctx context.Context, entryID string) error {
-	if err := uc.mediaRepo.DeleteByDocumentRef(ctx, entryID); err != nil {
+func (uc *UseCase) Delete(ctx context.Context, contentTypeSlug, documentID string) error {
+	if err := uc.mediaRepo.DeleteByDocumentRef(ctx, documentID); err != nil {
 		return err
 	}
 	for _, locale := range uc.supportedLocales {
-		if err := uc.repo.DeleteByEntryID(ctx, entryID, locale); err != nil {
+		if err := uc.repo.DeleteByDocumentID(ctx, contentTypeSlug, documentID, locale); err != nil {
 			return err
 		}
 	}

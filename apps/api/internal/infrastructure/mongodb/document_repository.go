@@ -16,67 +16,67 @@ import (
 var _ repository.DocumentRepository = (*documentRepository)(nil)
 
 type documentRepository struct {
-	col *mongo.Collection
+	db *mongo.Database
 }
 
 func NewDocumentRepository(db *mongo.Database) repository.DocumentRepository {
-	return &documentRepository{col: db.Collection("documents")}
+	return &documentRepository{db: db}
 }
 
-// versionFilter scopes a query to one physical record: a given entry's
-// draft or published variant in a given locale.
-func versionFilter(entryID string, version entity.DocumentVersion, locale string) bson.M {
-	return bson.M{"entryId": entryID, "version": version, "locale": locale}
+func (r *documentRepository) collection(contentTypeSlug string) *mongo.Collection {
+	return r.db.Collection("documents_" + contentTypeSlug)
 }
 
-// entryLocaleFilter scopes a query to every physical record (draft and
-// published) of one entry in one locale.
-func entryLocaleFilter(entryID, locale string) bson.M {
-	return bson.M{"entryId": entryID, "locale": locale}
+func versionFilter(documentID string, version entity.DocumentVersion, locale string) bson.M {
+	return bson.M{"documentId": documentID, "version": version, "locale": locale}
 }
 
-func (r *documentRepository) findByEntryAndVersion(ctx context.Context, entryID, locale string, version entity.DocumentVersion) (*entity.Document, error) {
+func documentLocaleFilter(documentID, locale string) bson.M {
+	return bson.M{"documentId": documentID, "locale": locale}
+}
+
+func (r *documentRepository) findByDocumentAndVersion(ctx context.Context, contentTypeSlug, documentID, locale string, version entity.DocumentVersion) (*entity.Document, error) {
 	var doc entity.Document
-	err := r.col.FindOne(ctx, versionFilter(entryID, version, locale)).Decode(&doc)
+	err := r.collection(contentTypeSlug).FindOne(ctx, versionFilter(documentID, version, locale)).Decode(&doc)
 	if err == mongo.ErrNoDocuments {
 		return nil, pkgerrors.ErrNotFound
 	}
 	return &doc, err
 }
 
-func (r *documentRepository) FindDraftByEntryID(ctx context.Context, entryID, locale string) (*entity.Document, error) {
-	return r.findByEntryAndVersion(ctx, entryID, locale, entity.VersionDraft)
+func (r *documentRepository) FindDraftByDocumentID(ctx context.Context, contentTypeSlug, documentID, locale string) (*entity.Document, error) {
+	return r.findByDocumentAndVersion(ctx, contentTypeSlug, documentID, locale, entity.VersionDraft)
 }
 
-func (r *documentRepository) FindPublishedByEntryID(ctx context.Context, entryID, locale string) (*entity.Document, error) {
-	return r.findByEntryAndVersion(ctx, entryID, locale, entity.VersionPublished)
+func (r *documentRepository) FindPublishedByDocumentID(ctx context.Context, contentTypeSlug, documentID, locale string) (*entity.Document, error) {
+	return r.findByDocumentAndVersion(ctx, contentTypeSlug, documentID, locale, entity.VersionPublished)
 }
 
-func (r *documentRepository) upsertVersion(ctx context.Context, doc *entity.Document, version entity.DocumentVersion) error {
+func (r *documentRepository) upsertVersion(ctx context.Context, contentTypeSlug string, doc *entity.Document, version entity.DocumentVersion) error {
 	doc.Version = version
-	if doc.ID == "" {
-		doc.ID = primitive.NewObjectID().Hex()
+	if doc.DocumentID == "" {
+		doc.DocumentID = primitive.NewObjectID().Hex()
 	}
-	_, err := r.col.ReplaceOne(
+	_, err := r.collection(contentTypeSlug).ReplaceOne(
 		ctx,
-		versionFilter(doc.EntryID, version, doc.Locale),
+		versionFilter(doc.DocumentID, version, doc.Locale),
 		doc,
 		options.Replace().SetUpsert(true),
 	)
 	return err
 }
 
-func (r *documentRepository) UpsertDraft(ctx context.Context, doc *entity.Document) error {
-	return r.upsertVersion(ctx, doc, entity.VersionDraft)
+func (r *documentRepository) UpsertDraft(ctx context.Context, contentTypeSlug string, doc *entity.Document) error {
+	return r.upsertVersion(ctx, contentTypeSlug, doc, entity.VersionDraft)
 }
 
-func (r *documentRepository) UpsertPublished(ctx context.Context, doc *entity.Document) error {
-	return r.upsertVersion(ctx, doc, entity.VersionPublished)
+func (r *documentRepository) UpsertPublished(ctx context.Context, contentTypeSlug string, doc *entity.Document) error {
+	return r.upsertVersion(ctx, contentTypeSlug, doc, entity.VersionPublished)
 }
 
-func (r *documentRepository) FindEntryDraftsByContentType(ctx context.Context, contentTypeID string) ([]*entity.Document, error) {
+func (r *documentRepository) FindDraftsByContentType(ctx context.Context, contentTypeSlug string) ([]*entity.Document, error) {
 	opts := options.Find().SetSort(bson.D{{Key: "createdAt", Value: -1}})
-	cursor, err := r.col.Find(ctx, bson.M{"contentTypeId": contentTypeID, "version": entity.VersionDraft}, opts)
+	cursor, err := r.collection(contentTypeSlug).Find(ctx, bson.M{"version": entity.VersionDraft}, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -88,17 +88,30 @@ func (r *documentRepository) FindEntryDraftsByContentType(ctx context.Context, c
 	return results, nil
 }
 
-func (r *documentRepository) DeleteByEntryID(ctx context.Context, entryID, locale string) error {
-	_, err := r.col.DeleteMany(ctx, entryLocaleFilter(entryID, locale))
+func (r *documentRepository) DeleteByDocumentID(ctx context.Context, contentTypeSlug, documentID, locale string) error {
+	_, err := r.collection(contentTypeSlug).DeleteMany(ctx, documentLocaleFilter(documentID, locale))
 	return err
 }
 
-func (r *documentRepository) DeletePublishedByEntryID(ctx context.Context, entryID, locale string) error {
-	_, err := r.col.DeleteOne(ctx, versionFilter(entryID, entity.VersionPublished, locale))
+func (r *documentRepository) DeletePublishedByDocumentID(ctx context.Context, contentTypeSlug, documentID, locale string) error {
+	_, err := r.collection(contentTypeSlug).DeleteOne(ctx, versionFilter(documentID, entity.VersionPublished, locale))
 	return err
 }
 
-func (r *documentRepository) DeleteByContentType(ctx context.Context, contentTypeID string) error {
-	_, err := r.col.DeleteMany(ctx, bson.M{"contentTypeId": contentTypeID})
+func (r *documentRepository) DeleteAllByContentType(ctx context.Context, contentTypeSlug string) error {
+	_, err := r.collection(contentTypeSlug).DeleteMany(ctx, bson.M{})
 	return err
+}
+
+func (r *documentRepository) EnsureCollection(ctx context.Context, contentTypeSlug string) error {
+	col := r.collection(contentTypeSlug)
+	_, err := col.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys:    bson.D{{Key: "documentId", Value: 1}, {Key: "version", Value: 1}, {Key: "locale", Value: 1}},
+		Options: options.Index().SetUnique(true),
+	})
+	return err
+}
+
+func (r *documentRepository) DropCollection(ctx context.Context, contentTypeSlug string) error {
+	return r.collection(contentTypeSlug).Drop(ctx)
 }

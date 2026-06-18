@@ -10,12 +10,12 @@ import (
 )
 
 type documentUseCase interface {
-	Save(ctx context.Context, doc *entity.Document, userID string) (*entity.Document, error)
-	GetPublished(ctx context.Context, entryID, locale string) (*entity.Document, error)
-	GetForEdit(ctx context.Context, entryID, locale string) (*entity.Document, string, error)
-	Publish(ctx context.Context, entryID, locale, userID string) error
-	Unpublish(ctx context.Context, entryID, locale string) error
-	Delete(ctx context.Context, entryID string) error
+	Save(ctx context.Context, contentTypeSlug string, doc *entity.Document, userID string) (*entity.Document, error)
+	GetPublished(ctx context.Context, contentTypeSlug, documentID, locale string) (*entity.Document, error)
+	GetForEdit(ctx context.Context, contentTypeSlug, documentID, locale string) (*entity.Document, string, error)
+	Publish(ctx context.Context, contentTypeSlug, documentID, locale, userID string) error
+	Unpublish(ctx context.Context, contentTypeSlug, documentID, locale string) error
+	Delete(ctx context.Context, contentTypeSlug, documentID string) error
 }
 
 type contentTypeUseCase interface {
@@ -29,19 +29,15 @@ type Resolver struct {
 
 type ctxKey string
 
-// RequestCtxKey is the context key for the incoming *http.Request, injected
-// by the GraphQL handler middleware so the auth directive can read headers.
 const RequestCtxKey ctxKey = "gql-request"
 
-// WithRequest injects r into ctx for auth directive access.
 func WithRequest(ctx context.Context, r *http.Request) context.Context {
 	return context.WithValue(ctx, RequestCtxKey, r)
 }
 
 func toModelDocument(d *entity.Document) *model.Document {
 	m := &model.Document{
-		ID:            d.ID,
-		EntryID:       d.EntryID,
+		DocumentID:    d.DocumentID,
 		Version:       string(d.Version),
 		ContentTypeID: d.ContentTypeID,
 		Data:          d.Data,

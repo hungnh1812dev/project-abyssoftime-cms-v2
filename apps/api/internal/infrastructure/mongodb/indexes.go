@@ -28,12 +28,6 @@ func EnsureIndexes(ctx context.Context, db *mongo.Database) error {
 			},
 		},
 		{
-			collection: "documents",
-			model: mongo.IndexModel{
-				Keys: bson.D{{Key: "contentTypeId", Value: 1}},
-			},
-		},
-		{
 			collection: "media_assets",
 			model: mongo.IndexModel{
 				Keys: bson.D{{Key: "documentRef", Value: 1}},

@@ -11,13 +11,13 @@ import (
 )
 
 type documentUseCase interface {
-	Save(ctx context.Context, doc *entity.Document, userID string) (*entity.Document, error)
-	GetForEdit(ctx context.Context, entryID, locale string) (*entity.Document, string, error)
-	GetPublished(ctx context.Context, entryID, locale string) (*entity.Document, error)
-	GetAll(ctx context.Context, contentTypeID string) ([]*entity.Document, error)
-	Publish(ctx context.Context, entryID, locale, userID string) error
-	Unpublish(ctx context.Context, entryID, locale string) error
-	Delete(ctx context.Context, entryID string) error
+	Save(ctx context.Context, contentTypeSlug string, doc *entity.Document, userID string) (*entity.Document, error)
+	GetForEdit(ctx context.Context, contentTypeSlug, documentID, locale string) (*entity.Document, string, error)
+	GetPublished(ctx context.Context, contentTypeSlug, documentID, locale string) (*entity.Document, error)
+	GetAll(ctx context.Context, contentTypeSlug string) ([]*entity.Document, error)
+	Publish(ctx context.Context, contentTypeSlug, documentID, locale, userID string) error
+	Unpublish(ctx context.Context, contentTypeSlug, documentID, locale string) error
+	Delete(ctx context.Context, contentTypeSlug, documentID string) error
 }
 
 type DocumentHandler struct {
@@ -29,16 +29,11 @@ func NewDocumentHandler(uc documentUseCase) *DocumentHandler {
 }
 
 type documentRequest struct {
-	ContentTypeID string         `json:"contentTypeId"`
-	Data          map[string]any `json:"data"`
+	Data map[string]any `json:"data"`
 }
 
-// entrySummary is the admin-facing view of an entry: its draft data plus
-// the computed draft/modified/published status. Field names intentionally
-// have no json tags, matching the rest of this API (entities marshal under
-// their literal Go field names, e.g. ContentType's ID/Slug/Kind).
 type entrySummary struct {
-	EntryID       string
+	DocumentID    string
 	ContentTypeID string
 	Data          map[string]any
 	Status        string
@@ -49,15 +44,13 @@ type entrySummary struct {
 	UpdatedBy     string
 }
 
-// localeParam reads the ?locale= query param; empty means "let the usecase
-// default to the first configured supported locale".
 func localeParam(r *http.Request) string {
 	return r.URL.Query().Get("locale")
 }
 
 func toSummary(doc *entity.Document, status string) entrySummary {
 	return entrySummary{
-		EntryID:       doc.EntryID,
+		DocumentID:    doc.DocumentID,
 		ContentTypeID: doc.ContentTypeID,
 		Data:          doc.Data,
 		Status:        status,
@@ -69,11 +62,9 @@ func toSummary(doc *entity.Document, status string) entrySummary {
 	}
 }
 
-// List returns every entry of a content type with its computed status —
-// the admin list view (collection-type panels).
 func (h *DocumentHandler) List(w http.ResponseWriter, r *http.Request) {
-	contentTypeID := r.URL.Query().Get("contentType")
-	drafts, err := h.uc.GetAll(r.Context(), contentTypeID)
+	slug := r.PathValue("slug")
+	drafts, err := h.uc.GetAll(r.Context(), slug)
 	if err != nil {
 		writeErr(w, err)
 		return
@@ -81,7 +72,7 @@ func (h *DocumentHandler) List(w http.ResponseWriter, r *http.Request) {
 	locale := localeParam(r)
 	summaries := make([]entrySummary, 0, len(drafts))
 	for _, draft := range drafts {
-		_, status, err := h.uc.GetForEdit(r.Context(), draft.EntryID, locale)
+		_, status, err := h.uc.GetForEdit(r.Context(), slug, draft.DocumentID, locale)
 		if err != nil {
 			writeErr(w, err)
 			return
@@ -91,15 +82,15 @@ func (h *DocumentHandler) List(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, summaries)
 }
 
-// Create saves a brand-new entry's draft (collection-type "add entry").
 func (h *DocumentHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req documentRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	doc := &entity.Document{ContentTypeID: req.ContentTypeID, Data: req.Data, Locale: localeParam(r)}
-	saved, err := h.uc.Save(r.Context(), doc, middleware.UserID(r.Context()))
+	slug := r.PathValue("slug")
+	doc := &entity.Document{Data: req.Data, Locale: localeParam(r)}
+	saved, err := h.uc.Save(r.Context(), slug, doc, middleware.UserID(r.Context()))
 	if err != nil {
 		writeErr(w, err)
 		return
@@ -107,9 +98,10 @@ func (h *DocumentHandler) Create(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, toSummary(saved, "draft"))
 }
 
-// GetByID returns the draft + computed status for the admin edit screen.
 func (h *DocumentHandler) GetByID(w http.ResponseWriter, r *http.Request) {
-	draft, status, err := h.uc.GetForEdit(r.Context(), r.PathValue("id"), localeParam(r))
+	slug := r.PathValue("slug")
+	documentID := r.PathValue("documentId")
+	draft, status, err := h.uc.GetForEdit(r.Context(), slug, documentID, localeParam(r))
 	if err != nil {
 		writeErr(w, err)
 		return
@@ -117,11 +109,10 @@ func (h *DocumentHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, toSummary(draft, status))
 }
 
-// GetPublic resolves an entry's published record only — the public/content
-// read path. Returns 404 if the entry has never been published, however
-// recent its draft.
 func (h *DocumentHandler) GetPublic(w http.ResponseWriter, r *http.Request) {
-	doc, err := h.uc.GetPublished(r.Context(), r.PathValue("id"), localeParam(r))
+	slug := r.PathValue("slug")
+	documentID := r.PathValue("documentId")
+	doc, err := h.uc.GetPublished(r.Context(), slug, documentID, localeParam(r))
 	if err != nil {
 		writeErr(w, err)
 		return
@@ -129,25 +120,25 @@ func (h *DocumentHandler) GetPublic(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, doc)
 }
 
-// Update saves changes to an existing entry's draft.
 func (h *DocumentHandler) Update(w http.ResponseWriter, r *http.Request) {
 	var req documentRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
+	slug := r.PathValue("slug")
+	documentID := r.PathValue("documentId")
 	doc := &entity.Document{
-		EntryID:       r.PathValue("id"),
-		ContentTypeID: req.ContentTypeID,
-		Data:          req.Data,
-		Locale:        localeParam(r),
+		DocumentID: documentID,
+		Data:       req.Data,
+		Locale:     localeParam(r),
 	}
-	saved, err := h.uc.Save(r.Context(), doc, middleware.UserID(r.Context()))
+	saved, err := h.uc.Save(r.Context(), slug, doc, middleware.UserID(r.Context()))
 	if err != nil {
 		writeErr(w, err)
 		return
 	}
-	_, status, err := h.uc.GetForEdit(r.Context(), saved.EntryID, saved.Locale)
+	_, status, err := h.uc.GetForEdit(r.Context(), slug, saved.DocumentID, saved.Locale)
 	if err != nil {
 		writeErr(w, err)
 		return
@@ -156,7 +147,9 @@ func (h *DocumentHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *DocumentHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	if err := h.uc.Delete(r.Context(), r.PathValue("id")); err != nil {
+	slug := r.PathValue("slug")
+	documentID := r.PathValue("documentId")
+	if err := h.uc.Delete(r.Context(), slug, documentID); err != nil {
 		writeErr(w, err)
 		return
 	}
@@ -164,7 +157,9 @@ func (h *DocumentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *DocumentHandler) Publish(w http.ResponseWriter, r *http.Request) {
-	if err := h.uc.Publish(r.Context(), r.PathValue("id"), localeParam(r), middleware.UserID(r.Context())); err != nil {
+	slug := r.PathValue("slug")
+	documentID := r.PathValue("documentId")
+	if err := h.uc.Publish(r.Context(), slug, documentID, localeParam(r), middleware.UserID(r.Context())); err != nil {
 		writeErr(w, err)
 		return
 	}
@@ -172,7 +167,9 @@ func (h *DocumentHandler) Publish(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *DocumentHandler) Unpublish(w http.ResponseWriter, r *http.Request) {
-	if err := h.uc.Unpublish(r.Context(), r.PathValue("id"), localeParam(r)); err != nil {
+	slug := r.PathValue("slug")
+	documentID := r.PathValue("documentId")
+	if err := h.uc.Unpublish(r.Context(), slug, documentID, localeParam(r)); err != nil {
 		writeErr(w, err)
 		return
 	}

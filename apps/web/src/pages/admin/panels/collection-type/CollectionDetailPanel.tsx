@@ -31,10 +31,12 @@ export function CollectionDetailPanel({ contentType, documentId }: Props) {
   const activeLocale = locale || locales[0] || ''
 
   const { data: doc, isLoading } = useQuery({
-    queryKey: ['documents', 'detail', documentId, activeLocale],
+    queryKey: ['documents', 'detail', contentType.Slug, documentId, activeLocale],
     queryFn: () =>
       api
-        .get<Document>(`/api/documents/${documentId}`, { params: { locale: activeLocale } })
+        .get<Document>(`/api/content-types/${contentType.Slug}/documents/${documentId}`, {
+          params: { locale: activeLocale },
+        })
         .then((r) => r.data),
     enabled: Boolean(documentId),
     placeholderData: keepPreviousData,
@@ -57,12 +59,12 @@ export function CollectionDetailPanel({ contentType, documentId }: Props) {
   const mutationFn = async (data: Record<string, unknown>) => {
     const result = await api
       .put<Document>(
-        `/api/documents/${doc.EntryID}`,
-        { contentTypeId: contentType.ID, data },
+        `/api/content-types/${contentType.Slug}/documents/${doc.DocumentID}`,
+        { data },
         { params: { locale: activeLocale } },
       )
       .then((r) => r.data)
-    await qc.invalidateQueries({ queryKey: ['documents', contentType.ID] })
+    await qc.invalidateQueries({ queryKey: ['documents', contentType.Slug] })
     return result
   }
 
@@ -101,7 +103,11 @@ export function CollectionDetailPanel({ contentType, documentId }: Props) {
               <Button
                 type="button"
                 onClick={() =>
-                  publish.mutate({ id: doc.EntryID, contentTypeId: contentType.ID, locale: activeLocale })
+                  publish.mutate({
+                    contentTypeSlug: contentType.Slug,
+                    id: doc.DocumentID,
+                    locale: activeLocale,
+                  })
                 }
                 disabled={publish.isPending}
               >
@@ -113,7 +119,11 @@ export function CollectionDetailPanel({ contentType, documentId }: Props) {
                 type="button"
                 variant="outline"
                 onClick={() =>
-                  unpublish.mutate({ id: doc.EntryID, contentTypeId: contentType.ID, locale: activeLocale })
+                  unpublish.mutate({
+                    contentTypeSlug: contentType.Slug,
+                    id: doc.DocumentID,
+                    locale: activeLocale,
+                  })
                 }
                 disabled={unpublish.isPending}
               >

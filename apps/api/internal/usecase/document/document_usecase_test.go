@@ -16,27 +16,29 @@ var ctx = context.Background()
 
 var supportedLocales = []string{"en", "vi"}
 
+const testSlug = "test-slug"
+
 // ---- Save --------------------------------------------------------------
 
-func TestSave_NewEntry_GeneratesEntryIDAndSetsAudit(t *testing.T) {
+func TestSave_NewEntry_GeneratesDocumentIDAndSetsAudit(t *testing.T) {
 	repo := &repomock.DocumentRepository{}
-	repo.FindDraftByEntryIDFn = func(_ context.Context, _, _ string) (*entity.Document, error) {
+	repo.FindDraftByDocumentIDFn = func(_ context.Context, _, _, _ string) (*entity.Document, error) {
 		return nil, pkgerrors.ErrNotFound
 	}
 	var upserted *entity.Document
-	repo.UpsertDraftFn = func(_ context.Context, doc *entity.Document) error {
+	repo.UpsertDraftFn = func(_ context.Context, _ string, doc *entity.Document) error {
 		upserted = doc
 		return nil
 	}
 	uc := docuc.New(repo, &repomock.MediaAssetRepository{}, supportedLocales)
 
 	doc := &entity.Document{ContentTypeID: "ct-1", Data: map[string]any{"title": "Hello"}}
-	saved, err := uc.Save(ctx, doc, "user-1")
+	saved, err := uc.Save(ctx, testSlug, doc, "user-1")
 	if err != nil {
 		t.Fatalf("Save() error = %v", err)
 	}
-	if saved.EntryID == "" {
-		t.Error("Save() did not generate an EntryID")
+	if saved.DocumentID == "" {
+		t.Error("Save() did not generate a DocumentID")
 	}
 	if saved.CreatedBy != "user-1" || saved.UpdatedBy != "user-1" {
 		t.Errorf("Save() CreatedBy/UpdatedBy = %q/%q, want user-1/user-1", saved.CreatedBy, saved.UpdatedBy)
@@ -52,26 +54,26 @@ func TestSave_NewEntry_GeneratesEntryIDAndSetsAudit(t *testing.T) {
 func TestSave_ExistingEntry_PreservesCreatedAtAndCreatedBy(t *testing.T) {
 	createdAt := time.Now().UTC().Add(-time.Hour)
 	existing := &entity.Document{
-		ID: "rec-1", EntryID: "entry-1", ContentTypeID: "ct-1",
+		DocumentID: "entry-1", ContentTypeID: "ct-1",
 		CreatedAt: createdAt, CreatedBy: "original-author",
 	}
 
 	repo := &repomock.DocumentRepository{}
-	repo.FindDraftByEntryIDFn = func(_ context.Context, entryID, _ string) (*entity.Document, error) {
-		if entryID == "entry-1" {
+	repo.FindDraftByDocumentIDFn = func(_ context.Context, _, documentID, _ string) (*entity.Document, error) {
+		if documentID == "entry-1" {
 			return existing, nil
 		}
 		return nil, pkgerrors.ErrNotFound
 	}
 	var upserted *entity.Document
-	repo.UpsertDraftFn = func(_ context.Context, doc *entity.Document) error {
+	repo.UpsertDraftFn = func(_ context.Context, _ string, doc *entity.Document) error {
 		upserted = doc
 		return nil
 	}
 	uc := docuc.New(repo, &repomock.MediaAssetRepository{}, supportedLocales)
 
-	doc := &entity.Document{EntryID: "entry-1", Data: map[string]any{"title": "Updated"}}
-	saved, err := uc.Save(ctx, doc, "editor-2")
+	doc := &entity.Document{DocumentID: "entry-1", Data: map[string]any{"title": "Updated"}}
+	saved, err := uc.Save(ctx, testSlug, doc, "editor-2")
 	if err != nil {
 		t.Fatalf("Save() error = %v", err)
 	}
@@ -87,21 +89,19 @@ func TestSave_ExistingEntry_PreservesCreatedAtAndCreatedBy(t *testing.T) {
 	if saved.ContentTypeID != "ct-1" {
 		t.Errorf("Save() ContentTypeID = %q, want ct-1 (preserved from existing)", saved.ContentTypeID)
 	}
-	if upserted.ID != "rec-1" {
-		t.Errorf("Save() did not preserve the existing record's Mongo _id, got %q", upserted.ID)
-	}
+	_ = upserted
 }
 
 func TestSave_RejectsUnsupportedLocale(t *testing.T) {
 	repo := &repomock.DocumentRepository{}
-	repo.UpsertDraftFn = func(_ context.Context, _ *entity.Document) error {
+	repo.UpsertDraftFn = func(_ context.Context, _ string, _ *entity.Document) error {
 		t.Fatal("Save() must not call UpsertDraft for an unsupported locale")
 		return nil
 	}
 	uc := docuc.New(repo, &repomock.MediaAssetRepository{}, supportedLocales)
 
 	doc := &entity.Document{ContentTypeID: "ct-1", Locale: "fr", Data: map[string]any{}}
-	_, err := uc.Save(ctx, doc, "user-1")
+	_, err := uc.Save(ctx, testSlug, doc, "user-1")
 	if !pkgerrors.Is(err, pkgerrors.ErrValidation) {
 		t.Errorf("Save() error = %v, want ErrValidation", err)
 	}
@@ -152,20 +152,20 @@ func TestGetForEdit(t *testing.T) {
 
 	t.Run("draft only", func(t *testing.T) {
 		repo := &repomock.DocumentRepository{}
-		repo.FindDraftByEntryIDFn = func(_ context.Context, _, _ string) (*entity.Document, error) {
-			return &entity.Document{EntryID: "e1", UpdatedAt: now}, nil
+		repo.FindDraftByDocumentIDFn = func(_ context.Context, _, _, _ string) (*entity.Document, error) {
+			return &entity.Document{DocumentID: "e1", UpdatedAt: now}, nil
 		}
-		repo.FindPublishedByEntryIDFn = func(_ context.Context, _, _ string) (*entity.Document, error) {
+		repo.FindPublishedByDocumentIDFn = func(_ context.Context, _, _, _ string) (*entity.Document, error) {
 			return nil, pkgerrors.ErrNotFound
 		}
 		uc := docuc.New(repo, &repomock.MediaAssetRepository{}, supportedLocales)
 
-		draft, status, err := uc.GetForEdit(ctx, "e1", "en")
+		draft, status, err := uc.GetForEdit(ctx, testSlug, "e1", "en")
 		if err != nil {
 			t.Fatalf("GetForEdit() error = %v", err)
 		}
-		if draft.EntryID != "e1" {
-			t.Errorf("GetForEdit() draft.EntryID = %q, want e1", draft.EntryID)
+		if draft.DocumentID != "e1" {
+			t.Errorf("GetForEdit() draft.DocumentID = %q, want e1", draft.DocumentID)
 		}
 		if status != "draft" {
 			t.Errorf("GetForEdit() status = %q, want draft", status)
@@ -174,12 +174,12 @@ func TestGetForEdit(t *testing.T) {
 
 	t.Run("draft not found", func(t *testing.T) {
 		repo := &repomock.DocumentRepository{}
-		repo.FindDraftByEntryIDFn = func(_ context.Context, _, _ string) (*entity.Document, error) {
+		repo.FindDraftByDocumentIDFn = func(_ context.Context, _, _, _ string) (*entity.Document, error) {
 			return nil, pkgerrors.ErrNotFound
 		}
 		uc := docuc.New(repo, &repomock.MediaAssetRepository{}, supportedLocales)
 
-		_, _, err := uc.GetForEdit(ctx, "missing", "en")
+		_, _, err := uc.GetForEdit(ctx, testSlug, "missing", "en")
 		if !pkgerrors.Is(err, pkgerrors.ErrNotFound) {
 			t.Errorf("GetForEdit() error = %v, want ErrNotFound", err)
 		}
@@ -188,16 +188,16 @@ func TestGetForEdit(t *testing.T) {
 	t.Run("defaults to first supported locale when omitted", func(t *testing.T) {
 		var gotLocale string
 		repo := &repomock.DocumentRepository{}
-		repo.FindDraftByEntryIDFn = func(_ context.Context, _, locale string) (*entity.Document, error) {
+		repo.FindDraftByDocumentIDFn = func(_ context.Context, _, _, locale string) (*entity.Document, error) {
 			gotLocale = locale
-			return &entity.Document{EntryID: "e1", UpdatedAt: now}, nil
+			return &entity.Document{DocumentID: "e1", UpdatedAt: now}, nil
 		}
-		repo.FindPublishedByEntryIDFn = func(_ context.Context, _, _ string) (*entity.Document, error) {
+		repo.FindPublishedByDocumentIDFn = func(_ context.Context, _, _, _ string) (*entity.Document, error) {
 			return nil, pkgerrors.ErrNotFound
 		}
 		uc := docuc.New(repo, &repomock.MediaAssetRepository{}, supportedLocales)
 
-		if _, _, err := uc.GetForEdit(ctx, "e1", ""); err != nil {
+		if _, _, err := uc.GetForEdit(ctx, testSlug, "e1", ""); err != nil {
 			t.Fatalf("GetForEdit() error = %v", err)
 		}
 		if gotLocale != "en" {
@@ -209,7 +209,7 @@ func TestGetForEdit(t *testing.T) {
 		repo := &repomock.DocumentRepository{}
 		uc := docuc.New(repo, &repomock.MediaAssetRepository{}, supportedLocales)
 
-		_, _, err := uc.GetForEdit(ctx, "e1", "fr")
+		_, _, err := uc.GetForEdit(ctx, testSlug, "e1", "fr")
 		if !pkgerrors.Is(err, pkgerrors.ErrValidation) {
 			t.Errorf("GetForEdit() error = %v, want ErrValidation", err)
 		}
@@ -230,15 +230,15 @@ func TestGetPublished(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := &repomock.DocumentRepository{}
-			repo.FindPublishedByEntryIDFn = func(_ context.Context, entryID, _ string) (*entity.Document, error) {
+			repo.FindPublishedByDocumentIDFn = func(_ context.Context, _, documentID, _ string) (*entity.Document, error) {
 				if tt.repoErr != nil {
 					return nil, tt.repoErr
 				}
-				return &entity.Document{EntryID: entryID}, nil
+				return &entity.Document{DocumentID: documentID}, nil
 			}
 			uc := docuc.New(repo, &repomock.MediaAssetRepository{}, supportedLocales)
 
-			_, err := uc.GetPublished(ctx, "e1", "en")
+			_, err := uc.GetPublished(ctx, testSlug, "e1", "en")
 			if !pkgerrors.Is(err, tt.wantErr) {
 				t.Errorf("GetPublished() error = %v, want %v", err, tt.wantErr)
 			}
@@ -250,7 +250,7 @@ func TestGetPublished_RejectsUnsupportedLocale(t *testing.T) {
 	repo := &repomock.DocumentRepository{}
 	uc := docuc.New(repo, &repomock.MediaAssetRepository{}, supportedLocales)
 
-	_, err := uc.GetPublished(ctx, "e1", "fr")
+	_, err := uc.GetPublished(ctx, testSlug, "e1", "fr")
 	if !pkgerrors.Is(err, pkgerrors.ErrValidation) {
 		t.Errorf("GetPublished() error = %v, want ErrValidation", err)
 	}
@@ -260,15 +260,15 @@ func TestGetPublished_RejectsUnsupportedLocale(t *testing.T) {
 
 func TestGetAll_ReturnsEntryDrafts(t *testing.T) {
 	repo := &repomock.DocumentRepository{}
-	repo.FindEntryDraftsByContentTypeFn = func(_ context.Context, contentTypeID string) ([]*entity.Document, error) {
+	repo.FindDraftsByContentTypeFn = func(_ context.Context, slug string) ([]*entity.Document, error) {
 		return []*entity.Document{
-			{EntryID: "1", ContentTypeID: contentTypeID},
-			{EntryID: "2", ContentTypeID: contentTypeID},
+			{DocumentID: "1", ContentTypeID: "ct-1"},
+			{DocumentID: "2", ContentTypeID: "ct-1"},
 		}, nil
 	}
 	uc := docuc.New(repo, &repomock.MediaAssetRepository{}, supportedLocales)
 
-	docs, err := uc.GetAll(ctx, "ct-1")
+	docs, err := uc.GetAll(ctx, testSlug)
 	if err != nil {
 		t.Fatalf("GetAll() error = %v", err)
 	}
@@ -282,22 +282,22 @@ func TestGetAll_ReturnsEntryDrafts(t *testing.T) {
 func TestPublish_CopiesDraftAndSyncsTimestamps(t *testing.T) {
 	draftUpdatedAt := time.Now().UTC()
 	draft := &entity.Document{
-		EntryID: "e1", ContentTypeID: "ct-1", Data: map[string]any{"title": "v2"},
+		DocumentID: "e1", ContentTypeID: "ct-1", Data: map[string]any{"title": "v2"},
 		Locale: "en", UpdatedAt: draftUpdatedAt, UpdatedBy: "editor-1",
 	}
 
 	repo := &repomock.DocumentRepository{}
-	repo.FindDraftByEntryIDFn = func(_ context.Context, _, _ string) (*entity.Document, error) {
+	repo.FindDraftByDocumentIDFn = func(_ context.Context, _, _, _ string) (*entity.Document, error) {
 		return draft, nil
 	}
 	var published *entity.Document
-	repo.UpsertPublishedFn = func(_ context.Context, doc *entity.Document) error {
+	repo.UpsertPublishedFn = func(_ context.Context, _ string, doc *entity.Document) error {
 		published = doc
 		return nil
 	}
 	uc := docuc.New(repo, &repomock.MediaAssetRepository{}, supportedLocales)
 
-	if err := uc.Publish(ctx, "e1", "en", "publisher-1"); err != nil {
+	if err := uc.Publish(ctx, testSlug, "e1", "en", "publisher-1"); err != nil {
 		t.Fatalf("Publish() error = %v", err)
 	}
 	if published == nil {
@@ -319,47 +319,47 @@ func TestPublish_CopiesDraftAndSyncsTimestamps(t *testing.T) {
 
 func TestPublish_DraftNotFound(t *testing.T) {
 	repo := &repomock.DocumentRepository{}
-	repo.FindDraftByEntryIDFn = func(_ context.Context, _, _ string) (*entity.Document, error) {
+	repo.FindDraftByDocumentIDFn = func(_ context.Context, _, _, _ string) (*entity.Document, error) {
 		return nil, pkgerrors.ErrNotFound
 	}
 	uc := docuc.New(repo, &repomock.MediaAssetRepository{}, supportedLocales)
 
-	if err := uc.Publish(ctx, "missing", "en", "publisher-1"); !pkgerrors.Is(err, pkgerrors.ErrNotFound) {
+	if err := uc.Publish(ctx, testSlug, "missing", "en", "publisher-1"); !pkgerrors.Is(err, pkgerrors.ErrNotFound) {
 		t.Errorf("Publish() error = %v, want ErrNotFound", err)
 	}
 }
 
 func TestPublish_RejectsUnsupportedLocale(t *testing.T) {
 	repo := &repomock.DocumentRepository{}
-	repo.FindDraftByEntryIDFn = func(_ context.Context, _, _ string) (*entity.Document, error) {
+	repo.FindDraftByDocumentIDFn = func(_ context.Context, _, _, _ string) (*entity.Document, error) {
 		t.Fatal("Publish() must not query the repository for an unsupported locale")
 		return nil, nil
 	}
 	uc := docuc.New(repo, &repomock.MediaAssetRepository{}, supportedLocales)
 
-	if err := uc.Publish(ctx, "e1", "fr", "publisher-1"); !pkgerrors.Is(err, pkgerrors.ErrValidation) {
+	if err := uc.Publish(ctx, testSlug, "e1", "fr", "publisher-1"); !pkgerrors.Is(err, pkgerrors.ErrValidation) {
 		t.Errorf("Publish() error = %v, want ErrValidation", err)
 	}
 }
 
 func TestPublish_LocaleIsolation_OnlyTouchesRequestedLocale(t *testing.T) {
-	enDraft := &entity.Document{EntryID: "e1", Locale: "en", Data: map[string]any{"title": "en-title"}}
+	enDraft := &entity.Document{DocumentID: "e1", Locale: "en", Data: map[string]any{"title": "en-title"}}
 
 	repo := &repomock.DocumentRepository{}
-	repo.FindDraftByEntryIDFn = func(_ context.Context, _, locale string) (*entity.Document, error) {
+	repo.FindDraftByDocumentIDFn = func(_ context.Context, _, _, locale string) (*entity.Document, error) {
 		if locale != "en" {
 			t.Fatalf("Publish(%q) queried draft for locale %q, want only en", "en", locale)
 		}
 		return enDraft, nil
 	}
 	var publishedLocale string
-	repo.UpsertPublishedFn = func(_ context.Context, doc *entity.Document) error {
+	repo.UpsertPublishedFn = func(_ context.Context, _ string, doc *entity.Document) error {
 		publishedLocale = doc.Locale
 		return nil
 	}
 	uc := docuc.New(repo, &repomock.MediaAssetRepository{}, supportedLocales)
 
-	if err := uc.Publish(ctx, "e1", "en", "publisher-1"); err != nil {
+	if err := uc.Publish(ctx, testSlug, "e1", "en", "publisher-1"); err != nil {
 		t.Fatalf("Publish() error = %v", err)
 	}
 	if publishedLocale != "en" {
@@ -370,20 +370,20 @@ func TestPublish_LocaleIsolation_OnlyTouchesRequestedLocale(t *testing.T) {
 // ---- Unpublish ---------------------------------------------------------------
 
 func TestUnpublish_DeletesPublishedRecord(t *testing.T) {
-	var deletedEntryID, deletedLocale string
+	var deletedDocID, deletedLocale string
 	repo := &repomock.DocumentRepository{}
-	repo.DeletePublishedByEntryIDFn = func(_ context.Context, entryID, locale string) error {
-		deletedEntryID = entryID
+	repo.DeletePublishedByDocumentIDFn = func(_ context.Context, _, documentID, locale string) error {
+		deletedDocID = documentID
 		deletedLocale = locale
 		return nil
 	}
 	uc := docuc.New(repo, &repomock.MediaAssetRepository{}, supportedLocales)
 
-	if err := uc.Unpublish(ctx, "e1", "en"); err != nil {
+	if err := uc.Unpublish(ctx, testSlug, "e1", "en"); err != nil {
 		t.Fatalf("Unpublish() error = %v", err)
 	}
-	if deletedEntryID != "e1" {
-		t.Errorf("Unpublish() deleted entry = %q, want e1", deletedEntryID)
+	if deletedDocID != "e1" {
+		t.Errorf("Unpublish() deleted document = %q, want e1", deletedDocID)
 	}
 	if deletedLocale != "en" {
 		t.Errorf("Unpublish() deleted locale = %q, want en", deletedLocale)
@@ -392,13 +392,13 @@ func TestUnpublish_DeletesPublishedRecord(t *testing.T) {
 
 func TestUnpublish_RejectsUnsupportedLocale(t *testing.T) {
 	repo := &repomock.DocumentRepository{}
-	repo.DeletePublishedByEntryIDFn = func(_ context.Context, _, _ string) error {
+	repo.DeletePublishedByDocumentIDFn = func(_ context.Context, _, _, _ string) error {
 		t.Fatal("Unpublish() must not call the repository for an unsupported locale")
 		return nil
 	}
 	uc := docuc.New(repo, &repomock.MediaAssetRepository{}, supportedLocales)
 
-	if err := uc.Unpublish(ctx, "e1", "fr"); !pkgerrors.Is(err, pkgerrors.ErrValidation) {
+	if err := uc.Unpublish(ctx, testSlug, "e1", "fr"); !pkgerrors.Is(err, pkgerrors.ErrValidation) {
 		t.Errorf("Unpublish() error = %v, want ErrValidation", err)
 	}
 }
@@ -415,13 +415,13 @@ func TestDelete_CascadeOrder(t *testing.T) {
 	}
 
 	docRepo := &repomock.DocumentRepository{}
-	docRepo.DeleteByEntryIDFn = func(_ context.Context, entryID, locale string) error {
-		callOrder = append(callOrder, fmt.Sprintf("entry:%s:%s", entryID, locale))
+	docRepo.DeleteByDocumentIDFn = func(_ context.Context, _, documentID, locale string) error {
+		callOrder = append(callOrder, fmt.Sprintf("entry:%s:%s", documentID, locale))
 		return nil
 	}
 
 	uc := docuc.New(docRepo, mediaRepo, supportedLocales)
-	if err := uc.Delete(ctx, "e1"); err != nil {
+	if err := uc.Delete(ctx, testSlug, "e1"); err != nil {
 		t.Fatalf("Delete() error = %v", err)
 	}
 
@@ -443,13 +443,13 @@ func TestDelete_MediaError_Aborts(t *testing.T) {
 	}
 	entryDeleteCalled := false
 	docRepo := &repomock.DocumentRepository{}
-	docRepo.DeleteByEntryIDFn = func(_ context.Context, _, _ string) error {
+	docRepo.DeleteByDocumentIDFn = func(_ context.Context, _, _, _ string) error {
 		entryDeleteCalled = true
 		return nil
 	}
 
 	uc := docuc.New(docRepo, mediaRepo, supportedLocales)
-	err := uc.Delete(ctx, "e1")
+	err := uc.Delete(ctx, testSlug, "e1")
 	if err == nil {
 		t.Error("Delete() should have returned error when media delete fails")
 	}

@@ -8,7 +8,6 @@ import type { ContentType, Document } from '@/types/cms'
 
 const ct: ContentType = {
   ID: 'ct-1',
-  DocumentID: 'ct-doc-1',
   Name: 'Homepage',
   Slug: 'homepage',
   Kind: 'single',
@@ -21,7 +20,7 @@ const ct: ContentType = {
 }
 
 const doc: Document = {
-  EntryID: 'ct-1',
+  DocumentID: 'ct-1',
   ContentTypeID: 'ct-1',
   Status: 'draft',
   Data: { title: 'Hello' },
@@ -44,9 +43,9 @@ afterEach(() => {
 
 describe('ContentTypePanel', () => {
   it('renders schema-driven fields from contentType.Fields', async () => {
-    mock.onGet('/api/documents').reply(200, [doc])
+    mock.onGet('/api/content-types/homepage/documents').reply(200, [doc])
     mock.onGet('/api/locales').reply(200, ['en'])
-    mock.onGet('/api/documents/ct-1').reply(200, doc)
+    mock.onGet('/api/content-types/homepage/documents/ct-1').reply(200, doc)
 
     renderWithProviders(<ContentTypePanel contentType={ct} />)
 
@@ -56,7 +55,7 @@ describe('ContentTypePanel', () => {
   })
 
   it('does not show a Go Back link when no id prop is given', async () => {
-    mock.onGet('/api/documents').reply(200, [doc])
+    mock.onGet('/api/content-types/homepage/documents').reply(200, [doc])
     mock.onGet('/api/locales').reply(200, ['en'])
 
     renderWithProviders(<ContentTypePanel contentType={ct} />)
@@ -65,10 +64,10 @@ describe('ContentTypePanel', () => {
   })
 
   it('shows a Go Back link when id prop is given', async () => {
-    const collectionDoc: Document = { ...doc, EntryID: 'entry-99' }
-    mock.onGet('/api/documents').reply(200, [collectionDoc])
+    const collectionDoc: Document = { ...doc, DocumentID: 'entry-99' }
+    mock.onGet('/api/content-types/homepage/documents').reply(200, [collectionDoc])
     mock.onGet('/api/locales').reply(200, ['en'])
-    mock.onGet('/api/documents/entry-99').reply(200, collectionDoc)
+    mock.onGet('/api/content-types/homepage/documents/entry-99').reply(200, collectionDoc)
 
     renderWithProviders(<ContentTypePanel contentType={{ ...ct, Kind: 'collection' }} id="entry-99" />)
 

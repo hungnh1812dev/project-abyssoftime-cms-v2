@@ -13,9 +13,7 @@ const (
 )
 
 type Document struct {
-	ID            string          `bson:"_id,omitempty"`
 	DocumentID    string          `bson:"documentId"`
-	EntryID       string          `bson:"entryId"`
 	Version       DocumentVersion `bson:"version"`
 	ContentTypeID string          `bson:"contentTypeId"`
 	Data          map[string]any  `bson:"data"`

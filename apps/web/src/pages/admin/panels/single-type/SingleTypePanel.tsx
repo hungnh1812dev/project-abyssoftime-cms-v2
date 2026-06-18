@@ -7,6 +7,7 @@ import { TextInput } from '@/components/form/inputs/TextInput'
 import { Button } from '@/components/ui/button'
 import {
   useDocuments,
+  useCreateDocument,
   useLocales,
   useUpdateDocument,
   usePublishDocument,
@@ -19,13 +20,14 @@ interface Props {
 }
 
 export function SingleTypePanel({ contentType }: Props) {
-  const { data: docs = [], isLoading } = useDocuments(contentType.ID)
+  const { data: docs = [], isLoading } = useDocuments(contentType.Slug)
   const { data: locales = [] } = useLocales()
   const [locale, setLocale] = useState('')
   const activeLocale = locale || locales[0] || ''
 
   const doc = docs.find((d) => d.Locale === activeLocale) ?? docs[0]
 
+  const { mutateAsync: createDoc } = useCreateDocument()
   const { mutateAsync: updateDoc } = useUpdateDocument()
   const publish = usePublishDocument()
   const unpublish = useUnpublishDocument()
@@ -35,11 +37,31 @@ export function SingleTypePanel({ contentType }: Props) {
   }
 
   if (!doc) {
-    return <p className="text-muted-foreground">No document found for this content type.</p>
+    const handleFirstSave = async (data: Record<string, unknown>) => {
+      await createDoc({ contentTypeSlug: contentType.Slug, data })
+    }
+
+    return (
+      <ContentDetailLayout title={contentType.Name}>
+        <FormProvider mutationFn={handleFirstSave}>
+          <div className="space-y-4">
+            {(contentType.Fields ?? []).map((field) => (
+              <div key={field.name}>
+                <label className="block text-sm font-medium mb-1">{field.name}</label>
+                <FormField name={field.name}>
+                  <TextInput aria-label={field.name} placeholder={field.name} />
+                </FormField>
+              </div>
+            ))}
+            <Button type="submit">Save</Button>
+          </div>
+        </FormProvider>
+      </ContentDetailLayout>
+    )
   }
 
   const mutationFn = (data: Record<string, unknown>) =>
-    updateDoc({ id: doc.EntryID, contentTypeId: contentType.ID, data, locale: activeLocale })
+    updateDoc({ contentTypeSlug: contentType.Slug, id: doc.DocumentID, data, locale: activeLocale })
 
   const fieldKeys = Object.keys(doc.Data)
   const canPublish = doc.Status !== 'published'
@@ -68,8 +90,8 @@ export function SingleTypePanel({ contentType }: Props) {
             <Button
               onClick={() =>
                 publish.mutate({
-                  id: doc.EntryID,
-                  contentTypeId: contentType.ID,
+                  contentTypeSlug: contentType.Slug,
+                  id: doc.DocumentID,
                   locale: activeLocale,
                 })
               }
@@ -83,8 +105,8 @@ export function SingleTypePanel({ contentType }: Props) {
               variant="outline"
               onClick={() =>
                 unpublish.mutate({
-                  id: doc.EntryID,
-                  contentTypeId: contentType.ID,
+                  contentTypeSlug: contentType.Slug,
+                  id: doc.DocumentID,
                   locale: activeLocale,
                 })
               }
@@ -98,10 +120,12 @@ export function SingleTypePanel({ contentType }: Props) {
     >
       <FormProvider
         query={{
-          queryKey: ['documents', 'detail', doc.EntryID, activeLocale, 'data'],
+          queryKey: ['documents', 'detail', contentType.Slug, doc.DocumentID, activeLocale, 'data'],
           queryFn: () =>
             api
-              .get<Document>(`/api/documents/${doc.EntryID}`, { params: { locale: activeLocale } })
+              .get<Document>(`/api/content-types/${contentType.Slug}/documents/${doc.DocumentID}`, {
+                params: { locale: activeLocale },
+              })
               .then((r) => r.data.Data),
         }}
         mutationFn={mutationFn}

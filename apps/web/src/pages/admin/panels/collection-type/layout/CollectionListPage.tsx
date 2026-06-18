@@ -23,7 +23,7 @@ function cellValue(doc: Document, col: CollectionColumnDef): React.ReactNode {
 }
 
 export function CollectionListPage({ contentType }: Props) {
-  const { data: docs = [], isLoading } = useDocuments(contentType.ID)
+  const { data: docs = [], isLoading } = useDocuments(contentType.Slug)
   const { mutate: deleteDoc } = useDeleteDocument()
   const { mutateAsync: createDoc } = useCreateDocument()
   const navigate = useNavigate()
@@ -32,13 +32,13 @@ export function CollectionListPage({ contentType }: Props) {
   const columns = registration?.columns
 
   async function handleCreate() {
-    const newDoc = await createDoc({ contentTypeId: contentType.ID, data: {} })
-    navigate(`/admin/content-type/collection-type/${contentType.Slug}/${newDoc.EntryID}`)
+    const newDoc = await createDoc({ contentTypeSlug: contentType.Slug, data: {} })
+    navigate(`/admin/content-type/collection-type/${contentType.Slug}/${newDoc.DocumentID}`)
   }
 
   function handleDelete(doc: Document) {
     if (!window.confirm('Delete this entry?')) return
-    deleteDoc({ id: doc.EntryID, contentTypeId: contentType.ID })
+    deleteDoc({ contentTypeSlug: contentType.Slug, id: doc.DocumentID })
   }
 
   if (isLoading) {
@@ -75,7 +75,7 @@ export function CollectionListPage({ contentType }: Props) {
           </thead>
           <tbody>
             {docs.map((doc) => (
-              <tr key={doc.EntryID} className="border-b">
+              <tr key={doc.DocumentID} className="border-b">
                 {columns ? (
                   columns.map((col) => (
                     <td key={col.key} className="py-2 pr-4">
@@ -85,14 +85,14 @@ export function CollectionListPage({ contentType }: Props) {
                 ) : (
                   <>
                     <td className="py-2 pr-4">
-                      {String(Object.values(doc.Data)[0] ?? doc.EntryID)}
+                      {String(Object.values(doc.Data)[0] ?? doc.DocumentID)}
                     </td>
                     <td className="py-2 pr-4 capitalize">{doc.Status}</td>
                   </>
                 )}
                 <td className="py-2 flex gap-2">
                   <Link
-                    to={`/admin/content-type/collection-type/${contentType.Slug}/${doc.EntryID}`}
+                    to={`/admin/content-type/collection-type/${contentType.Slug}/${doc.DocumentID}`}
                     className="text-primary underline-offset-4 hover:underline"
                   >
                     Edit

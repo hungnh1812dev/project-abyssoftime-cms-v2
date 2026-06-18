@@ -19,13 +19,13 @@ interface Props {
 }
 
 export function ContentTypePanel({ contentType, id }: Props) {
-  const { data: docs = [], isLoading } = useDocuments(contentType.ID);
+  const { data: docs = [], isLoading } = useDocuments(contentType.Slug);
   const { data: locales = [] } = useLocales();
   const [locale, setLocale] = useState("");
   const activeLocale = locale || locales[0] || "";
 
   const doc = id
-    ? docs.find((d) => d.EntryID === id) ?? docs[0]
+    ? docs.find((d) => d.DocumentID === id) ?? docs[0]
     : docs.find((d) => d.Locale === activeLocale) ?? docs[0];
 
   const { mutateAsync: updateDoc } = useUpdateDocument();
@@ -46,8 +46,8 @@ export function ContentTypePanel({ contentType, id }: Props) {
 
   const mutationFn = (data: Record<string, unknown>) =>
     updateDoc({
-      id: doc.EntryID,
-      contentTypeId: contentType.ID,
+      contentTypeSlug: contentType.Slug,
+      id: doc.DocumentID,
       data,
       locale: activeLocale,
     });
@@ -86,8 +86,8 @@ export function ContentTypePanel({ contentType, id }: Props) {
             <Button
               onClick={() =>
                 publish.mutate({
-                  id: doc.EntryID,
-                  contentTypeId: contentType.ID,
+                  contentTypeSlug: contentType.Slug,
+                  id: doc.DocumentID,
                   locale: activeLocale,
                 })
               }
@@ -101,8 +101,8 @@ export function ContentTypePanel({ contentType, id }: Props) {
               variant="outline"
               onClick={() =>
                 unpublish.mutate({
-                  id: doc.EntryID,
-                  contentTypeId: contentType.ID,
+                  contentTypeSlug: contentType.Slug,
+                  id: doc.DocumentID,
                   locale: activeLocale,
                 })
               }
@@ -117,10 +117,10 @@ export function ContentTypePanel({ contentType, id }: Props) {
       <ContentTypeBuilder
         schema={schema}
         query={{
-          queryKey: ["documents", "detail", doc.EntryID, activeLocale, "data"],
+          queryKey: ["documents", "detail", contentType.Slug, doc.DocumentID, activeLocale, "data"],
           queryFn: () =>
             api
-              .get<CmsDocument>(`/api/documents/${doc.EntryID}`, {
+              .get<CmsDocument>(`/api/content-types/${contentType.Slug}/documents/${doc.DocumentID}`, {
                 params: { locale: activeLocale },
               })
               .then((r) => (r.data as CmsDocument).Data),

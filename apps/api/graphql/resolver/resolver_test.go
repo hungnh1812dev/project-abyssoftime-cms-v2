@@ -17,31 +17,31 @@ import (
 // ---- mock usecases ---------------------------------------------------------
 
 type mockDocumentUC struct {
-	saveFn         func(ctx context.Context, doc *entity.Document, userID string) (*entity.Document, error)
-	getPublishedFn func(ctx context.Context, entryID, locale string) (*entity.Document, error)
-	getForEditFn   func(ctx context.Context, entryID, locale string) (*entity.Document, string, error)
-	publishFn      func(ctx context.Context, entryID, locale, userID string) error
-	unpublishFn    func(ctx context.Context, entryID, locale string) error
-	deleteFn       func(ctx context.Context, entryID string) error
+	saveFn         func(ctx context.Context, contentTypeSlug string, doc *entity.Document, userID string) (*entity.Document, error)
+	getPublishedFn func(ctx context.Context, contentTypeSlug, documentID, locale string) (*entity.Document, error)
+	getForEditFn   func(ctx context.Context, contentTypeSlug, documentID, locale string) (*entity.Document, string, error)
+	publishFn      func(ctx context.Context, contentTypeSlug, documentID, locale, userID string) error
+	unpublishFn    func(ctx context.Context, contentTypeSlug, documentID, locale string) error
+	deleteFn       func(ctx context.Context, contentTypeSlug, documentID string) error
 }
 
-func (m *mockDocumentUC) Save(ctx context.Context, doc *entity.Document, userID string) (*entity.Document, error) {
-	return m.saveFn(ctx, doc, userID)
+func (m *mockDocumentUC) Save(ctx context.Context, contentTypeSlug string, doc *entity.Document, userID string) (*entity.Document, error) {
+	return m.saveFn(ctx, contentTypeSlug, doc, userID)
 }
-func (m *mockDocumentUC) GetPublished(ctx context.Context, entryID, locale string) (*entity.Document, error) {
-	return m.getPublishedFn(ctx, entryID, locale)
+func (m *mockDocumentUC) GetPublished(ctx context.Context, contentTypeSlug, documentID, locale string) (*entity.Document, error) {
+	return m.getPublishedFn(ctx, contentTypeSlug, documentID, locale)
 }
-func (m *mockDocumentUC) GetForEdit(ctx context.Context, entryID, locale string) (*entity.Document, string, error) {
-	return m.getForEditFn(ctx, entryID, locale)
+func (m *mockDocumentUC) GetForEdit(ctx context.Context, contentTypeSlug, documentID, locale string) (*entity.Document, string, error) {
+	return m.getForEditFn(ctx, contentTypeSlug, documentID, locale)
 }
-func (m *mockDocumentUC) Publish(ctx context.Context, entryID, locale, userID string) error {
-	return m.publishFn(ctx, entryID, locale, userID)
+func (m *mockDocumentUC) Publish(ctx context.Context, contentTypeSlug, documentID, locale, userID string) error {
+	return m.publishFn(ctx, contentTypeSlug, documentID, locale, userID)
 }
-func (m *mockDocumentUC) Unpublish(ctx context.Context, entryID, locale string) error {
-	return m.unpublishFn(ctx, entryID, locale)
+func (m *mockDocumentUC) Unpublish(ctx context.Context, contentTypeSlug, documentID, locale string) error {
+	return m.unpublishFn(ctx, contentTypeSlug, documentID, locale)
 }
-func (m *mockDocumentUC) Delete(ctx context.Context, entryID string) error {
-	return m.deleteFn(ctx, entryID)
+func (m *mockDocumentUC) Delete(ctx context.Context, contentTypeSlug, documentID string) error {
+	return m.deleteFn(ctx, contentTypeSlug, documentID)
 }
 
 type mockContentTypeUC struct {
@@ -58,7 +58,6 @@ func ctxWithRequest(r *http.Request) context.Context {
 	return resolver.WithRequest(context.Background(), r)
 }
 
-// authedCtx injects userID/role directly — simulates context after AuthDirective runs.
 func authedCtx() context.Context {
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, middleware.ContextKeyUserID, "user-123")
@@ -66,10 +65,10 @@ func authedCtx() context.Context {
 	return ctx
 }
 
-func sampleDoc(entryID string) *entity.Document {
+func sampleDoc(documentID string) *entity.Document {
 	now := time.Now().UTC()
 	return &entity.Document{
-		ID: "doc-1", EntryID: entryID, Version: entity.VersionDraft,
+		DocumentID: documentID, Version: entity.VersionDraft,
 		ContentTypeID: "ct-1", Data: map[string]any{"title": "Hello"},
 		Locale: "en", CreatedAt: now, UpdatedAt: now,
 		CreatedBy: "user-1", UpdatedBy: "user-1",
@@ -141,29 +140,29 @@ func TestAuthDirective_NoRequestInCtx_Unauthorized(t *testing.T) {
 
 func TestPublishedDocument_Found(t *testing.T) {
 	docUC := &mockDocumentUC{
-		getPublishedFn: func(_ context.Context, entryID, locale string) (*entity.Document, error) {
-			return sampleDoc(entryID), nil
+		getPublishedFn: func(_ context.Context, _, documentID, locale string) (*entity.Document, error) {
+			return sampleDoc(documentID), nil
 		},
 	}
 	r := &resolver.Resolver{DocumentUC: docUC, ContentTypeUC: &mockContentTypeUC{}}
 	locale := "en"
-	doc, err := r.Query().PublishedDocument(context.Background(), "entry-1", &locale)
+	doc, err := r.Query().PublishedDocument(context.Background(), "blog", "doc-1", &locale)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if doc == nil || doc.EntryID != "entry-1" {
-		t.Errorf("got %+v, want EntryID entry-1", doc)
+	if doc == nil || doc.DocumentID != "doc-1" {
+		t.Errorf("got %+v, want DocumentID doc-1", doc)
 	}
 }
 
 func TestPublishedDocument_NotFound_ReturnsNil(t *testing.T) {
 	docUC := &mockDocumentUC{
-		getPublishedFn: func(_ context.Context, _, _ string) (*entity.Document, error) {
+		getPublishedFn: func(_ context.Context, _, _, _ string) (*entity.Document, error) {
 			return nil, pkgerrors.ErrNotFound
 		},
 	}
 	r := &resolver.Resolver{DocumentUC: docUC, ContentTypeUC: &mockContentTypeUC{}}
-	doc, err := r.Query().PublishedDocument(context.Background(), "entry-1", nil)
+	doc, err := r.Query().PublishedDocument(context.Background(), "blog", "doc-1", nil)
 	if err != nil {
 		t.Fatalf("expected nil error for not-found, got: %v", err)
 	}
@@ -197,9 +196,8 @@ func TestContentTypes(t *testing.T) {
 func TestSaveDocument(t *testing.T) {
 	now := time.Now().UTC()
 	docUC := &mockDocumentUC{
-		saveFn: func(_ context.Context, doc *entity.Document, _ string) (*entity.Document, error) {
-			doc.ID = "doc-1"
-			doc.EntryID = "entry-1"
+		saveFn: func(_ context.Context, _ string, doc *entity.Document, _ string) (*entity.Document, error) {
+			doc.DocumentID = "doc-1"
 			doc.Version = entity.VersionDraft
 			doc.CreatedAt = now
 			doc.UpdatedAt = now
@@ -210,49 +208,49 @@ func TestSaveDocument(t *testing.T) {
 	}
 	r := &resolver.Resolver{DocumentUC: docUC, ContentTypeUC: &mockContentTypeUC{}}
 	locale := "en"
-	doc, err := r.Mutation().SaveDocument(authedCtx(), "entry-1", &locale, map[string]any{"title": "Test"})
+	doc, err := r.Mutation().SaveDocument(authedCtx(), "blog", "doc-1", &locale, map[string]any{"title": "Test"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if doc == nil || doc.EntryID != "entry-1" {
-		t.Errorf("got %+v, want EntryID entry-1", doc)
+	if doc == nil || doc.DocumentID != "doc-1" {
+		t.Errorf("got %+v, want DocumentID doc-1", doc)
 	}
 }
 
 func TestPublishDocument(t *testing.T) {
 	now := time.Now().UTC()
 	published := &entity.Document{
-		ID: "doc-pub", EntryID: "entry-1", Version: entity.VersionPublished,
+		DocumentID: "doc-1", Version: entity.VersionPublished,
 		ContentTypeID: "ct-1", Data: map[string]any{"k": "v"},
 		Locale: "en", CreatedAt: now, UpdatedAt: now, PublishedAt: now,
 		CreatedBy: "u", UpdatedBy: "u", PublishedBy: "user-123",
 	}
 	docUC := &mockDocumentUC{
-		publishFn:      func(_ context.Context, _, _, _ string) error { return nil },
-		getPublishedFn: func(_ context.Context, _, _ string) (*entity.Document, error) { return published, nil },
+		publishFn:      func(_ context.Context, _, _, _, _ string) error { return nil },
+		getPublishedFn: func(_ context.Context, _, _, _ string) (*entity.Document, error) { return published, nil },
 	}
 	r := &resolver.Resolver{DocumentUC: docUC, ContentTypeUC: &mockContentTypeUC{}}
 	locale := "en"
-	doc, err := r.Mutation().PublishDocument(authedCtx(), "entry-1", &locale)
+	doc, err := r.Mutation().PublishDocument(authedCtx(), "blog", "doc-1", &locale)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if doc == nil || doc.EntryID != "entry-1" {
-		t.Errorf("got %+v, want EntryID entry-1", doc)
+	if doc == nil || doc.DocumentID != "doc-1" {
+		t.Errorf("got %+v, want DocumentID doc-1", doc)
 	}
 }
 
 func TestUnpublishDocument(t *testing.T) {
-	draft := sampleDoc("entry-1")
+	draft := sampleDoc("doc-1")
 	docUC := &mockDocumentUC{
-		unpublishFn: func(_ context.Context, _, _ string) error { return nil },
-		getForEditFn: func(_ context.Context, entryID, _ string) (*entity.Document, string, error) {
+		unpublishFn: func(_ context.Context, _, _, _ string) error { return nil },
+		getForEditFn: func(_ context.Context, _, documentID, _ string) (*entity.Document, string, error) {
 			return draft, "draft", nil
 		},
 	}
 	r := &resolver.Resolver{DocumentUC: docUC, ContentTypeUC: &mockContentTypeUC{}}
 	locale := "en"
-	doc, err := r.Mutation().UnpublishDocument(authedCtx(), "entry-1", &locale)
+	doc, err := r.Mutation().UnpublishDocument(authedCtx(), "blog", "doc-1", &locale)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -263,10 +261,10 @@ func TestUnpublishDocument(t *testing.T) {
 
 func TestDeleteDocument(t *testing.T) {
 	docUC := &mockDocumentUC{
-		deleteFn: func(_ context.Context, _ string) error { return nil },
+		deleteFn: func(_ context.Context, _, _ string) error { return nil },
 	}
 	r := &resolver.Resolver{DocumentUC: docUC, ContentTypeUC: &mockContentTypeUC{}}
-	ok, err := r.Mutation().DeleteDocument(authedCtx(), "entry-1")
+	ok, err := r.Mutation().DeleteDocument(authedCtx(), "blog", "doc-1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
