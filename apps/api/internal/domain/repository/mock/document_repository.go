@@ -14,8 +14,10 @@ type DocumentRepository struct {
 	FindPublishedByDocumentIDFn func(ctx context.Context, contentTypeSlug, documentID, locale string) (*entity.Document, error)
 	UpsertDraftFn               func(ctx context.Context, contentTypeSlug string, doc *entity.Document) error
 	UpsertPublishedFn           func(ctx context.Context, contentTypeSlug string, doc *entity.Document) error
-	FindDraftsByContentTypeFn   func(ctx context.Context, contentTypeSlug string) ([]*entity.Document, error)
-	DeleteByDocumentIDFn        func(ctx context.Context, contentTypeSlug, documentID, locale string) error
+	FindDraftsByContentTypeFn            func(ctx context.Context, contentTypeSlug string) ([]*entity.Document, error)
+	FindDraftsByContentTypePaginatedFn   func(ctx context.Context, contentTypeSlug string, start, size int, locale string) ([]*entity.Document, int64, error)
+	FindPublishedByDocumentIDsFn         func(ctx context.Context, contentTypeSlug string, documentIDs []string, locale string) ([]*entity.Document, error)
+	DeleteByDocumentIDFn                 func(ctx context.Context, contentTypeSlug, documentID, locale string) error
 	DeletePublishedByDocumentIDFn func(ctx context.Context, contentTypeSlug, documentID, locale string) error
 	DeleteAllByContentTypeFn    func(ctx context.Context, contentTypeSlug string) error
 	EnsureCollectionFn          func(ctx context.Context, contentTypeSlug string) error
@@ -40,6 +42,14 @@ func (m *DocumentRepository) UpsertPublished(ctx context.Context, contentTypeSlu
 
 func (m *DocumentRepository) FindDraftsByContentType(ctx context.Context, contentTypeSlug string) ([]*entity.Document, error) {
 	return m.FindDraftsByContentTypeFn(ctx, contentTypeSlug)
+}
+
+func (m *DocumentRepository) FindDraftsByContentTypePaginated(ctx context.Context, contentTypeSlug string, start, size int, locale string) ([]*entity.Document, int64, error) {
+	return m.FindDraftsByContentTypePaginatedFn(ctx, contentTypeSlug, start, size, locale)
+}
+
+func (m *DocumentRepository) FindPublishedByDocumentIDs(ctx context.Context, contentTypeSlug string, documentIDs []string, locale string) ([]*entity.Document, error) {
+	return m.FindPublishedByDocumentIDsFn(ctx, contentTypeSlug, documentIDs, locale)
 }
 
 func (m *DocumentRepository) DeleteByDocumentID(ctx context.Context, contentTypeSlug, documentID, locale string) error {
