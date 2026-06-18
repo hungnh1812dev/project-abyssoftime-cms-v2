@@ -64,7 +64,7 @@ func (s *Syncer) syncOne(ctx context.Context, def ContentTypeDefinition) error {
 		if !pkgerrors.Is(err, pkgerrors.ErrNotFound) {
 			return err
 		}
-		ct := &entity.ContentType{Name: def.Name, Slug: def.Slug, Kind: kind, Fields: def.Fields}
+		ct := &entity.ContentType{Name: def.Name, Slug: def.Slug, Kind: kind, Fields: def.Fields, ListFields: def.ListFields}
 		if err := s.Create(ctx, ct); err != nil {
 			return err
 		}
@@ -75,13 +75,26 @@ func (s *Syncer) syncOne(ctx context.Context, def ContentTypeDefinition) error {
 		return err
 	}
 
-	if current.Name == def.Name && current.Kind == kind && fieldsEqual(current.Fields, def.Fields) {
+	if current.Name == def.Name && current.Kind == kind && fieldsEqual(current.Fields, def.Fields) && stringSliceEqual(current.ListFields, def.ListFields) {
 		return nil
 	}
 	current.Name = def.Name
 	current.Kind = kind
 	current.Fields = def.Fields
+	current.ListFields = def.ListFields
 	return s.Update(ctx, current)
+}
+
+func stringSliceEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func fieldsEqual(a, b []entity.FieldDefinition) bool {

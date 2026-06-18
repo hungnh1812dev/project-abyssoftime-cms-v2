@@ -11,12 +11,12 @@ import {
   usePublishDocument,
   useUnpublishDocument,
 } from "@/hooks/useDocuments";
-import { ContentDetailLayout } from "../layout/ContentDetailLayout";
+import { ContentDetailLayout } from "../content-type/ContentDetailLayout";
 import { FormProvider } from "@/components/form/FormProvider";
 import { Button } from "@/components/ui/button";
 import { useCmsFormState } from "@/components/form/FormStateContext";
 import type { ContentType, Document } from "@/types/cms";
-import { renderSchemaField } from "../content-type/ContentTypeBuilder";
+import { renderSchemaField } from "../content-type/renderSchemaField";
 
 interface Props {
   contentType: ContentType;

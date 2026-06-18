@@ -11,7 +11,7 @@ import {
 import { api } from "@/lib/api";
 import type { ContentType, Document as CmsDocument } from "@/types/cms";
 import { useState } from "react";
-import { ContentDetailLayout } from "../layout/ContentDetailLayout";
+import { ContentDetailLayout } from "./ContentDetailLayout";
 import { ContentTypeBuilder } from "./ContentTypeBuilder";
 
 interface Props {

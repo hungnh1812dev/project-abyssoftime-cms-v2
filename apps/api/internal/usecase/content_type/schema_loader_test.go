@@ -44,6 +44,16 @@ func TestLoadDefinitions_Valid(t *testing.T) {
 	if blogPost.Kind != "collection" {
 		t.Errorf("blogPost.Kind = %q, want %q", blogPost.Kind, "collection")
 	}
+	if len(blogPost.ListFields) != 1 || blogPost.ListFields[0] != "title" {
+		t.Errorf("blogPost.ListFields = %v, want [title]", blogPost.ListFields)
+	}
+}
+
+func TestLoadDefinitions_ListFieldsInvalidRef(t *testing.T) {
+	_, err := contenttype.LoadDefinitions("testdata/invalid/listfields-invalid-ref")
+	if err == nil {
+		t.Fatal("LoadDefinitions() error = nil, want error for listFields referencing nonexistent field")
+	}
 }
 
 func TestLoadDefinitions_Malformed(t *testing.T) {

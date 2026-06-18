@@ -17,11 +17,12 @@ type FieldDefinition struct {
 }
 
 type ContentType struct {
-	ID        string            `bson:"_id,omitempty"`
-	Name      string            `bson:"name"`
-	Slug      string            `bson:"slug"`
-	Kind      ContentKind       `bson:"kind"`
-	Fields    []FieldDefinition `json:"Fields,omitempty" bson:"fields,omitempty"`
-	CreatedAt time.Time         `bson:"createdAt"`
-	UpdatedAt time.Time         `bson:"updatedAt"`
+	ID         string            `bson:"_id,omitempty"`
+	Name       string            `bson:"name"`
+	Slug       string            `bson:"slug"`
+	Kind       ContentKind       `bson:"kind"`
+	Fields     []FieldDefinition `json:"Fields,omitempty" bson:"fields,omitempty"`
+	ListFields []string          `json:"listFields,omitempty" bson:"listFields,omitempty"`
+	CreatedAt  time.Time         `bson:"createdAt"`
+	UpdatedAt  time.Time         `bson:"updatedAt"`
 }

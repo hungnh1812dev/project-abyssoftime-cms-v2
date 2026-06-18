@@ -11,10 +11,11 @@ import (
 )
 
 type ContentTypeDefinition struct {
-	Slug   string                   `json:"slug"`
-	Name   string                   `json:"name"`
-	Kind   string                   `json:"kind"`
-	Fields []entity.FieldDefinition `json:"fields"`
+	Slug       string                   `json:"slug"`
+	Name       string                   `json:"name"`
+	Kind       string                   `json:"kind"`
+	ListFields []string                 `json:"listFields,omitempty"`
+	Fields     []entity.FieldDefinition `json:"fields"`
 }
 
 // LoadDefinitions reads every *.json file in dir and parses it into a
@@ -51,7 +52,26 @@ func LoadDefinitions(dir string) ([]ContentTypeDefinition, error) {
 }
 
 func validateDefinition(def ContentTypeDefinition, path string) error {
-	return validateFields(def.Fields, path, 1)
+	if err := validateFields(def.Fields, path, 1); err != nil {
+		return err
+	}
+	return validateListFields(def, path)
+}
+
+func validateListFields(def ContentTypeDefinition, path string) error {
+	if len(def.ListFields) == 0 {
+		return nil
+	}
+	fieldNames := make(map[string]bool, len(def.Fields))
+	for _, f := range def.Fields {
+		fieldNames[f.Name] = true
+	}
+	for _, lf := range def.ListFields {
+		if !fieldNames[lf] {
+			return fmt.Errorf("%q: listFields entry %q does not match any field name", path, lf)
+		}
+	}
+	return nil
 }
 
 func validateFields(fields []entity.FieldDefinition, path string, depth int) error {

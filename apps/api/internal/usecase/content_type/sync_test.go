@@ -229,6 +229,90 @@ func TestSync_UpdatesFieldsWhenChanged(t *testing.T) {
 	}
 }
 
+func TestSync_CreatesContentTypeWithListFields(t *testing.T) {
+	repo := &repomock.ContentTypeRepository{}
+	repo.FindAllFn = func(_ context.Context) ([]*entity.ContentType, error) { return nil, nil }
+	repo.FindBySlugFn = func(_ context.Context, _ string) (*entity.ContentType, error) {
+		return nil, pkgerrors.ErrNotFound
+	}
+	var created *entity.ContentType
+	repo.CreateFn = func(_ context.Context, ct *entity.ContentType) error {
+		ct.ID = "ct-new"
+		created = ct
+		return nil
+	}
+
+	entries := &fakeEntryManager{}
+	docRepo := &repomock.DocumentRepository{}
+	syncer := contenttype.NewSyncer(contenttype.New(repo), entries, docRepo)
+
+	defs := []contenttype.ContentTypeDefinition{
+		{
+			Slug: "articles", Name: "Articles", Kind: "collection",
+			ListFields: []string{"title", "slug"},
+			Fields: []entity.FieldDefinition{
+				{Name: "title", Type: "text"},
+				{Name: "slug", Type: "text"},
+				{Name: "body", Type: "richtext"},
+			},
+		},
+	}
+	if err := syncer.Sync(ctx, defs); err != nil {
+		t.Fatalf("Sync() error = %v", err)
+	}
+	if created == nil {
+		t.Fatal("Sync() did not create a content type")
+	}
+	if len(created.ListFields) != 2 || created.ListFields[0] != "title" || created.ListFields[1] != "slug" {
+		t.Errorf("Sync() created ContentType.ListFields = %v, want [title slug]", created.ListFields)
+	}
+}
+
+func TestSync_UpdatesWhenListFieldsChanged(t *testing.T) {
+	existing := &entity.ContentType{
+		ID:         "ct-1",
+		Slug:       "articles",
+		Name:       "Articles",
+		Kind:       entity.KindCollection,
+		Fields:     []entity.FieldDefinition{{Name: "title", Type: "text"}, {Name: "body", Type: "richtext"}},
+		ListFields: []string{"title"},
+	}
+
+	repo := &repomock.ContentTypeRepository{}
+	repo.FindAllFn = func(_ context.Context) ([]*entity.ContentType, error) {
+		return []*entity.ContentType{existing}, nil
+	}
+	repo.FindBySlugFn = func(_ context.Context, _ string) (*entity.ContentType, error) {
+		return existing, nil
+	}
+	var updated *entity.ContentType
+	repo.UpdateFn = func(_ context.Context, ct *entity.ContentType) error {
+		updated = ct
+		return nil
+	}
+
+	entries := &fakeEntryManager{}
+	docRepo := &repomock.DocumentRepository{}
+	syncer := contenttype.NewSyncer(contenttype.New(repo), entries, docRepo)
+
+	defs := []contenttype.ContentTypeDefinition{
+		{
+			Slug: "articles", Name: "Articles", Kind: "collection",
+			ListFields: []string{"title", "body"},
+			Fields:     []entity.FieldDefinition{{Name: "title", Type: "text"}, {Name: "body", Type: "richtext"}},
+		},
+	}
+	if err := syncer.Sync(ctx, defs); err != nil {
+		t.Fatalf("Sync() error = %v", err)
+	}
+	if updated == nil {
+		t.Fatal("Sync() did not update the content type when ListFields changed")
+	}
+	if len(updated.ListFields) != 2 || updated.ListFields[1] != "body" {
+		t.Errorf("Sync() updated ContentType.ListFields = %v, want [title body]", updated.ListFields)
+	}
+}
+
 func TestSync_RemovesMissingDefinitions_CascadesEntries(t *testing.T) {
 	stale := &entity.ContentType{ID: "ct-stale", Slug: "old-type", Name: "Old Type", Kind: entity.KindCollection}
 

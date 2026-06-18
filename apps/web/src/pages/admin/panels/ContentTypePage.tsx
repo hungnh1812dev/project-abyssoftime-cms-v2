@@ -1,7 +1,7 @@
 import { useContentTypeBySlug } from "@/hooks/useContentTypes";
 import { useParams } from "react-router-dom";
 import { CollectionListPage } from "./collection-type/layout/CollectionListPage";
-import { ContentTypePanel } from "./ContentTypePanel";
+import { ContentTypePanel } from "./content-type/ContentTypePanel";
 
 export function ContentTypePage() {
   const { slug } = useParams<{ slug: string }>();

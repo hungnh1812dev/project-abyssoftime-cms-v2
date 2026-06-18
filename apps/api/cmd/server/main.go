@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 
-	gqlhandler "github.com/99designs/gqlgen/graphql/handler"
 	"project-abyssoftime-cms-v2/api/graphql/codegen"
 	"project-abyssoftime-cms-v2/api/graphql/generated"
 	"project-abyssoftime-cms-v2/api/graphql/resolver"
@@ -22,6 +21,8 @@ import (
 	docuc "project-abyssoftime-cms-v2/api/internal/usecase/document"
 	mediauc "project-abyssoftime-cms-v2/api/internal/usecase/media"
 	pkgjwt "project-abyssoftime-cms-v2/api/pkg/jwt"
+
+	gqlhandler "github.com/99designs/gqlgen/graphql/handler"
 )
 
 func newStorageAdapter(ctx context.Context, cfg *config.Config) (repository.StorageAdapter, error) {
@@ -118,18 +119,21 @@ func main() {
 		fmt.Fprint(w, `{"status":"ok"}`)
 	})
 
+	// auth routes
 	mux.HandleFunc("GET /auth/setup", authHandler.SetupStatus)
 	mux.HandleFunc("POST /auth/register", authHandler.Register)
 	mux.HandleFunc("POST /auth/login", authHandler.Login)
 	mux.HandleFunc("POST /auth/refresh", authHandler.Refresh)
 	mux.HandleFunc("POST /auth/logout", authHandler.Logout)
 
+	// content type routes
 	adminOnly := func(h http.HandlerFunc) http.Handler {
 		return middleware.Auth(middleware.RequireRole("admin", h))
 	}
-	mux.Handle("GET /api/content-types/all", adminOnly(ctHandler.ListSummary))
+	mux.Handle("GET /api/content-types", adminOnly(ctHandler.ListSummary))
 	mux.Handle("GET /api/content-types/{identifier}", adminOnly(ctHandler.Get))
 
+	// document routes
 	authRequired := func(h http.HandlerFunc) http.Handler {
 		return middleware.Auth(http.HandlerFunc(h))
 	}
@@ -141,8 +145,10 @@ func main() {
 	mux.Handle("POST /api/document-manager/{slug}/{documentId}/publish", adminOnly(docHandler.Publish))
 	mux.Handle("POST /api/document-manager/{slug}/{documentId}/unpublish", adminOnly(docHandler.Unpublish))
 
+	// public document route, no auth, only returns published documents
 	mux.HandleFunc("GET /api/public/document-manager/{slug}/{documentId}", docHandler.GetPublic)
 
+	// media routes
 	mux.Handle("GET /api/media", adminOnly(mediaHandler.List))
 	mux.Handle("POST /api/media/upload", adminOnly(mediaHandler.Upload))
 	mux.Handle("DELETE /api/media/{id}", adminOnly(mediaHandler.Delete))

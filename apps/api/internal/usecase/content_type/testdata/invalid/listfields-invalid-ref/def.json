@@ -1,8 +1,8 @@
 {
-  "slug": "blog-post",
-  "name": "Blog Post",
+  "slug": "articles",
+  "name": "Articles",
   "kind": "collection",
-  "listFields": ["title"],
+  "listFields": ["title", "nonexistent"],
   "fields": [
     { "name": "title", "type": "text" },
     { "name": "body", "type": "richtext" }
