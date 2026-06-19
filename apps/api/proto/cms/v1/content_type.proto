@@ -1,0 +1,38 @@
+syntax = "proto3";
+package cms.v1;
+option go_package = "project-abyssoftime-cms-v2/api/proto/cms/v1;cmsv1";
+
+import "google/protobuf/timestamp.proto";
+
+message FieldDefinition {
+  string name = 1;
+  string type = 2;
+  repeated string ext = 3;
+  repeated FieldDefinition fields = 4;
+}
+
+message ContentType {
+  string id = 1;
+  string name = 2;
+  string slug = 3;
+  string kind = 4;
+  repeated FieldDefinition fields = 5;
+  repeated string list_fields = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+}
+
+message GetContentTypeRequest {
+  string slug = 1;
+}
+
+message ListContentTypesRequest {}
+
+message ListContentTypesResponse {
+  repeated ContentType content_types = 1;
+}
+
+service ContentTypeService {
+  rpc GetContentType(GetContentTypeRequest) returns (ContentType);
+  rpc ListContentTypes(ListContentTypesRequest) returns (ListContentTypesResponse);
+}
