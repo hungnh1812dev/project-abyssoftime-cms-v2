@@ -1,7 +1,7 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useSingleTypeDocument, useSaveSingleType, usePublishSingleType, useUnpublishSingleType } from '@/hooks/useSingleTypeDocuments';
-import { useCollectionDocument, useUpdateCollectionDocument, usePublishCollectionDocument, useUnpublishCollectionDocument } from '@/hooks/useCollectionDocuments';
+import { useCollectionDocument, useCreateCollectionDocument, useUpdateCollectionDocument, usePublishCollectionDocument, useUnpublishCollectionDocument } from '@/hooks/useCollectionDocuments';
 import { useLocales } from '@/hooks/useLocales';
 import { api } from '@/lib/api';
 import type { Document as CmsDocument, ContentType } from '@/types/cms';
@@ -12,10 +12,12 @@ import { ContentTypeBuilder } from './ContentTypeBuilder';
 interface Props {
   contentType: ContentType;
   id?: string;
+  isNew?: boolean;
 }
 
-export function ContentTypePanel({ contentType, id }: Props) {
+export function ContentTypePanel({ contentType, id, isNew }: Props) {
   const isSingle = contentType.Kind === 'single';
+  const navigate = useNavigate();
   const { data: locales = [] } = useLocales();
   const [locale, setLocale] = useState('');
   const activeLocale = locale || locales[0] || '';
@@ -25,12 +27,13 @@ export function ContentTypePanel({ contentType, id }: Props) {
     activeLocale,
   );
   const collectionQuery = useCollectionDocument(
-    !isSingle ? contentType.Slug : '',
+    !isSingle && !isNew ? contentType.Slug : '',
     id ?? '',
     activeLocale,
   );
 
   const saveSingle = useSaveSingleType();
+  const createCollection = useCreateCollectionDocument();
   const publishSingle = usePublishSingleType();
   const unpublishSingle = useUnpublishSingleType();
 
@@ -38,8 +41,8 @@ export function ContentTypePanel({ contentType, id }: Props) {
   const publishCollection = usePublishCollectionDocument();
   const unpublishCollection = useUnpublishCollectionDocument();
 
-  const isLoading = isSingle ? singleQuery.isLoading : collectionQuery.isLoading;
-  const doc = isSingle ? singleQuery.data : collectionQuery.data;
+  const isLoading = isSingle ? singleQuery.isLoading : (!isNew && collectionQuery.isLoading);
+  const doc = isSingle ? singleQuery.data : (isNew ? undefined : collectionQuery.data);
 
   if (isLoading) {
     return <p className="text-muted-foreground">Loading…</p>;
@@ -47,16 +50,37 @@ export function ContentTypePanel({ contentType, id }: Props) {
 
   if (!doc) {
     const schema = contentType.Fields ?? [];
-    const handleFirstSave = async (data: Record<string, unknown>) => {
-      await saveSingle.mutateAsync({
-        contentTypeSlug: contentType.Slug,
-        locale: activeLocale,
-        data,
-      });
-    };
+    const handleFirstSave = isNew
+      ? async (data: Record<string, unknown>) => {
+          const created = await createCollection.mutateAsync({
+            contentTypeSlug: contentType.Slug,
+            data,
+            locale: activeLocale,
+          });
+          navigate(
+            `/admin/content-type/collection-type/${contentType.Slug}/${created.documentId}?locale=${activeLocale}`,
+            { replace: true },
+          );
+        }
+      : async (data: Record<string, unknown>) => {
+          await saveSingle.mutateAsync({
+            contentTypeSlug: contentType.Slug,
+            locale: activeLocale,
+            data,
+          });
+        };
 
     return (
-      <ContentDetailLayout title={contentType.Name}>
+      <ContentDetailLayout
+        title={contentType.Name}
+        backLink={
+          isNew ? (
+            <Link to=".." relative="path" className="text-muted-foreground text-sm hover:underline">
+              ← Go back
+            </Link>
+          ) : undefined
+        }
+      >
         <ContentTypeBuilder schema={schema} mutationFn={handleFirstSave} />
       </ContentDetailLayout>
     );
