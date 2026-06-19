@@ -47,14 +47,14 @@ function renderSidebar(token = SUPER_ADMIN_TOKEN) {
 
 describe('Sidebar', () => {
   it('renders content type names fetched from the API', async () => {
-    mock.onGet('/api/content-types/all').reply(200, contentTypes)
+    mock.onGet('/api/content-types').reply(200, contentTypes)
     renderSidebar()
     await waitFor(() => expect(screen.getByText('Blog')).toBeInTheDocument())
     expect(screen.getByText('About')).toBeInTheDocument()
   })
 
   it('renders nav links pointing to new content-type routes by kind', async () => {
-    mock.onGet('/api/content-types/all').reply(200, contentTypes)
+    mock.onGet('/api/content-types').reply(200, contentTypes)
     renderSidebar()
     await waitFor(() => expect(screen.getByRole('link', { name: 'Blog' })).toBeInTheDocument())
     expect(screen.getByRole('link', { name: 'Blog' })).toHaveAttribute(
@@ -68,7 +68,7 @@ describe('Sidebar', () => {
   })
 
   it('renders no content-type links when no content types exist', async () => {
-    mock.onGet('/api/content-types/all').reply(200, [])
+    mock.onGet('/api/content-types').reply(200, [])
     renderSidebar()
     await waitFor(() =>
       expect(screen.getByRole('link', { name: /media library/i })).toBeInTheDocument(),
@@ -78,7 +78,7 @@ describe('Sidebar', () => {
   })
 
   it('groups content types into Single Types and Collection Types sections', async () => {
-    mock.onGet('/api/content-types/all').reply(200, contentTypes)
+    mock.onGet('/api/content-types').reply(200, contentTypes)
     renderSidebar()
 
     await waitFor(() => expect(screen.getByText('Blog')).toBeInTheDocument())
@@ -100,7 +100,7 @@ describe('Sidebar', () => {
   })
 
   it('omits a section heading when no content type of that kind exists', async () => {
-    mock.onGet('/api/content-types/all').reply(200, [contentTypes[0]]) // collection only
+    mock.onGet('/api/content-types').reply(200, [contentTypes[0]]) // collection only
     renderSidebar()
 
     await waitFor(() => expect(screen.getByText('Blog')).toBeInTheDocument())
@@ -109,7 +109,7 @@ describe('Sidebar', () => {
   })
 
   it('renders a Settings section with a Media Library link to /admin/settings/media', async () => {
-    mock.onGet('/api/content-types/all').reply(200, [])
+    mock.onGet('/api/content-types').reply(200, [])
     renderSidebar()
 
     await waitFor(() =>
