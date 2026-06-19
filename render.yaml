@@ -2,17 +2,18 @@ services:
   # ── Go API (Web Service, free tier) ──────────────────────────────────────────
   - type: web
     name: cms-api
-    runtime: docker
+    runtime: go
     plan: free
-    dockerfilePath: ./apps/api/Dockerfile
-    dockerContext: ./apps/api
+    rootDir: apps/api
+    buildCommand: go build -trimpath -ldflags="-s -w" -o server ./cmd/server
+    startCommand: ./server
     envVars:
       - key: PORT
         value: "8080"
       - key: MONGODB_URI
-        sync: false  # Set manually — use MongoDB Atlas connection string
+        sync: false # Set manually — use MongoDB Atlas connection string
       - key: MONGODB_DB
-        value: "cms"
+        value: "abyssoftime-cms"
       - key: JWT_SECRET
         generateValue: true
       - key: STORAGE_PROVIDER
@@ -32,7 +33,6 @@ services:
   - type: web
     name: cms-web
     runtime: static
-    plan: free
     buildCommand: cd apps/web && npm ci && npm run build
     staticPublishPath: apps/web/dist
     headers:
