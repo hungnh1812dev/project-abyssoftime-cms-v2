@@ -1,0 +1,42 @@
+syntax = "proto3";
+package cms.v1;
+option go_package = "project-abyssoftime-cms-v2/api/proto/cms/v1;cmsv1";
+
+import "google/protobuf/timestamp.proto";
+
+message MediaAsset {
+  string id = 1;
+  string document_id = 2;
+  string url = 3;
+  string thumbnail_url = 4;
+  string public_id = 5;
+  string file_name = 6;
+  string file_ext = 7;
+  string hash = 8;
+  string content_type_id = 9;
+  string document_ref = 10;
+  google.protobuf.Timestamp created_at = 11;
+}
+
+message ListMediaRequest {
+  int32 page = 1;
+  int32 limit = 2;
+}
+
+message ListMediaResponse {
+  repeated MediaAsset assets = 1;
+  int64 total = 2;
+}
+
+message DeleteMediaRequest {
+  string id = 1;
+}
+
+message DeleteMediaResponse {
+  bool success = 1;
+}
+
+service MediaService {
+  rpc ListMedia(ListMediaRequest) returns (ListMediaResponse);
+  rpc DeleteMedia(DeleteMediaRequest) returns (DeleteMediaResponse);
+}

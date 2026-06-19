@@ -1,0 +1,10 @@
+{
+  "slug": "articles",
+  "name": "Articles",
+  "kind": "collection",
+  "listFields": ["title", "nonexistent"],
+  "fields": [
+    { "name": "title", "type": "text" },
+    { "name": "body", "type": "richtext" }
+  ]
+}

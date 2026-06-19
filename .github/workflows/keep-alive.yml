@@ -1,0 +1,14 @@
+name: Keep API Awake
+
+on:
+  schedule:
+    # Run every 14 minutes to prevent Render's free tier from sleeping (sleeps after 15m of inactivity)
+    - cron: '*/14 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping API Health Endpoint
+        run: curl -fsSL "https://cms-api.onrender.com/health" > /dev/null

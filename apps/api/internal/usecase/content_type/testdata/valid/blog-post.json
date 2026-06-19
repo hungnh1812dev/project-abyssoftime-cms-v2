@@ -1,0 +1,10 @@
+{
+  "slug": "blog-post",
+  "name": "Blog Post",
+  "kind": "collection",
+  "listFields": ["title"],
+  "fields": [
+    { "name": "title", "type": "text" },
+    { "name": "body", "type": "richtext" }
+  ]
+}

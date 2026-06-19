@@ -1,0 +1,12 @@
+{
+  "slug": "bad-depth",
+  "name": "Bad Depth",
+  "kind": "single",
+  "fields": [
+    { "name": "outer", "type": "component", "fields": [
+      { "name": "inner", "type": "component", "fields": [
+        { "name": "title", "type": "text" }
+      ]}
+    ]}
+  ]
+}
