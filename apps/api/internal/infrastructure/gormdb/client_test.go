@@ -28,4 +28,12 @@ func TestNewClient_SQLite(t *testing.T) {
 	}
 }
 
-// AutoMigrate is tested after C-2 adds GORM struct tags to entities.
+func TestAutoMigrate_SQLite(t *testing.T) {
+	db, err := NewClient("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	if err := AutoMigrate(db); err != nil {
+		t.Fatalf("AutoMigrate: %v", err)
+	}
+}

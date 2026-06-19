@@ -2,9 +2,6 @@ package entity
 
 import "time"
 
-// DocumentVersion distinguishes the two physical records (in the same
-// collection) that make up one logical entry: its draft and its published
-// snapshot.
 type DocumentVersion string
 
 const (
@@ -13,15 +10,16 @@ const (
 )
 
 type Document struct {
-	DocumentID    string          `bson:"documentId" json:"documentId"`
-	Version       DocumentVersion `bson:"version" json:"version"`
-	ContentTypeID string          `bson:"contentTypeId" json:"contentTypeId"`
-	Data          map[string]any  `bson:"data" json:"data"`
-	Locale        string          `bson:"locale" json:"locale"`
-	CreatedAt     time.Time       `bson:"createdAt" json:"createdAt"`
-	UpdatedAt     time.Time       `bson:"updatedAt" json:"updatedAt"`
-	PublishedAt   time.Time       `bson:"publishedAt,omitempty" json:"publishedAt,omitempty"`
-	CreatedBy     string          `bson:"createdBy" json:"createdBy"`
-	UpdatedBy     string          `bson:"updatedBy" json:"updatedBy"`
-	PublishedBy   string          `bson:"publishedBy,omitempty" json:"publishedBy,omitempty"`
+	DocumentID    string          `bson:"documentId"                json:"documentId"              gorm:"column:document_id;index"`
+	Version       DocumentVersion `bson:"version"                   json:"version"                 gorm:"column:version;type:varchar(20)"`
+	ContentTypeID string          `bson:"contentTypeId"             json:"contentTypeId"           gorm:"column:content_type_id"`
+	Data          map[string]any  `bson:"data"                      json:"data"                    gorm:"column:data;serializer:json"`
+	Locale        string          `bson:"locale"                    json:"locale"                  gorm:"column:locale"`
+	CreatedAt     time.Time       `bson:"createdAt"                 json:"createdAt"               gorm:"column:created_at"`
+	UpdatedAt     time.Time       `bson:"updatedAt"                 json:"updatedAt"               gorm:"column:updated_at"`
+	PublishedAt   time.Time       `bson:"publishedAt,omitempty"     json:"publishedAt,omitempty"   gorm:"column:published_at"`
+	CreatedBy     string          `bson:"createdBy"                 json:"createdBy"               gorm:"column:created_by"`
+	UpdatedBy     string          `bson:"updatedBy"                 json:"updatedBy"               gorm:"column:updated_by"`
+	PublishedBy   string          `bson:"publishedBy,omitempty"     json:"publishedBy,omitempty"   gorm:"column:published_by"`
+	Slug          string          `bson:"-"                         json:"-"                       gorm:"column:slug;index"`
 }
