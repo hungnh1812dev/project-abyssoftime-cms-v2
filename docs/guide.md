@@ -647,58 +647,83 @@ npm run lint          # ESLint
 npm run build         # Production build (catches TS errors)
 ```
 
-### Render.com
+### Render.com (free plan)
 
-The CMS is designed to run as a single Render service using `docker-compose`.
+The CMS deploys as **two Render services** + external MongoDB:
 
-**Setup:**
+| Service | Render type | What it runs |
+|---------|-------------|--------------|
+| `cms-api` | Web Service (Docker) | Go API binary from `apps/api/Dockerfile` |
+| `cms-web` | Static Site | Built React app from `apps/web/dist/` |
+| MongoDB | *(external)* | MongoDB Atlas free tier (Render doesn't offer free MongoDB) |
 
-1. Create a new **Web Service** on Render.
-2. Connect your GitHub repository.
-3. Set the build command: `docker-compose build`
-4. Set the start command: `docker-compose up`
-5. Add environment variables in the Render dashboard:
+A `render.yaml` blueprint at the repo root configures both services automatically.
 
-| Variable | Value |
-|----------|-------|
-| `PORT` | `8080` |
-| `MONGODB_URI` | Your MongoDB Atlas connection string |
-| `MONGODB_DB` | `cms` |
-| `JWT_SECRET` | A strong random string (32+ chars) |
-| `STORAGE_PROVIDER` | `cloudinary` or `s3` |
-| `CLOUDINARY_CLOUD_NAME` | *(if using Cloudinary)* |
-| `CLOUDINARY_API_KEY` | *(if using Cloudinary)* |
-| `CLOUDINARY_API_SECRET` | *(if using Cloudinary)* |
-| `SUPPORTED_LOCALES` | `en,vi` |
+**Step 1 — Create a MongoDB Atlas cluster (free):**
 
-**Notes:**
-- Use **MongoDB Atlas** (free tier available) for the database — Render does not host MongoDB natively.
-- The first user who registers gets `super_admin`. After that, registration is closed — all users are invited via the admin UI.
-- Set `JWT_SECRET` to a cryptographically random value. Changing it invalidates all existing sessions.
+1. Sign up at [mongodb.com/atlas](https://www.mongodb.com/atlas).
+2. Create a free M0 cluster.
+3. Create a database user and whitelist `0.0.0.0/0` (allow from anywhere) for Render access.
+4. Copy the connection string: `mongodb+srv://user:pass@cluster.mongodb.net`
+
+**Step 2 — Deploy via Render Blueprint:**
+
+1. Go to [Render Dashboard](https://dashboard.render.com) → **New** → **Blueprint**.
+2. Connect your GitHub repo. Render reads `render.yaml` and creates both services.
+3. Fill in the `sync: false` env vars when prompted:
+   - `MONGODB_URI` — your Atlas connection string from Step 1
+   - `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`
+
+**Step 3 — Update rewrite rules (one-time):**
+
+The `render.yaml` configures rewrite rules on the Static Site to proxy `/api/*` and `/auth/*` to the API service. After deploy, verify the API service URL matches the rewrite destinations. If your API service name differs from `cms-api`, update the URLs in `render.yaml`:
+
+```yaml
+routes:
+  - type: rewrite
+    source: /api/*
+    destination: https://<your-api-service>.onrender.com/api/*
+```
+
+**Step 4 — Register the first user:**
+
+Open `https://<your-web-service>.onrender.com/register`. The first account becomes `super_admin`. After that, registration is closed — invite new users from Settings > Users.
+
+**CI integration:**
+
+The GitHub Actions workflow triggers the API deploy hook after tests pass. Set `RENDER_DEPLOY_HOOK_API` in your GitHub repo (Settings > Variables > Actions) with the API service's deploy hook URL from Render. The Static Site auto-deploys when it detects a push — no hook needed.
+
+**Free plan limitations:**
+- Web Service spins down after 15 minutes of inactivity. First request after sleep takes ~30s (cold start).
+- 750 free hours/month across all services.
+- Static Sites are always on (no cold start).
+
+### Docker Compose (self-hosting / VPS)
+
+For self-hosted deployments (VPS, dedicated server), use `docker-compose.yml` which runs the full stack including MongoDB:
+
+```sh
+docker-compose up --build -d
+docker-compose logs -f api    # tail API logs
+docker-compose down           # stop all services
+```
+
+The compose file starts MongoDB (with persistent volume), the API, and the web frontend with nginx proxying API calls. Set env vars in a `.env` file at the repo root.
 
 ### Railway / Fly.io / Other platforms
 
-The CMS runs anywhere that supports Docker. The deployment pattern is the same:
+The CMS runs anywhere that supports Docker:
 
-1. Build the Docker images (`docker-compose build` or individual `Dockerfile`s in `apps/api` and `apps/web`).
-2. Set the environment variables listed in the [Config reference](#config-reference).
-3. Ensure the API can reach MongoDB (Atlas or a co-located instance).
-4. Expose the API port (`PORT`, default `8080`).
+1. **API service:** Deploy `apps/api/Dockerfile`. Set all backend env vars. Expose `PORT`.
+2. **Web service:** Deploy `apps/web/dist/` as static files (run `npm ci && npm run build` first).
+3. **MongoDB:** Use Atlas or a co-located MongoDB instance.
 
-**Split deployment** (API and web as separate services):
+**Routing:** The frontend makes relative API requests (`/api/*`, `/auth/*`). Configure your platform's reverse proxy or rewrite rules to route these to the API service:
 
-If your platform doesn't support `docker-compose`, deploy each service individually:
-
-- **API service:** Use `apps/api/Dockerfile`. Set all backend env vars. Expose `PORT`.
-- **Web service:** Use `apps/web/Dockerfile`. Set `VITE_API_URL` to the API service's public URL. Serves static files after `npm run build`.
-
-**Reverse proxy configuration:**
-
-If running behind a reverse proxy (Nginx, Caddy, Cloudflare):
-
-- Proxy `/api/*`, `/auth/*`, `/graphql` to the API service.
-- Serve the web build output (`apps/web/dist/`) as static files.
-- Set `/*` fallback to `index.html` for client-side routing.
+- `/api/*` → API service
+- `/auth/*` → API service
+- `/graphql` → API service
+- `/*` → `index.html` (SPA fallback)
 
 ### Production checklist
 
