@@ -39,28 +39,22 @@ jobs:
         working-directory: apps/web
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: apps/web/package-lock.json
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
 
       - name: Install dependencies
-        run: npm ci
+        run: bun install --frozen-lockfile
 
       - name: Lint
-        run: npm run lint
+        run: bun run lint
 
       - name: Unit tests
-        run: npm test
+        run: bun run test
 
       - name: Build
-        run: npm run build
-
-
+        run: bun run build
 
   # ── Render deploy hooks (main only) ─────────────────────────────────────────
   # API: Render Web Service (Native Go) — needs manual deploy hook trigger.
