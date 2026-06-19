@@ -1,54 +1,58 @@
-import { useState, useEffect } from 'react'
-import { Controller, type Control } from 'react-hook-form'
-import CodeMirror from '@uiw/react-codemirror'
-import { json } from '@codemirror/lang-json'
+import { useState } from 'react';
+import { Controller, type Control } from 'react-hook-form';
+import CodeMirror from '@uiw/react-codemirror';
+import { json } from '@codemirror/lang-json';
 
 interface JsonInputProps {
-  name?: string
-  control?: Control
+  name?: string;
+  control?: Control;
 }
 
 function serialize(value: unknown): string {
-  if (value == null) return ''
-  return JSON.stringify(value, null, 2)
+  if (value == null) return '';
+  return JSON.stringify(value, null, 2);
 }
 
 function InnerJsonInput({ field }: { field: { value: unknown; onChange: (v: unknown) => void } }) {
-  const [rawValue, setRawValue] = useState(() => serialize(field.value))
-  const [syntaxError, setSyntaxError] = useState<string | null>(null)
+  const [rawValue, setRawValue] = useState(serialize(field.value));
+  const [syntaxError, setSyntaxError] = useState<string | null>(null);
+  const fieldValue = field.value;
 
-  useEffect(() => {
-    setRawValue(serialize(field.value))
-  }, [field.value])
+  const [prevFieldValue, setPrevFieldValue] = useState(field.value);
+
+  if (fieldValue !== prevFieldValue) {
+    setPrevFieldValue(fieldValue);
+    setRawValue(serialize(fieldValue));
+  }
 
   return (
     <div>
-      <div data-testid="json-editor-wrapper" className="min-h-[15em] border border-input rounded-md overflow-hidden">
+      <div data-testid="json-editor-wrapper" className="border-input min-h-[15em] overflow-hidden rounded-md border">
         <CodeMirror
           value={rawValue}
           extensions={[json()]}
           minHeight="15em"
           onChange={(val) => {
-            setRawValue(val)
+            setRawValue(val);
             if (val.trim() === '') {
-              setSyntaxError(null)
-              field.onChange(null)
-              return
+              setSyntaxError(null);
+              field.onChange(null);
+              return;
             }
             try {
-              const parsed = JSON.parse(val)
-              setSyntaxError(null)
-              field.onChange(parsed)
+              const parsed = JSON.parse(val);
+              setSyntaxError(null);
+              field.onChange(parsed);
             } catch {
-              setSyntaxError('Invalid JSON')
-              field.onChange(undefined)
+              setSyntaxError('Invalid JSON');
+              field.onChange(undefined);
             }
           }}
         />
       </div>
       {syntaxError && <p role="alert">{syntaxError}</p>}
     </div>
-  )
+  );
 }
 
 export function JsonInput({ name, control }: JsonInputProps) {
@@ -62,5 +66,5 @@ export function JsonInput({ name, control }: JsonInputProps) {
       }}
       render={({ field }) => <InnerJsonInput field={field} />}
     />
-  )
+  );
 }
