@@ -689,6 +689,40 @@ routes:
 
 Open `https://<your-web-service>.onrender.com/register`. The first account becomes `super_admin`. After that, registration is closed — invite new users from Settings > Users.
 
+**Exposed URLs after deploy:**
+
+Assuming your services are `cms-web.onrender.com` (Static Site) and `cms-api.onrender.com` (API):
+
+| URL | Description |
+|-----|-------------|
+| `https://cms-web.onrender.com` | Admin UI (login → dashboard) |
+| `https://cms-web.onrender.com/login` | Login page |
+| `https://cms-web.onrender.com/register` | First-time setup only (disabled after super_admin created) |
+| `https://cms-web.onrender.com/invite/:token` | Invite accept page |
+| `https://cms-web.onrender.com/admin` | Admin dashboard (requires auth) |
+| `https://cms-web.onrender.com/admin/settings/users` | User management (admin+) |
+| `https://cms-web.onrender.com/admin/settings/access-tokens` | API token management (super_admin) |
+| `https://cms-web.onrender.com/admin/settings/roles` | Permission matrix (super_admin) |
+| `https://cms-web.onrender.com/admin/settings/media` | Media library |
+
+All API calls below are proxied through the Static Site rewrite rules — external consumers can use either the web URL or the direct API URL:
+
+| URL | Auth | Description |
+|-----|------|-------------|
+| `https://cms-api.onrender.com/health` | none | Health check |
+| `https://cms-api.onrender.com/auth/login` | none | Login (POST, returns JWT) |
+| `https://cms-api.onrender.com/auth/setup` | none | Check if super_admin exists |
+| `https://cms-api.onrender.com/api/content-types` | JWT (admin+) | List content type definitions |
+| `https://cms-api.onrender.com/api/document-manager/single-type/:slug` | JWT | Get single-type document |
+| `https://cms-api.onrender.com/api/document-manager/collection-type/:slug` | JWT | List collection entries |
+| `https://cms-api.onrender.com/api/public/document-manager/:slug/:documentId` | none / API token | Public read (published only) |
+| `https://cms-api.onrender.com/api/media` | JWT (editor+) | List media assets |
+| `https://cms-api.onrender.com/api/users` | JWT (admin+) | List users |
+| `https://cms-api.onrender.com/api/invites` | JWT (admin+) | List pending invites |
+| `https://cms-api.onrender.com/api/access-tokens` | JWT (super_admin) | List API tokens |
+| `https://cms-api.onrender.com/api/locales` | none | List supported locales |
+| `https://cms-api.onrender.com/graphql` | mixed | GraphQL endpoint (queries public, mutations require JWT) |
+
 **CI integration:**
 
 The GitHub Actions workflow triggers the API deploy hook after tests pass. Set `RENDER_DEPLOY_HOOK_API` in your GitHub repo (Settings > Variables > Actions) with the API service's deploy hook URL from Render. The Static Site auto-deploys when it detects a push — no hook needed.
