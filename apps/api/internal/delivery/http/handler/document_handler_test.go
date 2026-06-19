@@ -8,25 +8,25 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/gin-gonic/gin"
+
 	"project-abyssoftime-cms-v2/api/internal/delivery/http/handler"
 	"project-abyssoftime-cms-v2/api/internal/domain/entity"
 	pkgerrors "project-abyssoftime-cms-v2/api/pkg/errors"
 )
 
-// ---- mock usecase ----------------------------------------------------------
-
 type mockDocumentUC struct {
-	saveFn              func(ctx context.Context, contentTypeSlug string, doc *entity.Document, userID string) (*entity.Document, error)
-	getForEditFn        func(ctx context.Context, contentTypeSlug, documentID, locale string) (*entity.Document, string, error)
-	getPublishedFn      func(ctx context.Context, contentTypeSlug, documentID, locale string) (*entity.Document, error)
-	publishFn           func(ctx context.Context, contentTypeSlug, documentID, locale, userID string) error
-	unpublishFn         func(ctx context.Context, contentTypeSlug, documentID, locale string) error
-	deleteFn            func(ctx context.Context, contentTypeSlug, documentID string) error
-	getSingleTypeFn     func(ctx context.Context, contentTypeSlug, locale string) (*entity.Document, string, error)
-	saveSingleTypeFn    func(ctx context.Context, contentTypeSlug string, data map[string]any, locale, userID string) (*entity.Document, error)
-	publishSingleTypeFn func(ctx context.Context, contentTypeSlug, locale, userID string) error
+	saveFn                func(ctx context.Context, contentTypeSlug string, doc *entity.Document, userID string) (*entity.Document, error)
+	getForEditFn          func(ctx context.Context, contentTypeSlug, documentID, locale string) (*entity.Document, string, error)
+	getPublishedFn        func(ctx context.Context, contentTypeSlug, documentID, locale string) (*entity.Document, error)
+	publishFn             func(ctx context.Context, contentTypeSlug, documentID, locale, userID string) error
+	unpublishFn           func(ctx context.Context, contentTypeSlug, documentID, locale string) error
+	deleteFn              func(ctx context.Context, contentTypeSlug, documentID string) error
+	getSingleTypeFn       func(ctx context.Context, contentTypeSlug, locale string) (*entity.Document, string, error)
+	saveSingleTypeFn      func(ctx context.Context, contentTypeSlug string, data map[string]any, locale, userID string) (*entity.Document, error)
+	publishSingleTypeFn   func(ctx context.Context, contentTypeSlug, locale, userID string) error
 	unpublishSingleTypeFn func(ctx context.Context, contentTypeSlug, locale string) error
-	getAllPaginatedFn    func(ctx context.Context, contentTypeSlug string, start, size int, locale string) ([]*entity.Document, []string, int64, error)
+	getAllPaginatedFn      func(ctx context.Context, contentTypeSlug string, start, size int, locale string) ([]*entity.Document, []string, int64, error)
 }
 
 func (m *mockDocumentUC) Save(ctx context.Context, s string, d *entity.Document, u string) (*entity.Document, error) {
@@ -78,9 +78,9 @@ func newHandler(uc *mockDocumentUC) *handler.DocumentHandler {
 	return handler.NewDocumentHandler(uc, ctUC)
 }
 
-// ---- Single-type: GetSingleType -------------------------------------------
-
 func TestDocumentHandler_GetSingleType(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
 	t.Run("200 found", func(t *testing.T) {
 		uc := &mockDocumentUC{}
 		uc.getSingleTypeFn = func(_ context.Context, _, _ string) (*entity.Document, string, error) {
@@ -88,13 +88,14 @@ func TestDocumentHandler_GetSingleType(t *testing.T) {
 		}
 		h := newHandler(uc)
 
-		req := httptest.NewRequest(http.MethodGet, "/api/document-manager/single-type/about?locale=en", nil)
-		req.SetPathValue("slug", "about")
 		w := httptest.NewRecorder()
-		h.GetSingleType(w, req)
+		_, r := gin.CreateTestContext(w)
+		r.GET("/api/document-manager/single-type/:slug", h.GetSingleType)
+		req := httptest.NewRequest(http.MethodGet, "/api/document-manager/single-type/about?locale=en", nil)
+		r.ServeHTTP(w, req)
 
 		if w.Code != http.StatusOK {
-			t.Fatalf("GetSingleType() status = %d, want 200", w.Code)
+			t.Fatalf("status = %d, want 200", w.Code)
 		}
 	})
 
@@ -105,20 +106,21 @@ func TestDocumentHandler_GetSingleType(t *testing.T) {
 		}
 		h := newHandler(uc)
 
-		req := httptest.NewRequest(http.MethodGet, "/api/document-manager/single-type/about?locale=en", nil)
-		req.SetPathValue("slug", "about")
 		w := httptest.NewRecorder()
-		h.GetSingleType(w, req)
+		_, r := gin.CreateTestContext(w)
+		r.GET("/api/document-manager/single-type/:slug", h.GetSingleType)
+		req := httptest.NewRequest(http.MethodGet, "/api/document-manager/single-type/about?locale=en", nil)
+		r.ServeHTTP(w, req)
 
 		if w.Code != http.StatusNotFound {
-			t.Fatalf("GetSingleType() status = %d, want 404", w.Code)
+			t.Fatalf("status = %d, want 404", w.Code)
 		}
 	})
 }
 
-// ---- Single-type: SaveSingleType ------------------------------------------
-
 func TestDocumentHandler_SaveSingleType(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
 	uc := &mockDocumentUC{}
 	uc.saveSingleTypeFn = func(_ context.Context, _ string, _ map[string]any, _ string, _ string) (*entity.Document, error) {
 		return &entity.Document{DocumentID: "e1", Locale: "en"}, nil
@@ -128,57 +130,61 @@ func TestDocumentHandler_SaveSingleType(t *testing.T) {
 	}
 	h := newHandler(uc)
 
-	body := map[string]any{"data": map[string]any{"title": "Hello"}}
-	var buf bytes.Buffer
-	_ = json.NewEncoder(&buf).Encode(body)
-	req := httptest.NewRequest(http.MethodPut, "/api/document-manager/single-type/about", &buf)
-	req.SetPathValue("slug", "about")
+	body, _ := json.Marshal(map[string]any{"data": map[string]any{"title": "Hello"}})
 	w := httptest.NewRecorder()
-	h.SaveSingleType(w, req)
+	_, r := gin.CreateTestContext(w)
+	r.PUT("/api/document-manager/single-type/:slug", h.SaveSingleType)
+	req := httptest.NewRequest(http.MethodPut, "/api/document-manager/single-type/about", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
-		t.Fatalf("SaveSingleType() status = %d, want 200", w.Code)
+		t.Fatalf("status = %d, want 200", w.Code)
 	}
 }
 
-// ---- Single-type: Publish/Unpublish ----------------------------------------
-
 func TestDocumentHandler_PublishSingleType(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
 	uc := &mockDocumentUC{}
 	uc.publishSingleTypeFn = func(_ context.Context, _, _, _ string) error { return nil }
 	h := newHandler(uc)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/document-manager/single-type/about/publish", nil)
-	req.SetPathValue("slug", "about")
 	w := httptest.NewRecorder()
-	h.PublishSingleType(w, req)
+	_, r := gin.CreateTestContext(w)
+	r.POST("/api/document-manager/single-type/:slug/publish", h.PublishSingleType)
+	req := httptest.NewRequest(http.MethodPost, "/api/document-manager/single-type/about/publish", nil)
+	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
-		t.Errorf("PublishSingleType() status = %d, want 200", w.Code)
+		t.Errorf("status = %d, want 200", w.Code)
 	}
 }
 
 func TestDocumentHandler_UnpublishSingleType(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
 	uc := &mockDocumentUC{}
 	uc.unpublishSingleTypeFn = func(_ context.Context, _, _ string) error { return nil }
 	h := newHandler(uc)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/document-manager/single-type/about/unpublish", nil)
-	req.SetPathValue("slug", "about")
 	w := httptest.NewRecorder()
-	h.UnpublishSingleType(w, req)
+	_, r := gin.CreateTestContext(w)
+	r.POST("/api/document-manager/single-type/:slug/unpublish", h.UnpublishSingleType)
+	req := httptest.NewRequest(http.MethodPost, "/api/document-manager/single-type/about/unpublish", nil)
+	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
-		t.Errorf("UnpublishSingleType() status = %d, want 200", w.Code)
+		t.Errorf("status = %d, want 200", w.Code)
 	}
 }
 
-// ---- Collection-type: ListCollection ---------------------------------------
-
 func TestDocumentHandler_ListCollection(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
 	t.Run("returns paginated response with projected data", func(t *testing.T) {
 		uc := &mockDocumentUC{}
-		uc.getAllPaginatedFn = func(_ context.Context, _ string, start, size int, _ string) ([]*entity.Document, []string, int64, error) {
+		uc.getAllPaginatedFn = func(_ context.Context, _ string, _, _ int, _ string) ([]*entity.Document, []string, int64, error) {
 			return []*entity.Document{
 				{DocumentID: "d1", Data: map[string]any{"title": "Post 1", "body": "full body"}, Locale: "en"},
 			}, []string{"draft"}, 5, nil
@@ -191,30 +197,31 @@ func TestDocumentHandler_ListCollection(t *testing.T) {
 		}}
 		h := handler.NewDocumentHandler(uc, ctUC)
 
-		req := httptest.NewRequest(http.MethodGet, "/api/document-manager/collection-type/articles?start=0&size=20&locale=en", nil)
-		req.SetPathValue("slug", "articles")
 		w := httptest.NewRecorder()
-		h.ListCollection(w, req)
+		_, r := gin.CreateTestContext(w)
+		r.GET("/api/document-manager/collection-type/:slug", h.ListCollection)
+		req := httptest.NewRequest(http.MethodGet, "/api/document-manager/collection-type/articles?start=0&size=20&locale=en", nil)
+		r.ServeHTTP(w, req)
 
 		if w.Code != http.StatusOK {
-			t.Fatalf("ListCollection() status = %d, want 200", w.Code)
+			t.Fatalf("status = %d, want 200", w.Code)
 		}
 		var resp map[string]any
 		_ = json.NewDecoder(w.Body).Decode(&resp)
 		if resp["total"].(float64) != 5 {
-			t.Errorf("ListCollection() total = %v, want 5", resp["total"])
+			t.Errorf("total = %v, want 5", resp["total"])
 		}
 		items := resp["items"].([]any)
 		if len(items) != 1 {
-			t.Fatalf("ListCollection() items count = %d, want 1", len(items))
+			t.Fatalf("items count = %d, want 1", len(items))
 		}
 		item := items[0].(map[string]any)
 		data := item["data"].(map[string]any)
 		if _, ok := data["body"]; ok {
-			t.Error("ListCollection() should not include 'body' in projected data")
+			t.Error("should not include 'body' in projected data")
 		}
 		if data["title"] != "Post 1" {
-			t.Errorf("ListCollection() data.title = %v, want Post 1", data["title"])
+			t.Errorf("data.title = %v, want Post 1", data["title"])
 		}
 	})
 
@@ -228,16 +235,17 @@ func TestDocumentHandler_ListCollection(t *testing.T) {
 		}
 		h := newHandler(uc)
 
-		req := httptest.NewRequest(http.MethodGet, "/api/document-manager/collection-type/articles", nil)
-		req.SetPathValue("slug", "articles")
 		w := httptest.NewRecorder()
-		h.ListCollection(w, req)
+		_, r := gin.CreateTestContext(w)
+		r.GET("/api/document-manager/collection-type/:slug", h.ListCollection)
+		req := httptest.NewRequest(http.MethodGet, "/api/document-manager/collection-type/articles", nil)
+		r.ServeHTTP(w, req)
 
 		if gotStart != 0 {
-			t.Errorf("ListCollection() default start = %d, want 0", gotStart)
+			t.Errorf("default start = %d, want 0", gotStart)
 		}
 		if gotSize != 20 {
-			t.Errorf("ListCollection() default size = %d, want 20", gotSize)
+			t.Errorf("default size = %d, want 20", gotSize)
 		}
 	})
 
@@ -250,20 +258,21 @@ func TestDocumentHandler_ListCollection(t *testing.T) {
 		}
 		h := newHandler(uc)
 
-		req := httptest.NewRequest(http.MethodGet, "/api/document-manager/collection-type/articles?size=500", nil)
-		req.SetPathValue("slug", "articles")
 		w := httptest.NewRecorder()
-		h.ListCollection(w, req)
+		_, r := gin.CreateTestContext(w)
+		r.GET("/api/document-manager/collection-type/:slug", h.ListCollection)
+		req := httptest.NewRequest(http.MethodGet, "/api/document-manager/collection-type/articles?size=500", nil)
+		r.ServeHTTP(w, req)
 
 		if gotSize != 100 {
-			t.Errorf("ListCollection() capped size = %d, want 100", gotSize)
+			t.Errorf("capped size = %d, want 100", gotSize)
 		}
 	})
 }
 
-// ---- Collection-type: GetCollection ----------------------------------------
-
 func TestDocumentHandler_GetCollection(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
 	t.Run("200 found", func(t *testing.T) {
 		uc := &mockDocumentUC{}
 		uc.getForEditFn = func(_ context.Context, _, documentID, _ string) (*entity.Document, string, error) {
@@ -271,14 +280,14 @@ func TestDocumentHandler_GetCollection(t *testing.T) {
 		}
 		h := newHandler(uc)
 
-		req := httptest.NewRequest(http.MethodGet, "/api/document-manager/collection-type/articles/abc", nil)
-		req.SetPathValue("slug", "articles")
-		req.SetPathValue("documentId", "abc")
 		w := httptest.NewRecorder()
-		h.GetCollection(w, req)
+		_, r := gin.CreateTestContext(w)
+		r.GET("/api/document-manager/collection-type/:slug/:documentId", h.GetCollection)
+		req := httptest.NewRequest(http.MethodGet, "/api/document-manager/collection-type/articles/abc", nil)
+		r.ServeHTTP(w, req)
 
 		if w.Code != http.StatusOK {
-			t.Errorf("GetCollection() status = %d, want 200", w.Code)
+			t.Errorf("status = %d, want 200", w.Code)
 		}
 	})
 
@@ -289,21 +298,21 @@ func TestDocumentHandler_GetCollection(t *testing.T) {
 		}
 		h := newHandler(uc)
 
-		req := httptest.NewRequest(http.MethodGet, "/api/document-manager/collection-type/articles/missing", nil)
-		req.SetPathValue("slug", "articles")
-		req.SetPathValue("documentId", "missing")
 		w := httptest.NewRecorder()
-		h.GetCollection(w, req)
+		_, r := gin.CreateTestContext(w)
+		r.GET("/api/document-manager/collection-type/:slug/:documentId", h.GetCollection)
+		req := httptest.NewRequest(http.MethodGet, "/api/document-manager/collection-type/articles/missing", nil)
+		r.ServeHTTP(w, req)
 
 		if w.Code != http.StatusNotFound {
-			t.Errorf("GetCollection() status = %d, want 404", w.Code)
+			t.Errorf("status = %d, want 404", w.Code)
 		}
 	})
 }
 
-// ---- Collection-type: CreateCollection ------------------------------------
-
 func TestDocumentHandler_CreateCollection(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
 	uc := &mockDocumentUC{}
 	uc.saveFn = func(_ context.Context, _ string, doc *entity.Document, _ string) (*entity.Document, error) {
 		doc.DocumentID = "new-entry"
@@ -311,22 +320,22 @@ func TestDocumentHandler_CreateCollection(t *testing.T) {
 	}
 	h := newHandler(uc)
 
-	body := map[string]any{"data": map[string]any{"title": "Hello"}}
-	var buf bytes.Buffer
-	_ = json.NewEncoder(&buf).Encode(body)
-	req := httptest.NewRequest(http.MethodPost, "/api/document-manager/collection-type/articles", &buf)
-	req.SetPathValue("slug", "articles")
+	body, _ := json.Marshal(map[string]any{"data": map[string]any{"title": "Hello"}})
 	w := httptest.NewRecorder()
-	h.CreateCollection(w, req)
+	_, r := gin.CreateTestContext(w)
+	r.POST("/api/document-manager/collection-type/:slug", h.CreateCollection)
+	req := httptest.NewRequest(http.MethodPost, "/api/document-manager/collection-type/articles", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusCreated {
-		t.Errorf("CreateCollection() status = %d, want 201", w.Code)
+		t.Errorf("status = %d, want 201", w.Code)
 	}
 }
 
-// ---- Collection-type: UpdateCollection ------------------------------------
-
 func TestDocumentHandler_UpdateCollection(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
 	uc := &mockDocumentUC{}
 	uc.saveFn = func(_ context.Context, _ string, doc *entity.Document, _ string) (*entity.Document, error) {
 		return doc, nil
@@ -336,75 +345,76 @@ func TestDocumentHandler_UpdateCollection(t *testing.T) {
 	}
 	h := newHandler(uc)
 
-	body := map[string]any{"data": map[string]any{"title": "Updated"}}
-	var buf bytes.Buffer
-	_ = json.NewEncoder(&buf).Encode(body)
-	req := httptest.NewRequest(http.MethodPut, "/api/document-manager/collection-type/articles/abc", &buf)
-	req.SetPathValue("slug", "articles")
-	req.SetPathValue("documentId", "abc")
+	body, _ := json.Marshal(map[string]any{"data": map[string]any{"title": "Updated"}})
 	w := httptest.NewRecorder()
-	h.UpdateCollection(w, req)
+	_, r := gin.CreateTestContext(w)
+	r.PUT("/api/document-manager/collection-type/:slug/:documentId", h.UpdateCollection)
+	req := httptest.NewRequest(http.MethodPut, "/api/document-manager/collection-type/articles/abc", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
-		t.Errorf("UpdateCollection() status = %d, want 200", w.Code)
+		t.Errorf("status = %d, want 200", w.Code)
 	}
 }
 
-// ---- Collection-type: DeleteCollection ------------------------------------
-
 func TestDocumentHandler_DeleteCollection(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
 	uc := &mockDocumentUC{}
 	uc.deleteFn = func(_ context.Context, _, _ string) error { return nil }
 	h := newHandler(uc)
 
-	req := httptest.NewRequest(http.MethodDelete, "/api/document-manager/collection-type/articles/abc", nil)
-	req.SetPathValue("slug", "articles")
-	req.SetPathValue("documentId", "abc")
 	w := httptest.NewRecorder()
-	h.DeleteCollection(w, req)
+	_, r := gin.CreateTestContext(w)
+	r.DELETE("/api/document-manager/collection-type/:slug/:documentId", h.DeleteCollection)
+	req := httptest.NewRequest(http.MethodDelete, "/api/document-manager/collection-type/articles/abc", nil)
+	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusNoContent {
-		t.Errorf("DeleteCollection() status = %d, want 204", w.Code)
+		t.Errorf("status = %d, want 204", w.Code)
 	}
 }
 
-// ---- Collection-type: Publish/Unpublish -----------------------------------
-
 func TestDocumentHandler_PublishCollection(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
 	uc := &mockDocumentUC{}
 	uc.publishFn = func(_ context.Context, _, _, _, _ string) error { return nil }
 	h := newHandler(uc)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/document-manager/collection-type/articles/abc/publish", nil)
-	req.SetPathValue("slug", "articles")
-	req.SetPathValue("documentId", "abc")
 	w := httptest.NewRecorder()
-	h.PublishCollection(w, req)
+	_, r := gin.CreateTestContext(w)
+	r.POST("/api/document-manager/collection-type/:slug/:documentId/publish", h.PublishCollection)
+	req := httptest.NewRequest(http.MethodPost, "/api/document-manager/collection-type/articles/abc/publish", nil)
+	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
-		t.Errorf("PublishCollection() status = %d, want 200", w.Code)
+		t.Errorf("status = %d, want 200", w.Code)
 	}
 }
 
 func TestDocumentHandler_UnpublishCollection(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
 	uc := &mockDocumentUC{}
 	uc.unpublishFn = func(_ context.Context, _, _, _ string) error { return nil }
 	h := newHandler(uc)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/document-manager/collection-type/articles/abc/unpublish", nil)
-	req.SetPathValue("slug", "articles")
-	req.SetPathValue("documentId", "abc")
 	w := httptest.NewRecorder()
-	h.UnpublishCollection(w, req)
+	_, r := gin.CreateTestContext(w)
+	r.POST("/api/document-manager/collection-type/:slug/:documentId/unpublish", h.UnpublishCollection)
+	req := httptest.NewRequest(http.MethodPost, "/api/document-manager/collection-type/articles/abc/unpublish", nil)
+	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
-		t.Errorf("UnpublishCollection() status = %d, want 200", w.Code)
+		t.Errorf("status = %d, want 200", w.Code)
 	}
 }
 
-// ---- Public (unchanged) ---------------------------------------------------
-
 func TestDocumentHandler_GetPublic(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
 	t.Run("200 when published", func(t *testing.T) {
 		uc := &mockDocumentUC{}
 		uc.getPublishedFn = func(_ context.Context, _, documentID, _ string) (*entity.Document, error) {
@@ -412,14 +422,14 @@ func TestDocumentHandler_GetPublic(t *testing.T) {
 		}
 		h := newHandler(uc)
 
-		req := httptest.NewRequest(http.MethodGet, "/api/public/document-manager/articles/abc", nil)
-		req.SetPathValue("slug", "articles")
-		req.SetPathValue("documentId", "abc")
 		w := httptest.NewRecorder()
-		h.GetPublic(w, req)
+		_, r := gin.CreateTestContext(w)
+		r.GET("/api/public/document-manager/:slug/:documentId", h.GetPublic)
+		req := httptest.NewRequest(http.MethodGet, "/api/public/document-manager/articles/abc", nil)
+		r.ServeHTTP(w, req)
 
 		if w.Code != http.StatusOK {
-			t.Errorf("GetPublic() status = %d, want 200", w.Code)
+			t.Errorf("status = %d, want 200", w.Code)
 		}
 	})
 
@@ -430,14 +440,14 @@ func TestDocumentHandler_GetPublic(t *testing.T) {
 		}
 		h := newHandler(uc)
 
-		req := httptest.NewRequest(http.MethodGet, "/api/public/document-manager/articles/abc", nil)
-		req.SetPathValue("slug", "articles")
-		req.SetPathValue("documentId", "abc")
 		w := httptest.NewRecorder()
-		h.GetPublic(w, req)
+		_, r := gin.CreateTestContext(w)
+		r.GET("/api/public/document-manager/:slug/:documentId", h.GetPublic)
+		req := httptest.NewRequest(http.MethodGet, "/api/public/document-manager/articles/abc", nil)
+		r.ServeHTTP(w, req)
 
 		if w.Code != http.StatusNotFound {
-			t.Errorf("GetPublic() status = %d, want 404", w.Code)
+			t.Errorf("status = %d, want 404", w.Code)
 		}
 	})
 }
