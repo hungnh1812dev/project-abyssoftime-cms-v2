@@ -14,7 +14,7 @@ func clearEnv(t *testing.T) {
 		"CLOUDINARY_CLOUD_NAME", "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET",
 		"CONTENT_TYPES_DIR", "STORAGE_PROVIDER", "S3_BUCKET", "S3_REGION",
 		"SUPPORTED_LOCALES", "MEDIA_AUTO_THUMBNAIL", "GRAPHQL_PATH", "DB_DRIVER",
-		"POSTGRES_URI",
+		"SQL_DRIVER", "SQL_DSN", "DB_USER", "DB_CONTENT_TYPE", "DB_DOCUMENT", "DB_MEDIA",
 	} {
 		t.Setenv(k, "")
 	}
@@ -37,6 +37,10 @@ func TestLoad_Defaults(t *testing.T) {
 		DB: config.DBConfig{
 			Driver: "mongo",
 			Mongo:  config.MongoConfig{URI: "mongodb://localhost:27017", Name: "cms"},
+			SQL:    config.SQLConfig{Driver: "postgres"},
+			EntityDB: config.EntityDBConfig{
+				User: "mongo", ContentType: "mongo", Document: "mongo", Media: "mongo",
+			},
 		},
 		Media: config.MediaConfig{
 			Driver:            "cloudinary",

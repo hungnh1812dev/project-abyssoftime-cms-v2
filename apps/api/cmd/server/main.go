@@ -13,8 +13,12 @@ import (
 	deliveryhandler "project-abyssoftime-cms-v2/api/internal/delivery/http/handler"
 	"project-abyssoftime-cms-v2/api/internal/domain/repository"
 	cloudinaryadapter "project-abyssoftime-cms-v2/api/internal/infrastructure/cloudinary"
+	"project-abyssoftime-cms-v2/api/internal/infrastructure/gormdb"
 	"project-abyssoftime-cms-v2/api/internal/infrastructure/mongodb"
 	s3adapter "project-abyssoftime-cms-v2/api/internal/infrastructure/s3"
+
+	"go.mongodb.org/mongo-driver/mongo"
+	"gorm.io/gorm"
 	"project-abyssoftime-cms-v2/api/internal/usecase/auth"
 	contenttype "project-abyssoftime-cms-v2/api/internal/usecase/content_type"
 	docuc "project-abyssoftime-cms-v2/api/internal/usecase/document"
@@ -54,28 +58,78 @@ func main() {
 
 	pkgjwt.SetSecret(cfg.JWTSecret)
 
-	mongoClient, err := mongodb.NewClient(ctx, cfg.DB.Mongo.URI)
-	if err != nil {
-		log.Fatalf("mongodb connect: %v", err)
-	}
-	defer func() {
-		if err := mongoClient.Disconnect(ctx); err != nil {
-			log.Printf("mongodb disconnect: %v", err)
+	// --- database connections ---
+	needsMongo := cfg.DB.EntityDB.User == "mongo" ||
+		cfg.DB.EntityDB.ContentType == "mongo" ||
+		cfg.DB.EntityDB.Document == "mongo" ||
+		cfg.DB.EntityDB.Media == "mongo"
+	needsSQL := cfg.DB.EntityDB.User == "sql" ||
+		cfg.DB.EntityDB.ContentType == "sql" ||
+		cfg.DB.EntityDB.Document == "sql" ||
+		cfg.DB.EntityDB.Media == "sql"
+
+	var mongoDB *mongo.Database
+	if needsMongo {
+		mongoClient, err := mongodb.NewClient(ctx, cfg.DB.Mongo.URI)
+		if err != nil {
+			log.Fatalf("mongodb connect: %v", err)
 		}
-	}()
-	log.Println("connected to mongodb")
+		defer func() {
+			if err := mongoClient.Disconnect(ctx); err != nil {
+				log.Printf("mongodb disconnect: %v", err)
+			}
+		}()
+		log.Println("connected to mongodb")
 
-	db := mongodb.Database(mongoClient, cfg.DB.Mongo.Name)
+		mongoDB = mongodb.Database(mongoClient, cfg.DB.Mongo.Name)
 
-	if err := mongodb.EnsureIndexes(ctx, db); err != nil {
-		log.Fatalf("ensure indexes: %v", err)
+		if err := mongodb.EnsureIndexes(ctx, mongoDB); err != nil {
+			log.Fatalf("ensure indexes: %v", err)
+		}
+		log.Println("indexes ensured")
 	}
-	log.Println("indexes ensured")
 
-	userRepo := mongodb.NewUserRepository(db)
-	ctRepo := mongodb.NewContentTypeRepository(db)
-	docRepo := mongodb.NewDocumentRepository(db)
-	mediaRepo := mongodb.NewMediaAssetRepository(db)
+	var sqlDB *gorm.DB
+	if needsSQL {
+		var err error
+		sqlDB, err = gormdb.NewClient(cfg.DB.SQL.Driver, cfg.DB.SQL.DSN)
+		if err != nil {
+			log.Fatalf("gorm connect: %v", err)
+		}
+		if err := gormdb.AutoMigrate(sqlDB); err != nil {
+			log.Fatalf("gorm auto-migrate: %v", err)
+		}
+		log.Printf("connected to sql (%s)", cfg.DB.SQL.Driver)
+	}
+
+	// --- repository factory ---
+	var userRepo repository.UserRepository
+	if cfg.DB.EntityDB.User == "sql" {
+		userRepo = gormdb.NewUserRepository(sqlDB)
+	} else {
+		userRepo = mongodb.NewUserRepository(mongoDB)
+	}
+
+	var ctRepo repository.ContentTypeRepository
+	if cfg.DB.EntityDB.ContentType == "sql" {
+		ctRepo = gormdb.NewContentTypeRepository(sqlDB)
+	} else {
+		ctRepo = mongodb.NewContentTypeRepository(mongoDB)
+	}
+
+	var docRepo repository.DocumentRepository
+	if cfg.DB.EntityDB.Document == "sql" {
+		docRepo = gormdb.NewDocumentRepository(sqlDB)
+	} else {
+		docRepo = mongodb.NewDocumentRepository(mongoDB)
+	}
+
+	var mediaRepo repository.MediaAssetRepository
+	if cfg.DB.EntityDB.Media == "sql" {
+		mediaRepo = gormdb.NewMediaAssetRepository(sqlDB)
+	} else {
+		mediaRepo = mongodb.NewMediaAssetRepository(mongoDB)
+	}
 
 	storage, err := newStorageAdapter(ctx, cfg)
 	if err != nil {
