@@ -2,13 +2,11 @@ package handler
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 
 	"project-abyssoftime-cms-v2/api/internal/domain/entity"
-	pkgerrors "project-abyssoftime-cms-v2/api/pkg/errors"
 )
 
 const RefreshCookieName = "refresh_token"
@@ -109,35 +107,4 @@ func (h *AuthHandler) SetupStatus(c *gin.Context) {
 func (h *AuthHandler) Logout(c *gin.Context) {
 	c.SetCookie(RefreshCookieName, "", -1, "/", "", false, true)
 	c.Status(http.StatusOK)
-}
-
-// ---- response helpers -------------------------------------------------------
-
-func writeJSON(w http.ResponseWriter, status int, body any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(body)
-}
-
-func writeError(w http.ResponseWriter, status int, msg string) {
-	writeJSON(w, status, map[string]string{"error": msg})
-}
-
-func writeErr(w http.ResponseWriter, err error) {
-	switch {
-	case pkgerrors.Is(err, pkgerrors.ErrConflict):
-		writeError(w, http.StatusConflict, err.Error())
-	case pkgerrors.Is(err, pkgerrors.ErrUnauthorized):
-		writeError(w, http.StatusUnauthorized, err.Error())
-	case pkgerrors.Is(err, pkgerrors.ErrForbidden):
-		writeError(w, http.StatusForbidden, err.Error())
-	case pkgerrors.Is(err, pkgerrors.ErrNotFound):
-		writeError(w, http.StatusNotFound, err.Error())
-	case pkgerrors.Is(err, pkgerrors.ErrBadRequest):
-		writeError(w, http.StatusBadRequest, err.Error())
-	case pkgerrors.Is(err, pkgerrors.ErrValidation):
-		writeError(w, http.StatusUnprocessableEntity, err.Error())
-	default:
-		writeError(w, http.StatusInternalServerError, "internal server error")
-	}
 }
