@@ -96,10 +96,6 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
     steps:
-      - name: Trigger Render deploy — API
-        if: vars.RENDER_DEPLOY_HOOK_API != ''
-        run: curl -fsSL "${{ vars.RENDER_DEPLOY_HOOK_API }}"
-
-      - name: Trigger Render deploy — Web
-        if: vars.RENDER_DEPLOY_HOOK_WEB != ''
-        run: curl -fsSL "${{ vars.RENDER_DEPLOY_HOOK_WEB }}"
+      - name: Trigger Render deploy
+        if: vars.RENDER_DEPLOY_HOOK != ''
+        run: curl -fsSL "${{ vars.RENDER_DEPLOY_HOOK }}"
