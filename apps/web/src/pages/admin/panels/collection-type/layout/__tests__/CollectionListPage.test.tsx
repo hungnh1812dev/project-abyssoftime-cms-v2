@@ -166,10 +166,9 @@ describe('CollectionListPage — navigation', () => {
     })
   })
 
-  it('Add entry button creates a document and navigates to detail page', async () => {
+  it('Add new item navigates to /new without creating a document', async () => {
     const user = userEvent.setup()
     mock.onGet('/api/document-manager/blog-posts').reply(200, [])
-    mock.onPost('/api/document-manager/blog-posts').reply(201, { ...doc1, documentId: 'doc-new' })
 
     renderWithProviders(<CollectionListPage contentType={ct} />, {
       initialEntries: ['/admin/content-type/collection-type/blog-posts'],
@@ -178,9 +177,7 @@ describe('CollectionListPage — navigation', () => {
     await waitFor(() => screen.getByRole('button', { name: /add/i }))
     await user.click(screen.getByRole('button', { name: /add/i }))
 
-    await waitFor(() =>
-      expect(mock.history.post.some((r) => r.url === '/api/document-manager/blog-posts')).toBe(true),
-    )
+    expect(mock.history.post).toHaveLength(0)
   })
 
   it('Delete button shows confirm dialog and calls DELETE', async () => {

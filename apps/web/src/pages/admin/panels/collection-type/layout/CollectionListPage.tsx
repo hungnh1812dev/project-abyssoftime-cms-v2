@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { useCollectionDocuments, useDeleteCollectionDocument, useCreateCollectionDocument } from '@/hooks/useCollectionDocuments';
+import { useCollectionDocuments, useDeleteCollectionDocument } from '@/hooks/useCollectionDocuments';
 import { useLocales } from '@/hooks/useLocales';
 import { getRegistration, type CollectionColumnDef } from '@/content-type-registry';
 import type { ContentType, Document, FieldDefinition } from '@/types/cms';
@@ -55,16 +55,14 @@ export function CollectionListPage({ contentType }: Props) {
 
   const { data: page, isLoading } = useCollectionDocuments(contentType.Slug, start, PAGE_SIZE, activeLocale);
   const { mutate: deleteDoc } = useDeleteCollectionDocument();
-  const { mutateAsync: createDoc } = useCreateCollectionDocument();
   const navigate = useNavigate();
 
   const columns = deriveColumns(contentType);
   const docs = page?.items ?? [];
   const total = page?.total ?? 0;
 
-  async function handleCreate() {
-    const newDoc = await createDoc({ contentTypeSlug: contentType.Slug, data: {} });
-    navigate(`/admin/content-type/collection-type/${contentType.Slug}/${newDoc.documentId}`);
+  function handleCreate() {
+    navigate(`/admin/content-type/collection-type/${contentType.Slug}/new`);
   }
 
   function handleDelete(doc: Document) {

@@ -70,6 +70,14 @@ export function AppRouter() {
           }
         />
         <Route
+          path="content-type/collection-type/:slug/new"
+          element={
+            <Suspense fallback={<PanelFallback />}>
+              <CollectionDetailPage />
+            </Suspense>
+          }
+        />
+        <Route
           path="content-type/collection-type/:slug/:id"
           element={
             <Suspense fallback={<PanelFallback />}>
