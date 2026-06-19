@@ -3,11 +3,8 @@ package main
 import (
 	"context"
 	"log"
-	"net/http"
 
-	"project-abyssoftime-cms-v2/api/graphql/codegen"
-	"project-abyssoftime-cms-v2/api/graphql/generated"
-	"project-abyssoftime-cms-v2/api/graphql/resolver"
+	"project-abyssoftime-cms-v2/api/graphql/dynamic"
 	"project-abyssoftime-cms-v2/api/internal/config"
 	deliveryhttp "project-abyssoftime-cms-v2/api/internal/delivery/http"
 	deliveryhandler "project-abyssoftime-cms-v2/api/internal/delivery/http/handler"
@@ -24,8 +21,6 @@ import (
 	docuc "project-abyssoftime-cms-v2/api/internal/usecase/document"
 	mediauc "project-abyssoftime-cms-v2/api/internal/usecase/media"
 	pkgjwt "project-abyssoftime-cms-v2/api/pkg/jwt"
-
-	gqlhandler "github.com/99designs/gqlgen/graphql/handler"
 )
 
 func newStorageAdapter(ctx context.Context, cfg *config.Config) (repository.StorageAdapter, error) {
@@ -42,13 +37,6 @@ func newStorageAdapter(ctx context.Context, cfg *config.Config) (repository.Stor
 }
 
 func main() {
-	const schemaPath = "graphql/schema.graphqls"
-	const sentinelPath = "graphql/.graphql.hash"
-	if err := codegen.EnsureUpToDate(schemaPath, sentinelPath, codegen.DefaultRunner()); err != nil {
-		log.Fatalf("graphql codegen: %v", err)
-	}
-	log.Println("graphql: generated code up to date")
-
 	ctx := context.Background()
 
 	cfg, err := config.Load()
@@ -152,21 +140,12 @@ func main() {
 	}
 	log.Printf("synced %d content-type definitions from %s", len(defs), defsDir)
 
-	// GraphQL
-	gqlSchema := generated.NewExecutableSchema(generated.Config{
-		Resolvers: &resolver.Resolver{
-			DocumentUC:    documentUC,
-			ContentTypeUC: ctUC,
-		},
-		Directives: generated.DirectiveRoot{
-			Auth: resolver.AuthDirective,
-		},
-	})
-	gqlSrv := gqlhandler.NewDefaultServer(gqlSchema)
-	gqlHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := resolver.WithRequest(r.Context(), r)
-		gqlSrv.ServeHTTP(w, r.WithContext(ctx))
-	})
+	// Dynamic GraphQL — schema generated from content-type definitions
+	gqlFactory := dynamic.NewResolverFactory(documentUC, ctUC)
+	gqlHandler, err := gqlFactory.BuildHandler(defs)
+	if err != nil {
+		log.Fatalf("graphql schema: %v", err)
+	}
 
 	// Gin router
 	router := deliveryhttp.SetupRouter(deliveryhttp.RouterConfig{
