@@ -1,6 +1,6 @@
 # project-abyssoftime-cms-v2
 
-A lightweight, code-first Personal Headless CMS. Go backend (Clean Architecture, MongoDB, REST) + React/Vite frontend. Self-hosted on Render.com via docker-compose.
+A lightweight, code-first Personal Headless CMS. Go backend (Clean Architecture, MongoDB, REST) + React/Vite frontend. Self-hosted on Render.com via docker-compose. 
 
 ---
 
