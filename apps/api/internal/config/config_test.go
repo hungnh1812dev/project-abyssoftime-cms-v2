@@ -15,6 +15,7 @@ func clearEnv(t *testing.T) {
 		"CONTENT_TYPES_DIR", "STORAGE_PROVIDER", "S3_BUCKET", "S3_REGION",
 		"SUPPORTED_LOCALES", "MEDIA_AUTO_THUMBNAIL", "GRAPHQL_PATH", "DB_DRIVER",
 		"SQL_DRIVER", "SQL_DSN", "DB_USER", "DB_CONTENT_TYPE", "DB_DOCUMENT", "DB_MEDIA",
+		"GRPC_PORT",
 	} {
 		t.Setenv(k, "")
 	}
@@ -31,6 +32,7 @@ func TestLoad_Defaults(t *testing.T) {
 
 	want := &config.Config{
 		Port:             "8080",
+		GRPCPort:         "9090",
 		JWTSecret:        "test-secret",
 		ContentTypeDir:   "content-types",
 		SupportedLocales: []string{"en", "vi"},

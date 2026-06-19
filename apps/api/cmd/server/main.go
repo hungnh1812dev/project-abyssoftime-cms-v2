@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"log"
+	"net"
 
 	"project-abyssoftime-cms-v2/api/graphql/dynamic"
 	"project-abyssoftime-cms-v2/api/internal/config"
+	grpcdelivery "project-abyssoftime-cms-v2/api/internal/delivery/grpc"
 	deliveryhttp "project-abyssoftime-cms-v2/api/internal/delivery/http"
 	deliveryhandler "project-abyssoftime-cms-v2/api/internal/delivery/http/handler"
 	"project-abyssoftime-cms-v2/api/internal/domain/repository"
@@ -147,7 +149,7 @@ func main() {
 		log.Fatalf("graphql schema: %v", err)
 	}
 
-	// Gin router
+	// Gin router (REST + GraphQL)
 	router := deliveryhttp.SetupRouter(deliveryhttp.RouterConfig{
 		AuthHandler:    deliveryhandler.NewAuthHandler(authUC),
 		CTHandler:      deliveryhandler.NewContentTypeHandler(ctUC),
@@ -158,8 +160,25 @@ func main() {
 		GraphQLPath:    cfg.GraphQL.Path,
 	})
 
+	// gRPC server
+	grpcSrv := grpcdelivery.NewServer(authUC, ctUC, documentUC, mediaUC)
+
+	// Start gRPC in a goroutine
+	go func() {
+		grpcAddr := ":" + cfg.GRPCPort
+		lis, err := net.Listen("tcp", grpcAddr)
+		if err != nil {
+			log.Fatalf("grpc listen: %v", err)
+		}
+		log.Printf("gRPC server listening on %s", grpcAddr)
+		if err := grpcSrv.Serve(lis); err != nil {
+			log.Fatalf("grpc serve: %v", err)
+		}
+	}()
+
+	// Start REST + GraphQL (blocks)
 	addr := ":" + cfg.Port
-	log.Printf("server listening on %s", addr)
+	log.Printf("REST server listening on %s", addr)
 	log.Printf("graphql endpoint: %s", cfg.GraphQL.Path)
 	if err := router.Run(addr); err != nil {
 		log.Fatal(err)

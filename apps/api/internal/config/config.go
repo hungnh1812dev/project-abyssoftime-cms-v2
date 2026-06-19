@@ -11,8 +11,9 @@ import (
 
 type Config struct {
 	Port             string
+	GRPCPort         string
 	JWTSecret        string
-	ContentTypeDir   string // was ContentTypesDir; env var CONTENT_TYPES_DIR unchanged
+	ContentTypeDir   string
 	SupportedLocales []string
 	DB               DBConfig
 	Media            MediaConfig
@@ -99,6 +100,7 @@ func Load() (*Config, error) {
 
 	return &Config{
 		Port:             getenv("PORT", "8080"),
+		GRPCPort:         getenv("GRPC_PORT", "9090"),
 		JWTSecret:        getenv("JWT_SECRET", ""),
 		ContentTypeDir:   getenv("CONTENT_TYPES_DIR", "content-types"),
 		SupportedLocales: splitLocales(getenv("SUPPORTED_LOCALES", "en,vi")),
