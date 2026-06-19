@@ -1,6 +1,6 @@
 # Feature Guide
 
-Consolidated reference for all CMS features: panels, schema-as-code, draft/publish, localization, media, GraphQL, and config.
+Consolidated reference for all CMS features: panels, schema-as-code, draft/publish, localization, media, GraphQL, roles, user management, access tokens, config, and deployment.
 
 See [local-dev.md](local-dev.md) for environment setup and run commands.
 
@@ -14,7 +14,11 @@ See [local-dev.md](local-dev.md) for environment setup and run commands.
 4. [Localization (i18n)](#localization-i18n)
 5. [Media upload and auto-thumbnail](#media-upload-and-auto-thumbnail)
 6. [GraphQL API](#graphql-api)
-7. [Config reference](#config-reference)
+7. [Roles and permissions](#roles-and-permissions)
+8. [User management](#user-management)
+9. [API access tokens](#api-access-tokens)
+10. [Config reference](#config-reference)
+11. [Deployment](#deployment)
 
 ---
 
@@ -437,6 +441,142 @@ Generated code in `apps/api/graphql/generated/` is never hand-edited.
 
 ---
 
+## Roles and permissions
+
+The CMS uses a four-tier role hierarchy. Higher roles inherit all permissions of lower roles.
+
+| Level | Role | Permissions |
+|-------|------|-------------|
+| 4 | `super_admin` | Full access: user management, access tokens, role viewing, content-type management, content management |
+| 3 | `admin` | Content-type management + content management + user management |
+| 2 | `editor` | Content management only (create, edit, save, publish documents + media upload) |
+| 1 | `guest` | Read-only (view content in admin UI) |
+
+### Initial setup
+
+The **first user** who registers at `/register` automatically receives the `super_admin` role. After that, public registration is disabled — all subsequent users are created through the invite flow (see [User management](#user-management)).
+
+### Route protection
+
+The backend enforces role hierarchy via `GinRequireMinRole` middleware. For example, `GinRequireMinRole("editor")` allows `editor`, `admin`, and `super_admin` but rejects `guest`.
+
+The frontend uses the `ProtectedRoute` component with an optional `minRole` prop:
+
+```tsx
+<ProtectedRoute minRole="admin">
+  <UsersPage />
+</ProtectedRoute>
+```
+
+### Sidebar visibility
+
+Settings links in the admin sidebar are filtered by role:
+
+| Link | Visible to |
+|------|------------|
+| Media Library | All authenticated users |
+| Users | `admin` and above |
+| Access Tokens | `super_admin` only |
+| Roles | `super_admin` only |
+
+### Roles page
+
+The Roles page (`/admin/settings/roles`) displays a read-only permission matrix showing what each role can do. Roles are fixed — custom role configuration is not supported.
+
+---
+
+## User management
+
+Users are managed through the Users page (`/admin/settings/users`), accessible to `admin` and above.
+
+### Invite flow
+
+1. An admin or super_admin opens the Users page and clicks **Invite User**.
+2. They enter an email address and select a role (only roles strictly lower than their own are available).
+3. The system generates a unique invite link with a 32-byte token. The admin copies and shares it out-of-band.
+4. The invitee opens the link (`/invite/:token`), sets their password, and their account is created with the pre-assigned role.
+5. The invite token is single-use and expires after 7 days.
+
+### Role change constraints
+
+- A user can only change the role of someone whose current role is **strictly lower** than their own.
+- A user can only assign a role that is **strictly lower** than their own.
+- A user cannot change their own role or delete themselves.
+- `super_admin` is the only role that can assign `admin`.
+
+### Deleting users
+
+Deleting a user removes their account but does **not** cascade-delete their content contributions. The `createdBy`/`updatedBy` fields on documents retain the deleted user's ID as a historical reference.
+
+### API endpoints
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/users` | `admin`+ | List all users (paginated) |
+| `GET` | `/api/users/:id` | `admin`+ | Get user details |
+| `PUT` | `/api/users/:id/role` | `admin`+ | Change a user's role |
+| `DELETE` | `/api/users/:id` | `admin`+ | Delete a user |
+| `POST` | `/api/invites` | `admin`+ | Create an invite |
+| `GET` | `/api/invites` | `admin`+ | List pending invites |
+| `DELETE` | `/api/invites/:id` | `admin`+ | Revoke a pending invite |
+| `POST` | `/auth/invite/:token` | public | Accept invite (set password) |
+
+---
+
+## API access tokens
+
+API access tokens allow external consumers (e.g. a Next.js frontend, a mobile app) to authenticate against the CMS API without using a user's JWT session.
+
+### Creating tokens
+
+Only `super_admin` can manage access tokens via the Access Tokens page (`/admin/settings/access-tokens`).
+
+1. Click **Create new token** and fill in:
+   - **Name** — a human-readable label (e.g. "Frontend production")
+   - **Scopes** — what the token can access (see below)
+   - **Expiration** — 7 days, 30 days, 90 days, 1 year, or no expiration
+2. The plaintext token is shown **once**. Copy it immediately — it cannot be retrieved again.
+
+### Scopes
+
+Scopes control what data the token can read. Tokens are **read-only** — they never grant write access regardless of scopes.
+
+| Scope | Access |
+|-------|--------|
+| `documents:read` | Read published documents for **all** content types |
+| `documents:read:<slug>` | Read published documents for a **specific** content type only |
+| `media:read` | Read media assets |
+| `content-types:read` | Read content type definitions |
+
+The create dialog groups scopes: under **Documents**, you can check "All content types" (stores `documents:read`) or expand and pick individual content types (stores `documents:read:blog-posts`, etc.). **Media** and **Content Types** are separate checkboxes.
+
+### Using a token
+
+Pass it as a Bearer token in the `Authorization` header:
+
+```sh
+curl -H "Authorization: Bearer <token>" \
+  https://your-cms.example.com/api/public/document-manager/blog-posts/doc123
+```
+
+### Token security
+
+- Tokens are stored as SHA-256 hashes — the plaintext is never persisted.
+- A 6-character prefix is stored for display purposes (`abc123••••••`).
+- Expired tokens are rejected at authentication time.
+- `lastUsedAt` is updated on every successful validation.
+- Tokens cannot be edited — to change scopes or expiration, delete and recreate.
+
+### API endpoints
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `POST` | `/api/access-tokens` | `super_admin` | Create a new token (returns plaintext once) |
+| `GET` | `/api/access-tokens` | `super_admin` | List all tokens (paginated, no plaintext) |
+| `DELETE` | `/api/access-tokens/:id` | `super_admin` | Revoke a token |
+
+---
+
 ## Config reference
 
 All environment variables are loaded once at boot into a typed `Config` struct (`internal/config`). No `os.Getenv` calls exist anywhere else in the codebase.
@@ -444,18 +584,190 @@ All environment variables are loaded once at boot into a typed `Config` struct (
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `PORT` | API listen port | `8080` |
-| `MONGODB_URI` | MongoDB connection string | `mongodb://localhost:27017/cms` |
+| `GRPC_PORT` | gRPC server listen port | `9090` |
+| `MONGODB_URI` | MongoDB connection string | `mongodb://localhost:27017` |
+| `MONGODB_DB` | MongoDB database name | `cms` |
 | `JWT_SECRET` | Secret for signing JWTs | *(required, no default)* |
 | `CLOUDINARY_CLOUD_NAME` | Cloudinary account name | *(required for Cloudinary media)* |
 | `CLOUDINARY_API_KEY` | Cloudinary API key | *(required for Cloudinary media)* |
 | `CLOUDINARY_API_SECRET` | Cloudinary API secret | *(required for Cloudinary media)* |
+| `S3_BUCKET` | S3 bucket name | *(required for S3 media)* |
+| `S3_REGION` | S3 region | *(required for S3 media)* |
 | `CONTENT_TYPES_DIR` | Directory of JSON content-type definition files synced on boot | `content-types` |
-| `STORAGE_PROVIDER` | Active media storage adapter | `s3` or `cloudinary` |
+| `STORAGE_PROVIDER` | Active media storage adapter | `cloudinary` or `s3` |
 | `SUPPORTED_LOCALES` | Comma-separated locale codes accepted when saving drafts | `en,vi` |
 | `MEDIA_AUTO_THUMBNAIL` | Toggle server-side thumbnail generation at upload time | `true` |
 | `GRAPHQL_PATH` | Mount path for the GraphQL endpoint | `/graphql` |
+| `DB_DRIVER` | Database driver | `mongo` |
+| `SQL_DRIVER` | SQL sub-driver (when DB_DRIVER includes SQL entities) | `postgres` |
+| `SQL_DSN` | SQL connection string | *(required for SQL entities)* |
 | `VITE_API_URL` | API base URL used by the Vite dev-server proxy | `http://localhost:8080` |
 
 Copy `.env.example` → `.env` and fill in required values. Never commit `.env`.
 
-For full setup instructions, see [local-dev.md](local-dev.md).
+---
+
+## Deployment
+
+### Docker Compose (recommended for self-hosting)
+
+The project includes a `docker-compose.yml` that runs the full stack: API, web frontend, and MongoDB.
+
+```sh
+# Build and start all services
+docker-compose up --build
+
+# Detached mode
+docker-compose up --build -d
+
+# View logs
+docker-compose logs -f api
+docker-compose logs -f web
+
+# Stop and remove containers
+docker-compose down
+```
+
+The API container runs `go build` and serves the binary. The web container runs `npm run build` and serves the static files. MongoDB uses a persistent volume.
+
+### Pre-deploy verification
+
+Run these checks locally before deploying:
+
+```sh
+# Backend
+cd apps/api
+go vet ./...          # Static analysis
+go test ./...         # All tests
+go build ./cmd/server # Verify production binary compiles
+
+# Frontend
+cd apps/web
+npm run lint          # ESLint
+npm run build         # Production build (catches TS errors)
+```
+
+### Render.com (free plan)
+
+The CMS deploys as **two Render services** + external MongoDB:
+
+| Service | Render type | What it runs |
+|---------|-------------|--------------|
+| `cms-api` | Web Service (Docker) | Go API binary from `apps/api/Dockerfile` |
+| `cms-web` | Static Site | Built React app from `apps/web/dist/` |
+| MongoDB | *(external)* | MongoDB Atlas free tier (Render doesn't offer free MongoDB) |
+
+A `render.yaml` blueprint at the repo root configures both services automatically.
+
+**Step 1 — Create a MongoDB Atlas cluster (free):**
+
+1. Sign up at [mongodb.com/atlas](https://www.mongodb.com/atlas).
+2. Create a free M0 cluster.
+3. Create a database user and whitelist `0.0.0.0/0` (allow from anywhere) for Render access.
+4. Copy the connection string: `mongodb+srv://user:pass@cluster.mongodb.net`
+
+**Step 2 — Deploy via Render Blueprint:**
+
+1. Go to [Render Dashboard](https://dashboard.render.com) → **New** → **Blueprint**.
+2. Connect your GitHub repo. Render reads `render.yaml` and creates both services.
+3. Fill in the `sync: false` env vars when prompted:
+   - `MONGODB_URI` — your Atlas connection string from Step 1
+   - `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`
+
+**Step 3 — Update rewrite rules (one-time):**
+
+The `render.yaml` configures rewrite rules on the Static Site to proxy `/api/*` and `/auth/*` to the API service. After deploy, verify the API service URL matches the rewrite destinations. If your API service name differs from `cms-api`, update the URLs in `render.yaml`:
+
+```yaml
+routes:
+  - type: rewrite
+    source: /api/*
+    destination: https://<your-api-service>.onrender.com/api/*
+```
+
+**Step 4 — Register the first user:**
+
+Open `https://<your-web-service>.onrender.com/register`. The first account becomes `super_admin`. After that, registration is closed — invite new users from Settings > Users.
+
+**Exposed URLs after deploy:**
+
+Assuming your services are `cms-web.onrender.com` (Static Site) and `cms-api.onrender.com` (API):
+
+| URL | Description |
+|-----|-------------|
+| `https://cms-web.onrender.com` | Admin UI (login → dashboard) |
+| `https://cms-web.onrender.com/login` | Login page |
+| `https://cms-web.onrender.com/register` | First-time setup only (disabled after super_admin created) |
+| `https://cms-web.onrender.com/invite/:token` | Invite accept page |
+| `https://cms-web.onrender.com/admin` | Admin dashboard (requires auth) |
+| `https://cms-web.onrender.com/admin/settings/users` | User management (admin+) |
+| `https://cms-web.onrender.com/admin/settings/access-tokens` | API token management (super_admin) |
+| `https://cms-web.onrender.com/admin/settings/roles` | Permission matrix (super_admin) |
+| `https://cms-web.onrender.com/admin/settings/media` | Media library |
+
+All API calls below are proxied through the Static Site rewrite rules — external consumers can use either the web URL or the direct API URL:
+
+| URL | Auth | Description |
+|-----|------|-------------|
+| `https://cms-api.onrender.com/health` | none | Health check |
+| `https://cms-api.onrender.com/auth/login` | none | Login (POST, returns JWT) |
+| `https://cms-api.onrender.com/auth/setup` | none | Check if super_admin exists |
+| `https://cms-api.onrender.com/api/content-types` | JWT (admin+) | List content type definitions |
+| `https://cms-api.onrender.com/api/document-manager/single-type/:slug` | JWT | Get single-type document |
+| `https://cms-api.onrender.com/api/document-manager/collection-type/:slug` | JWT | List collection entries |
+| `https://cms-api.onrender.com/api/public/document-manager/:slug/:documentId` | none / API token | Public read (published only) |
+| `https://cms-api.onrender.com/api/media` | JWT (editor+) | List media assets |
+| `https://cms-api.onrender.com/api/users` | JWT (admin+) | List users |
+| `https://cms-api.onrender.com/api/invites` | JWT (admin+) | List pending invites |
+| `https://cms-api.onrender.com/api/access-tokens` | JWT (super_admin) | List API tokens |
+| `https://cms-api.onrender.com/api/locales` | none | List supported locales |
+| `https://cms-api.onrender.com/graphql` | mixed | GraphQL endpoint (queries public, mutations require JWT) |
+
+**CI integration:**
+
+The GitHub Actions workflow triggers the API deploy hook after tests pass. Set `RENDER_DEPLOY_HOOK_API` in your GitHub repo (Settings > Variables > Actions) with the API service's deploy hook URL from Render. The Static Site auto-deploys when it detects a push — no hook needed.
+
+**Free plan limitations:**
+- Web Service spins down after 15 minutes of inactivity. First request after sleep takes ~30s (cold start).
+- 750 free hours/month across all services.
+- Static Sites are always on (no cold start).
+
+### Docker Compose (self-hosting / VPS)
+
+For self-hosted deployments (VPS, dedicated server), use `docker-compose.yml` which runs the full stack including MongoDB:
+
+```sh
+docker-compose up --build -d
+docker-compose logs -f api    # tail API logs
+docker-compose down           # stop all services
+```
+
+The compose file starts MongoDB (with persistent volume), the API, and the web frontend with nginx proxying API calls. Set env vars in a `.env` file at the repo root.
+
+### Railway / Fly.io / Other platforms
+
+The CMS runs anywhere that supports Docker:
+
+1. **API service:** Deploy `apps/api/Dockerfile`. Set all backend env vars. Expose `PORT`.
+2. **Web service:** Deploy `apps/web/dist/` as static files (run `npm ci && npm run build` first).
+3. **MongoDB:** Use Atlas or a co-located MongoDB instance.
+
+**Routing:** The frontend makes relative API requests (`/api/*`, `/auth/*`). Configure your platform's reverse proxy or rewrite rules to route these to the API service:
+
+- `/api/*` → API service
+- `/auth/*` → API service
+- `/graphql` → API service
+- `/*` → `index.html` (SPA fallback)
+
+### Production checklist
+
+- [ ] `JWT_SECRET` is set to a strong random value (not the dev default)
+- [ ] MongoDB is accessible from the API service (connection string tested)
+- [ ] Storage provider credentials are configured (Cloudinary or S3)
+- [ ] First user registered as `super_admin` — public registration is now closed
+- [ ] `SUPPORTED_LOCALES` matches your content strategy
+- [ ] API health check passes: `curl https://your-domain/health` returns `{"status":"ok"}`
+- [ ] Frontend loads and redirects to `/login`
+- [ ] Media upload works (test with a small image)
+
+For local development setup, see [local-dev.md](local-dev.md).

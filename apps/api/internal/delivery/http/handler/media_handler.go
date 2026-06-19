@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/gin-gonic/gin"
+
 	"project-abyssoftime-cms-v2/api/internal/domain/entity"
 )
 
@@ -23,21 +25,21 @@ func NewMediaHandler(uc mediaUseCase) *MediaHandler {
 	return &MediaHandler{uc: uc}
 }
 
-func (h *MediaHandler) List(w http.ResponseWriter, r *http.Request) {
-	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+func (h *MediaHandler) List(c *gin.Context) {
+	page, _ := strconv.Atoi(c.Query("page"))
+	limit, _ := strconv.Atoi(c.Query("limit"))
 	if page < 1 {
 		page = 1
 	}
 	if limit < 1 || limit > 100 {
 		limit = 20
 	}
-	items, total, err := h.uc.List(r.Context(), page, limit)
+	items, total, err := h.uc.List(c.Request.Context(), page, limit)
 	if err != nil {
-		writeErr(w, err)
+		ginWriteErr(c, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
+	c.JSON(http.StatusOK, gin.H{
 		"items": items,
 		"total": total,
 		"page":  page,
@@ -45,35 +47,36 @@ func (h *MediaHandler) List(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *MediaHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
-	if err := h.uc.Delete(r.Context(), id); err != nil {
-		writeErr(w, err)
+func (h *MediaHandler) Delete(c *gin.Context) {
+	id := c.Param("id")
+	if err := h.uc.Delete(c.Request.Context(), id); err != nil {
+		ginWriteErr(c, err)
 		return
 	}
-	w.WriteHeader(http.StatusNoContent)
+	c.Status(http.StatusNoContent)
 }
 
-func (h *MediaHandler) Upload(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseMultipartForm(10 << 20); err != nil {
-		writeError(w, http.StatusBadRequest, "failed to parse multipart form")
+func (h *MediaHandler) Upload(c *gin.Context) {
+	fileHeader, err := c.FormFile("file")
+	if err != nil {
+		ginWriteError(c, http.StatusBadRequest, "file field is required")
 		return
 	}
 
-	file, header, err := r.FormFile("file")
+	file, err := fileHeader.Open()
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "file field is required")
+		ginWriteError(c, http.StatusBadRequest, "failed to read uploaded file")
 		return
 	}
 	defer file.Close()
 
-	documentRef := r.FormValue("documentRef")
-	contentTypeID := r.FormValue("contentTypeId")
+	documentRef := c.PostForm("documentRef")
+	contentTypeID := c.PostForm("contentTypeId")
 
-	asset, err := h.uc.Upload(r.Context(), file, header.Filename, documentRef, contentTypeID)
+	asset, err := h.uc.Upload(c.Request.Context(), file, fileHeader.Filename, documentRef, contentTypeID)
 	if err != nil {
-		writeErr(w, err)
+		ginWriteErr(c, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, asset)
+	c.JSON(http.StatusCreated, asset)
 }

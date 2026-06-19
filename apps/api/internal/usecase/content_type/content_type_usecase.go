@@ -3,7 +3,7 @@ package content_type
 import (
 	"context"
 
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"github.com/google/uuid"
 
 	"project-abyssoftime-cms-v2/api/internal/domain/entity"
 	"project-abyssoftime-cms-v2/api/internal/domain/repository"
@@ -37,7 +37,7 @@ func (uc *UseCase) Create(ctx context.Context, ct *entity.ContentType) error {
 		return pkgerrors.ErrConflict
 	}
 	if ct.ID == "" {
-		ct.ID = primitive.NewObjectID().Hex()
+		ct.ID = uuid.New().String()
 	}
 	return uc.repo.Create(ctx, ct)
 }

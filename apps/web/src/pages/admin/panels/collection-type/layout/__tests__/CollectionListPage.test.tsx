@@ -16,6 +16,11 @@ const ct: ContentType = {
   Name: 'Blog Posts',
   Slug: 'blog-posts',
   Kind: 'collection',
+  Fields: [
+    { name: 'title', type: 'text' },
+    { name: 'active', type: 'boolean' },
+    { name: 'views', type: 'number' },
+  ],
   CreatedAt: '',
   UpdatedAt: '',
 }
@@ -48,6 +53,7 @@ let mock: MockAdapter
 
 beforeEach(() => {
   mock = new MockAdapter(api)
+  mock.onGet('/api/locales').reply(200, ['en'])
 })
 
 afterEach(() => {
@@ -57,7 +63,7 @@ afterEach(() => {
 
 describe('CollectionListPage — fallback (no registry columns)', () => {
   it('renders a row for each document using the first Data field as display', async () => {
-    mock.onGet('/api/document-manager/blog-posts').reply(200, [doc1, doc2])
+    mock.onGet('/api/document-manager/collection-type/blog-posts').reply(200, { items: [doc1, doc2], total: 2, start: 0, size: 20 })
     renderWithProviders(<CollectionListPage contentType={ct} />)
     await waitFor(() => {
       expect(screen.getByText('First Post')).toBeInTheDocument()
@@ -66,7 +72,7 @@ describe('CollectionListPage — fallback (no registry columns)', () => {
   })
 
   it('shows the status for each document', async () => {
-    mock.onGet('/api/document-manager/blog-posts').reply(200, [doc1, doc2])
+    mock.onGet('/api/document-manager/collection-type/blog-posts').reply(200, { items: [doc1, doc2], total: 2, start: 0, size: 20 })
     renderWithProviders(<CollectionListPage contentType={ct} />)
     await waitFor(() => {
       expect(screen.getByText('draft')).toBeInTheDocument()
@@ -75,7 +81,7 @@ describe('CollectionListPage — fallback (no registry columns)', () => {
   })
 
   it('shows empty state when no documents exist', async () => {
-    mock.onGet('/api/document-manager/blog-posts').reply(200, [])
+    mock.onGet('/api/document-manager/collection-type/blog-posts').reply(200, { items: [], total: 0, start: 0, size: 20 })
     renderWithProviders(<CollectionListPage contentType={ct} />)
     await waitFor(() => expect(screen.getByText(/no entries/i)).toBeInTheDocument())
   })
@@ -94,7 +100,7 @@ describe('CollectionListPage — registry columns', () => {
       ],
     })
 
-    mock.onGet('/api/document-manager/blog-posts').reply(200, [doc1])
+    mock.onGet('/api/document-manager/collection-type/blog-posts').reply(200, { items: [doc1], total: 1, start: 0, size: 20 })
     renderWithProviders(<CollectionListPage contentType={ct} />)
 
     await waitFor(() => {
@@ -112,7 +118,7 @@ describe('CollectionListPage — registry columns', () => {
       columns: [{ key: 'active', label: 'Active', type: 'boolean' }],
     })
 
-    mock.onGet('/api/document-manager/blog-posts').reply(200, [doc1, doc2])
+    mock.onGet('/api/document-manager/collection-type/blog-posts').reply(200, { items: [doc1, doc2], total: 2, start: 0, size: 20 })
     renderWithProviders(<CollectionListPage contentType={ct} />)
 
     await waitFor(() => {
@@ -129,7 +135,7 @@ describe('CollectionListPage — registry columns', () => {
       columns: [{ key: 'views', label: 'Views', type: 'number' }],
     })
 
-    mock.onGet('/api/document-manager/blog-posts').reply(200, [doc1])
+    mock.onGet('/api/document-manager/collection-type/blog-posts').reply(200, { items: [doc1], total: 1, start: 0, size: 20 })
     renderWithProviders(<CollectionListPage contentType={ct} />)
 
     await waitFor(() => expect(screen.getByText('42')).toBeInTheDocument())
@@ -144,7 +150,7 @@ describe('CollectionListPage — registry columns', () => {
       columns: [{ key: 'cover', label: 'Cover', type: 'image' }],
     })
 
-    mock.onGet('/api/document-manager/blog-posts').reply(200, [imgDoc])
+    mock.onGet('/api/document-manager/collection-type/blog-posts').reply(200, { items: [imgDoc], total: 1, start: 0, size: 20 })
     renderWithProviders(<CollectionListPage contentType={ct} />)
 
     await waitFor(() => {
@@ -156,7 +162,7 @@ describe('CollectionListPage — registry columns', () => {
 
 describe('CollectionListPage — navigation', () => {
   it('Edit link points to the new collection-type detail path', async () => {
-    mock.onGet('/api/document-manager/blog-posts').reply(200, [doc1])
+    mock.onGet('/api/document-manager/collection-type/blog-posts').reply(200, { items: [doc1], total: 1, start: 0, size: 20 })
     renderWithProviders(<CollectionListPage contentType={ct} />, {
       initialEntries: ['/admin/content-type/collection-type/blog-posts'],
     })
@@ -166,10 +172,9 @@ describe('CollectionListPage — navigation', () => {
     })
   })
 
-  it('Add entry button creates a document and navigates to detail page', async () => {
+  it('Add new item navigates to /new without creating a document', async () => {
     const user = userEvent.setup()
-    mock.onGet('/api/document-manager/blog-posts').reply(200, [])
-    mock.onPost('/api/document-manager/blog-posts').reply(201, { ...doc1, documentId: 'doc-new' })
+    mock.onGet('/api/document-manager/collection-type/blog-posts').reply(200, { items: [], total: 0, start: 0, size: 20 })
 
     renderWithProviders(<CollectionListPage contentType={ct} />, {
       initialEntries: ['/admin/content-type/collection-type/blog-posts'],
@@ -178,16 +183,14 @@ describe('CollectionListPage — navigation', () => {
     await waitFor(() => screen.getByRole('button', { name: /add/i }))
     await user.click(screen.getByRole('button', { name: /add/i }))
 
-    await waitFor(() =>
-      expect(mock.history.post.some((r) => r.url === '/api/document-manager/blog-posts')).toBe(true),
-    )
+    expect(mock.history.post).toHaveLength(0)
   })
 
   it('Delete button shows confirm dialog and calls DELETE', async () => {
     const user = userEvent.setup()
     vi.spyOn(window, 'confirm').mockReturnValue(true)
-    mock.onGet('/api/document-manager/blog-posts').reply(200, [doc1])
-    mock.onDelete('/api/document-manager/blog-posts/doc-1').reply(204)
+    mock.onGet('/api/document-manager/collection-type/blog-posts').reply(200, { items: [doc1], total: 1, start: 0, size: 20 })
+    mock.onDelete('/api/document-manager/collection-type/blog-posts/doc-1').reply(204)
 
     renderWithProviders(<CollectionListPage contentType={ct} />)
 
@@ -196,14 +199,14 @@ describe('CollectionListPage — navigation', () => {
 
     expect(window.confirm).toHaveBeenCalled()
     await waitFor(() =>
-      expect(mock.history.delete.some((r) => r.url === '/api/document-manager/blog-posts/doc-1')).toBe(true),
+      expect(mock.history.delete.some((r) => r.url === '/api/document-manager/collection-type/blog-posts/doc-1')).toBe(true),
     )
   })
 
   it('Delete button does not call DELETE when user cancels confirm', async () => {
     const user = userEvent.setup()
     vi.spyOn(window, 'confirm').mockReturnValue(false)
-    mock.onGet('/api/document-manager/blog-posts').reply(200, [doc1])
+    mock.onGet('/api/document-manager/collection-type/blog-posts').reply(200, { items: [doc1], total: 1, start: 0, size: 20 })
 
     renderWithProviders(<CollectionListPage contentType={ct} />)
 

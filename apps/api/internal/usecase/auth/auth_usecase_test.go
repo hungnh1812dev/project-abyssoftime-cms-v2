@@ -14,9 +14,6 @@ import (
 	pkgjwt "project-abyssoftime-cms-v2/api/pkg/jwt"
 )
 
-// ---- helpers ---------------------------------------------------------------
-
-// mustHash generates a bcrypt hash; panics on error (safe for test init).
 func mustHash(password string) string {
 	h, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.MinCost)
 	if err != nil {
@@ -34,8 +31,6 @@ func validRefreshToken(t *testing.T, userID string) string {
 	return tok
 }
 
-// ---- Register --------------------------------------------------------------
-
 func TestRegister(t *testing.T) {
 	ctx := context.Background()
 
@@ -49,44 +44,37 @@ func TestRegister(t *testing.T) {
 		wantRole   entity.Role
 	}{
 		{
-			name:     "first registration — assigned admin role",
+			name:     "first registration — assigned super_admin role",
 			email:    "new@example.com",
 			password: "secret123",
 			setupRepo: func(r *repomock.UserRepository) {
+				r.HasSuperAdminFn = func(_ context.Context) (bool, error) { return false, nil }
 				r.FindByEmailFn = func(_ context.Context, _ string) (*entity.User, error) {
 					return nil, pkgerrors.ErrNotFound
 				}
-				r.CountAdminsFn = func(_ context.Context) (int64, error) { return 0, nil }
 				r.CreateFn = func(_ context.Context, u *entity.User) error {
 					u.ID = "gen-id-1"
 					return nil
 				}
 			},
 			wantUserID: true,
-			wantRole:   entity.RoleAdmin,
+			wantRole:   entity.RoleSuperAdmin,
 		},
 		{
-			name:     "subsequent registration — assigned guest role",
+			name:     "registration blocked after super_admin exists",
 			email:    "guest@example.com",
 			password: "secret123",
 			setupRepo: func(r *repomock.UserRepository) {
-				r.FindByEmailFn = func(_ context.Context, _ string) (*entity.User, error) {
-					return nil, pkgerrors.ErrNotFound
-				}
-				r.CountAdminsFn = func(_ context.Context) (int64, error) { return 1, nil }
-				r.CreateFn = func(_ context.Context, u *entity.User) error {
-					u.ID = "gen-id-2"
-					return nil
-				}
+				r.HasSuperAdminFn = func(_ context.Context) (bool, error) { return true, nil }
 			},
-			wantUserID: true,
-			wantRole:   entity.RoleGuest,
+			wantErr: pkgerrors.ErrForbidden,
 		},
 		{
 			name:     "conflict — email already registered",
 			email:    "dup@example.com",
 			password: "secret123",
 			setupRepo: func(r *repomock.UserRepository) {
+				r.HasSuperAdminFn = func(_ context.Context) (bool, error) { return false, nil }
 				r.FindByEmailFn = func(_ context.Context, _ string) (*entity.User, error) {
 					return &entity.User{ID: "existing"}, nil
 				}
@@ -94,26 +82,24 @@ func TestRegister(t *testing.T) {
 			wantErr: pkgerrors.ErrConflict,
 		},
 		{
-			name:     "repo FindByEmail returns unexpected error",
+			name:     "HasSuperAdmin returns error",
 			email:    "x@example.com",
 			password: "secret123",
 			setupRepo: func(r *repomock.UserRepository) {
-				r.FindByEmailFn = func(_ context.Context, _ string) (*entity.User, error) {
-					return nil, errors.New("db down")
+				r.HasSuperAdminFn = func(_ context.Context) (bool, error) {
+					return false, errors.New("db down")
 				}
 			},
 			wantErr: errors.New("db down"),
 		},
 		{
-			name:     "CountAdmins returns error",
-			email:    "z@example.com",
+			name:     "repo FindByEmail returns unexpected error",
+			email:    "x@example.com",
 			password: "secret123",
 			setupRepo: func(r *repomock.UserRepository) {
+				r.HasSuperAdminFn = func(_ context.Context) (bool, error) { return false, nil }
 				r.FindByEmailFn = func(_ context.Context, _ string) (*entity.User, error) {
-					return nil, pkgerrors.ErrNotFound
-				}
-				r.CountAdminsFn = func(_ context.Context) (int64, error) {
-					return 0, errors.New("db down")
+					return nil, errors.New("db down")
 				}
 			},
 			wantErr: errors.New("db down"),
@@ -123,10 +109,10 @@ func TestRegister(t *testing.T) {
 			email:    "y@example.com",
 			password: "secret123",
 			setupRepo: func(r *repomock.UserRepository) {
+				r.HasSuperAdminFn = func(_ context.Context) (bool, error) { return false, nil }
 				r.FindByEmailFn = func(_ context.Context, _ string) (*entity.User, error) {
 					return nil, pkgerrors.ErrNotFound
 				}
-				r.CountAdminsFn = func(_ context.Context) (int64, error) { return 0, nil }
 				r.CreateFn = func(_ context.Context, _ *entity.User) error {
 					return errors.New("insert failed")
 				}
@@ -164,8 +150,6 @@ func TestRegister(t *testing.T) {
 		})
 	}
 }
-
-// ---- Login -----------------------------------------------------------------
 
 func TestLogin(t *testing.T) {
 	ctx := context.Background()
@@ -253,8 +237,6 @@ func TestLogin(t *testing.T) {
 	}
 }
 
-// ---- RefreshToken ----------------------------------------------------------
-
 func TestRefreshToken(t *testing.T) {
 	ctx := context.Background()
 
@@ -266,7 +248,7 @@ func TestRefreshToken(t *testing.T) {
 		wantNonEmpty bool
 	}{
 		{
-			name: "success — returns new access token",
+			name:       "success — returns new access token",
 			buildToken: func() string { return validRefreshToken(t, "u1") },
 			setupRepo: func(r *repomock.UserRepository) {
 				r.FindByIDFn = func(_ context.Context, id string) (*entity.User, error) {
@@ -282,7 +264,7 @@ func TestRefreshToken(t *testing.T) {
 			wantErr:    pkgerrors.ErrUnauthorized,
 		},
 		{
-			name: "user no longer exists → ErrUnauthorized",
+			name:       "user no longer exists → ErrUnauthorized",
 			buildToken: func() string { return validRefreshToken(t, "deleted-user") },
 			setupRepo: func(r *repomock.UserRepository) {
 				r.FindByIDFn = func(_ context.Context, _ string) (*entity.User, error) {
@@ -317,8 +299,6 @@ func TestRefreshToken(t *testing.T) {
 	}
 }
 
-// ---- Logout ----------------------------------------------------------------
-
 func TestLogout(t *testing.T) {
 	ctx := context.Background()
 	repo := &repomock.UserRepository{}
@@ -329,36 +309,34 @@ func TestLogout(t *testing.T) {
 	}
 }
 
-// ---- SetupStatus -----------------------------------------------------------
-
 func TestSetupStatus(t *testing.T) {
 	ctx := context.Background()
 
 	tests := []struct {
-		name        string
-		setupRepo   func(*repomock.UserRepository)
-		wantExists  bool
-		wantErr     bool
+		name       string
+		setupRepo  func(*repomock.UserRepository)
+		wantExists bool
+		wantErr    bool
 	}{
 		{
-			name: "no admins — adminExists false",
+			name: "no super_admin — returns false",
 			setupRepo: func(r *repomock.UserRepository) {
-				r.CountAdminsFn = func(_ context.Context) (int64, error) { return 0, nil }
+				r.HasSuperAdminFn = func(_ context.Context) (bool, error) { return false, nil }
 			},
 			wantExists: false,
 		},
 		{
-			name: "admin exists — adminExists true",
+			name: "super_admin exists — returns true",
 			setupRepo: func(r *repomock.UserRepository) {
-				r.CountAdminsFn = func(_ context.Context) (int64, error) { return 1, nil }
+				r.HasSuperAdminFn = func(_ context.Context) (bool, error) { return true, nil }
 			},
 			wantExists: true,
 		},
 		{
 			name: "repo error propagated",
 			setupRepo: func(r *repomock.UserRepository) {
-				r.CountAdminsFn = func(_ context.Context) (int64, error) {
-					return 0, errors.New("db down")
+				r.HasSuperAdminFn = func(_ context.Context) (bool, error) {
+					return false, errors.New("db down")
 				}
 			},
 			wantErr: true,

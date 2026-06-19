@@ -26,6 +26,30 @@ const MediaLibraryPage = lazy(() =>
   })),
 );
 
+const UsersPage = lazy(() =>
+  import("@/pages/admin/settings/UsersPage").then((m) => ({
+    default: m.UsersPage,
+  })),
+);
+
+const AccessTokensPage = lazy(() =>
+  import("@/pages/admin/settings/AccessTokensPage").then((m) => ({
+    default: m.AccessTokensPage,
+  })),
+);
+
+const RolesPage = lazy(() =>
+  import("@/pages/admin/settings/RolesPage").then((m) => ({
+    default: m.RolesPage,
+  })),
+);
+
+const InviteAcceptPage = lazy(() =>
+  import("@/pages/auth/InviteAcceptPage").then((m) => ({
+    default: m.InviteAcceptPage,
+  })),
+);
+
 function PanelFallback() {
   return <div className="text-muted-foreground p-4">Loading…</div>;
 }
@@ -35,6 +59,14 @@ export function AppRouter() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route
+        path="/invite/:token"
+        element={
+          <Suspense fallback={<PanelFallback />}>
+            <InviteAcceptPage />
+          </Suspense>
+        }
+      />
       <Route
         path="/403"
         element={
@@ -70,6 +102,14 @@ export function AppRouter() {
           }
         />
         <Route
+          path="content-type/collection-type/:slug/new"
+          element={
+            <Suspense fallback={<PanelFallback />}>
+              <CollectionDetailPage />
+            </Suspense>
+          }
+        />
+        <Route
           path="content-type/collection-type/:slug/:id"
           element={
             <Suspense fallback={<PanelFallback />}>
@@ -83,6 +123,36 @@ export function AppRouter() {
             <Suspense fallback={<PanelFallback />}>
               <MediaLibraryPage />
             </Suspense>
+          }
+        />
+        <Route
+          path="settings/users"
+          element={
+            <ProtectedRoute minRole="admin">
+              <Suspense fallback={<PanelFallback />}>
+                <UsersPage />
+              </Suspense>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="settings/access-tokens"
+          element={
+            <ProtectedRoute minRole="super_admin">
+              <Suspense fallback={<PanelFallback />}>
+                <AccessTokensPage />
+              </Suspense>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="settings/roles"
+          element={
+            <ProtectedRoute minRole="super_admin">
+              <Suspense fallback={<PanelFallback />}>
+                <RolesPage />
+              </Suspense>
+            </ProtectedRoute>
           }
         />
       </Route>

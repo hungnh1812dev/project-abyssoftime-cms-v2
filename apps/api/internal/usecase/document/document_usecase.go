@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"github.com/google/uuid"
 
 	"project-abyssoftime-cms-v2/api/internal/domain/entity"
 	"project-abyssoftime-cms-v2/api/internal/domain/repository"
@@ -52,7 +52,7 @@ func (uc *UseCase) Save(ctx context.Context, contentTypeSlug string, doc *entity
 	doc.Locale = locale
 
 	if doc.DocumentID == "" {
-		doc.DocumentID = primitive.NewObjectID().Hex()
+		doc.DocumentID = uuid.New().String()
 	}
 	existing, err := uc.repo.FindDraftByDocumentID(ctx, contentTypeSlug, doc.DocumentID, doc.Locale)
 	if err != nil && !pkgerrors.Is(err, pkgerrors.ErrNotFound) {

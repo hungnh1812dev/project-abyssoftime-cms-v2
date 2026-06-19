@@ -2,27 +2,30 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
-	"net/http"
+	"net"
 
-	"project-abyssoftime-cms-v2/api/graphql/codegen"
-	"project-abyssoftime-cms-v2/api/graphql/generated"
-	"project-abyssoftime-cms-v2/api/graphql/resolver"
+	"project-abyssoftime-cms-v2/api/graphql/dynamic"
 	"project-abyssoftime-cms-v2/api/internal/config"
+	grpcdelivery "project-abyssoftime-cms-v2/api/internal/delivery/grpc"
+	deliveryhttp "project-abyssoftime-cms-v2/api/internal/delivery/http"
 	deliveryhandler "project-abyssoftime-cms-v2/api/internal/delivery/http/handler"
-	"project-abyssoftime-cms-v2/api/internal/delivery/http/middleware"
 	"project-abyssoftime-cms-v2/api/internal/domain/repository"
 	cloudinaryadapter "project-abyssoftime-cms-v2/api/internal/infrastructure/cloudinary"
+	"project-abyssoftime-cms-v2/api/internal/infrastructure/gormdb"
 	"project-abyssoftime-cms-v2/api/internal/infrastructure/mongodb"
 	s3adapter "project-abyssoftime-cms-v2/api/internal/infrastructure/s3"
+
+	"go.mongodb.org/mongo-driver/mongo"
+	"gorm.io/gorm"
 	"project-abyssoftime-cms-v2/api/internal/usecase/auth"
 	contenttype "project-abyssoftime-cms-v2/api/internal/usecase/content_type"
 	docuc "project-abyssoftime-cms-v2/api/internal/usecase/document"
+	accesstokenuc "project-abyssoftime-cms-v2/api/internal/usecase/access_token"
+	inviteuc "project-abyssoftime-cms-v2/api/internal/usecase/invite"
 	mediauc "project-abyssoftime-cms-v2/api/internal/usecase/media"
+	useruc "project-abyssoftime-cms-v2/api/internal/usecase/user"
 	pkgjwt "project-abyssoftime-cms-v2/api/pkg/jwt"
-
-	gqlhandler "github.com/99designs/gqlgen/graphql/handler"
 )
 
 func newStorageAdapter(ctx context.Context, cfg *config.Config) (repository.StorageAdapter, error) {
@@ -39,13 +42,6 @@ func newStorageAdapter(ctx context.Context, cfg *config.Config) (repository.Stor
 }
 
 func main() {
-	const schemaPath = "graphql/schema.graphqls"
-	const sentinelPath = "graphql/.graphql.hash"
-	if err := codegen.EnsureUpToDate(schemaPath, sentinelPath, codegen.DefaultRunner()); err != nil {
-		log.Fatalf("graphql codegen: %v", err)
-	}
-	log.Println("graphql: generated code up to date")
-
 	ctx := context.Background()
 
 	cfg, err := config.Load()
@@ -55,45 +51,97 @@ func main() {
 
 	pkgjwt.SetSecret(cfg.JWTSecret)
 
-	mongoClient, err := mongodb.NewClient(ctx, cfg.DB.Mongo.URI)
-	if err != nil {
-		log.Fatalf("mongodb connect: %v", err)
-	}
-	defer func() {
-		if err := mongoClient.Disconnect(ctx); err != nil {
-			log.Printf("mongodb disconnect: %v", err)
+	// --- database connections ---
+	needsMongo := cfg.DB.EntityDB.User == "mongo" ||
+		cfg.DB.EntityDB.ContentType == "mongo" ||
+		cfg.DB.EntityDB.Document == "mongo" ||
+		cfg.DB.EntityDB.Media == "mongo"
+	needsSQL := cfg.DB.EntityDB.User == "sql" ||
+		cfg.DB.EntityDB.ContentType == "sql" ||
+		cfg.DB.EntityDB.Document == "sql" ||
+		cfg.DB.EntityDB.Media == "sql"
+
+	var mongoDB *mongo.Database
+	if needsMongo {
+		mongoClient, err := mongodb.NewClient(ctx, cfg.DB.Mongo.URI)
+		if err != nil {
+			log.Fatalf("mongodb connect: %v", err)
 		}
-	}()
-	log.Println("connected to mongodb")
+		defer func() {
+			if err := mongoClient.Disconnect(ctx); err != nil {
+				log.Printf("mongodb disconnect: %v", err)
+			}
+		}()
+		log.Println("connected to mongodb")
 
-	db := mongodb.Database(mongoClient, cfg.DB.Mongo.Name)
+		mongoDB = mongodb.Database(mongoClient, cfg.DB.Mongo.Name)
 
-	if err := mongodb.EnsureIndexes(ctx, db); err != nil {
-		log.Fatalf("ensure indexes: %v", err)
+		if err := mongodb.EnsureIndexes(ctx, mongoDB); err != nil {
+			log.Fatalf("ensure indexes: %v", err)
+		}
+		log.Println("indexes ensured")
 	}
-	log.Println("indexes ensured")
 
-	// repositories
-	userRepo := mongodb.NewUserRepository(db)
-	ctRepo := mongodb.NewContentTypeRepository(db)
-	docRepo := mongodb.NewDocumentRepository(db)
-	mediaRepo := mongodb.NewMediaAssetRepository(db)
+	var sqlDB *gorm.DB
+	if needsSQL {
+		var err error
+		sqlDB, err = gormdb.NewClient(cfg.DB.SQL.Driver, cfg.DB.SQL.DSN)
+		if err != nil {
+			log.Fatalf("gorm connect: %v", err)
+		}
+		if err := gormdb.AutoMigrate(sqlDB); err != nil {
+			log.Fatalf("gorm auto-migrate: %v", err)
+		}
+		log.Printf("connected to sql (%s)", cfg.DB.SQL.Driver)
+	}
 
-	// storage adapter: config-selected, S3 or Cloudinary, behind the same interface
+	// --- repository factory ---
+	var userRepo repository.UserRepository
+	if cfg.DB.EntityDB.User == "sql" {
+		userRepo = gormdb.NewUserRepository(sqlDB)
+	} else {
+		userRepo = mongodb.NewUserRepository(mongoDB)
+	}
+
+	var ctRepo repository.ContentTypeRepository
+	if cfg.DB.EntityDB.ContentType == "sql" {
+		ctRepo = gormdb.NewContentTypeRepository(sqlDB)
+	} else {
+		ctRepo = mongodb.NewContentTypeRepository(mongoDB)
+	}
+
+	var docRepo repository.DocumentRepository
+	if cfg.DB.EntityDB.Document == "sql" {
+		docRepo = gormdb.NewDocumentRepository(sqlDB)
+	} else {
+		docRepo = mongodb.NewDocumentRepository(mongoDB)
+	}
+
+	var mediaRepo repository.MediaAssetRepository
+	if cfg.DB.EntityDB.Media == "sql" {
+		mediaRepo = gormdb.NewMediaAssetRepository(sqlDB)
+	} else {
+		mediaRepo = mongodb.NewMediaAssetRepository(mongoDB)
+	}
+
 	storage, err := newStorageAdapter(ctx, cfg)
 	if err != nil {
 		log.Fatalf("%s init: %v", cfg.Media.Driver, err)
 	}
 	log.Printf("storage provider: %s", cfg.Media.Driver)
 
-	// usecases
+	// --- invite + access token repositories ---
+	inviteRepo := mongodb.NewInviteRepository(mongoDB)
+	accessTokenRepo := mongodb.NewAccessTokenRepository(mongoDB)
+
 	authUC := auth.New(userRepo)
 	ctUC := contenttype.New(ctRepo)
 	documentUC := docuc.New(docRepo, mediaRepo, cfg.SupportedLocales)
 	mediaUC := mediauc.New(mediaRepo, storage, cfg.Media.GenerateThumbnail)
+	userUC := useruc.New(userRepo)
+	inviteUC := inviteuc.New(inviteRepo, userRepo)
+	accessTokenUC := accesstokenuc.New(accessTokenRepo)
 
-	// content-type schema-as-code sync: JSON definitions are the source of
-	// truth, reconciled into Mongo before the server starts accepting traffic.
 	defsDir := cfg.ContentTypeDir
 	defs, err := contenttype.LoadDefinitions(defsDir)
 	if err != nil {
@@ -104,83 +152,48 @@ func main() {
 	}
 	log.Printf("synced %d content-type definitions from %s", len(defs), defsDir)
 
-	// handlers
-	authHandler := deliveryhandler.NewAuthHandler(authUC)
-	ctHandler := deliveryhandler.NewContentTypeHandler(ctUC)
-	docHandler := deliveryhandler.NewDocumentHandler(documentUC, ctUC)
-	mediaHandler := deliveryhandler.NewMediaHandler(mediaUC)
-	localeHandler := deliveryhandler.NewLocaleHandler(cfg.SupportedLocales)
+	// Dynamic GraphQL — schema generated from content-type definitions
+	gqlFactory := dynamic.NewResolverFactory(documentUC, ctUC)
+	gqlHandler, err := gqlFactory.BuildHandler(defs)
+	if err != nil {
+		log.Fatalf("graphql schema: %v", err)
+	}
 
-	mux := http.NewServeMux()
-
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, `{"status":"ok"}`)
+	// Gin router (REST + GraphQL)
+	router := deliveryhttp.SetupRouter(deliveryhttp.RouterConfig{
+		AuthHandler:    deliveryhandler.NewAuthHandler(authUC),
+		CTHandler:      deliveryhandler.NewContentTypeHandler(ctUC),
+		DocHandler:     deliveryhandler.NewDocumentHandler(documentUC, ctUC),
+		MediaHandler:   deliveryhandler.NewMediaHandler(mediaUC),
+		LocaleHandler:  deliveryhandler.NewLocaleHandler(cfg.SupportedLocales),
+		UserHandler:        deliveryhandler.NewUserHandler(userUC),
+		InviteHandler:      deliveryhandler.NewInviteHandler(inviteUC),
+		AccessTokenHandler: deliveryhandler.NewAccessTokenHandler(accessTokenUC),
+		GraphQLHandler:     gqlHandler,
+		GraphQLPath:        cfg.GraphQL.Path,
 	})
 
-	// auth routes
-	mux.HandleFunc("GET /auth/setup", authHandler.SetupStatus)
-	mux.HandleFunc("POST /auth/register", authHandler.Register)
-	mux.HandleFunc("POST /auth/login", authHandler.Login)
-	mux.HandleFunc("POST /auth/refresh", authHandler.Refresh)
-	mux.HandleFunc("POST /auth/logout", authHandler.Logout)
+	// gRPC server
+	grpcSrv := grpcdelivery.NewServer(authUC, ctUC, documentUC, mediaUC)
 
-	// content type routes
-	adminOnly := func(h http.HandlerFunc) http.Handler {
-		return middleware.Auth(middleware.RequireRole("admin", h))
-	}
-	mux.Handle("GET /api/content-types", adminOnly(ctHandler.ListSummary))
-	mux.Handle("GET /api/content-types/{identifier}", adminOnly(ctHandler.Get))
+	// Start gRPC in a goroutine
+	go func() {
+		grpcAddr := ":" + cfg.GRPCPort
+		lis, err := net.Listen("tcp", grpcAddr)
+		if err != nil {
+			log.Fatalf("grpc listen: %v", err)
+		}
+		log.Printf("gRPC server listening on %s", grpcAddr)
+		if err := grpcSrv.Serve(lis); err != nil {
+			log.Fatalf("grpc serve: %v", err)
+		}
+	}()
 
-	// document routes — single-type
-	authRequired := func(h http.HandlerFunc) http.Handler {
-		return middleware.Auth(http.HandlerFunc(h))
-	}
-	mux.Handle("GET /api/document-manager/single-type/{slug}", authRequired(docHandler.GetSingleType))
-	mux.Handle("PUT /api/document-manager/single-type/{slug}", adminOnly(docHandler.SaveSingleType))
-	mux.Handle("POST /api/document-manager/single-type/{slug}/publish", adminOnly(docHandler.PublishSingleType))
-	mux.Handle("POST /api/document-manager/single-type/{slug}/unpublish", adminOnly(docHandler.UnpublishSingleType))
-
-	// document routes — collection-type
-	mux.Handle("GET /api/document-manager/collection-type/{slug}", authRequired(docHandler.ListCollection))
-	mux.Handle("GET /api/document-manager/collection-type/{slug}/{documentId}", authRequired(docHandler.GetCollection))
-	mux.Handle("POST /api/document-manager/collection-type/{slug}", adminOnly(docHandler.CreateCollection))
-	mux.Handle("PUT /api/document-manager/collection-type/{slug}/{documentId}", adminOnly(docHandler.UpdateCollection))
-	mux.Handle("DELETE /api/document-manager/collection-type/{slug}/{documentId}", adminOnly(docHandler.DeleteCollection))
-	mux.Handle("POST /api/document-manager/collection-type/{slug}/{documentId}/publish", adminOnly(docHandler.PublishCollection))
-	mux.Handle("POST /api/document-manager/collection-type/{slug}/{documentId}/unpublish", adminOnly(docHandler.UnpublishCollection))
-
-	// public document route, no auth, only returns published documents
-	mux.HandleFunc("GET /api/public/document-manager/{slug}/{documentId}", docHandler.GetPublic)
-
-	// media routes
-	mux.Handle("GET /api/media", adminOnly(mediaHandler.List))
-	mux.Handle("POST /api/media/upload", adminOnly(mediaHandler.Upload))
-	mux.Handle("DELETE /api/media/{id}", adminOnly(mediaHandler.Delete))
-
-	mux.HandleFunc("GET /api/locales", localeHandler.List)
-
-	// GraphQL endpoint alongside REST — same usecases, auth via @auth directive.
-	gqlSchema := generated.NewExecutableSchema(generated.Config{
-		Resolvers: &resolver.Resolver{
-			DocumentUC:    documentUC,
-			ContentTypeUC: ctUC,
-		},
-		Directives: generated.DirectiveRoot{
-			Auth: resolver.AuthDirective,
-		},
-	})
-	gqlSrv := gqlhandler.NewDefaultServer(gqlSchema)
-	mux.Handle(cfg.GraphQL.Path, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := resolver.WithRequest(r.Context(), r)
-		gqlSrv.ServeHTTP(w, r.WithContext(ctx))
-	}))
-	log.Printf("graphql endpoint: %s", cfg.GraphQL.Path)
-
+	// Start REST + GraphQL (blocks)
 	addr := ":" + cfg.Port
-	log.Printf("server listening on %s", addr)
-	if err := http.ListenAndServe(addr, mux); err != nil {
+	log.Printf("REST server listening on %s", addr)
+	log.Printf("graphql endpoint: %s", cfg.GraphQL.Path)
+	if err := router.Run(addr); err != nil {
 		log.Fatal(err)
 	}
 }

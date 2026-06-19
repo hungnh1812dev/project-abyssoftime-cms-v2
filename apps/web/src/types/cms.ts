@@ -48,6 +48,8 @@ export interface MediaAsset {
   fileName: string
   fileExt: string
   hash: string
+  width: number
+  height: number
   documentRef: string
   contentTypeId: string
   createdAt: string

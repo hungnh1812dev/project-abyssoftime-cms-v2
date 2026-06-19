@@ -356,7 +356,8 @@ All routes remain under `/admin`. Sub-paths are restructured:
 |---|---|---|
 | `/admin/content-type/single-type/:slug` | `SingleTypePage` | Single-type edit form |
 | `/admin/content-type/collection-type/:slug` | `CollectionListPage` | Collection-type list + "Add new item" |
-| `/admin/content-type/collection-type/:slug/:id` | `CollectionDetailPage` | Collection-type item edit form |
+| `/admin/content-type/collection-type/:slug/new` | `CollectionDetailPage` | New item — empty form, no `documentId` |
+| `/admin/content-type/collection-type/:slug/:id` | `CollectionDetailPage` | Existing item edit form |
 
 Existing `/admin/content-types/:slug` and `/admin/content-types/:slug/:id` routes are removed.
 
@@ -458,19 +459,30 @@ Replaces `SingleTypePanel`. Responsibilities:
   - `boolean` → `✓` / `—`
   - `number` → numeric string
   - `image` → `<img>` thumbnail (src = field value)
-- "Add new item": creates document (`useCreateDocument`) → navigate to `/admin/content-type/collection-type/:slug/:id`
-- Per-row: Edit link → detail page; Delete button → `useDeleteDocument` (with `window.confirm` guard)
+- "Add new item": navigates to `/admin/content-type/collection-type/:slug/new` (does **not** create a document — the empty form is rendered without a `documentId`)
+- Per-row: Edit link → detail page (`/:slug/:id`); Delete button → `useDeleteDocument` (with `window.confirm` guard)
 - No locale switching on the list view (locale is only relevant on the detail/edit form)
 
 ---
 
 ### 7.6 Collection-Type Detail Page (`CollectionDetailPage`)
 
-- Navigates by URL (`/admin/content-type/collection-type/:slug/:id`)
+- Two URL forms:
+  - **New item**: `/admin/content-type/collection-type/:slug/new` — no `documentId` in URL
+  - **Existing item**: `/admin/content-type/collection-type/:slug/:id` — `documentId` in URL
+- **New item flow** (`/new`):
+  1. Renders an empty form based on content-type fields (no API fetch)
+  2. Publish/Unpublish buttons disabled until first Save
+  3. On Save → `useCreateCollectionDocument` → API returns the created document with `documentId`
+  4. After successful save → `navigate(`/admin/content-type/collection-type/${slug}/${documentId}?locale=${locale}`)` — replaces the `/new` URL with the real document URL
+  5. Page reloads as the existing-item form with full lifecycle (dirty tracking, publish/unpublish)
+- **Existing item flow** (`/:id`):
+  - Fetches document by `documentId` → pre-fills form
+  - Save mutation sends `{ data, locale: activeLocale }` via `useUpdateCollectionDocument`
+  - Full lifecycle: dirty tracking, toasts, post-save reset
 - Maintains local `locale` state identical to `SingleTypePage`
 - When `useLocales()` returns more than one locale, renders a locale `<select>` in `renderActions`
 - Switching locale reloads the document for the new locale; form resets and `isDirty` becomes `false`
-- Save mutation sends `{ data, locale: activeLocale }` — identical shape to existing `useUpdateDocument`
 - Back link returns to `/admin/content-type/collection-type/:slug`
 - `ContentTypeLayout` used with `renderActions` for locale selector + Publish/Unpublish
 
@@ -1520,8 +1532,13 @@ Enter admin page:
             └── if collection-type → Render CollectionListPage
                 └── GET /api/document-manager/collection-type/{slug}?start=0&size=20&locale={locale}
                     └── Paginated table (projected fields only)
-                        └── Click item / Edit / Add new
-                            └── Navigate to CollectionDetailPage
+                        ├── Click "Add new item"
+                        │   └── Navigate to /admin/content-type/collection-type/{slug}/new
+                        │       └── Empty form (no API fetch, no documentId)
+                        │           └── Save → POST /api/document-manager/collection-type/{slug}
+                        │               └── 201 → navigate to /{slug}/{documentId}?locale={locale}
+                        └── Click item / Edit
+                            └── Navigate to /admin/content-type/collection-type/{slug}/{documentId}
                                 └── GET /api/document-manager/collection-type/{slug}/{documentId}?locale={locale}
                                     ├── 404 → error state
                                     └── 200 → form pre-filled with full data
@@ -1536,10 +1553,15 @@ Direct enter collection-type list (/admin/content-type/collection-type/:slug):
 └── GET /api/content-types/{slug} → full schema
     └── Render CollectionListPage → same collection list flow above
 
+Direct enter new item (/admin/content-type/collection-type/:slug/new):
+└── Sidebar: GET /api/content-types
+└── GET /api/content-types/{slug} → full schema
+    └── Render CollectionDetailPage (new mode) → empty form, Save creates document
+
 Direct enter collection-type document (/admin/content-type/collection-type/:slug/:id):
 └── Sidebar: GET /api/content-types
 └── GET /api/content-types/{slug} → full schema
-    └── Render ContentTypePanel (collection mode)
+    └── Render CollectionDetailPage (edit mode)
         └── GET /api/document-manager/collection-type/{slug}/{documentId}?locale={locale}
 ```
 
@@ -1732,3 +1754,1376 @@ apps/web/src/hooks/useDocuments.ts    ← replaced by kind-specific hook files
 | **Never** | Include `documentId` in single-type URLs — slug + locale is the unique identifier |
 | **Ask first** | Changing default `size` from 20 or maximum from 100 |
 | **Ask first** | Adding sort parameters to collection list endpoint |
+
+---
+
+## 11. Backend Tech Stack Refactoring
+
+### 11.1 Objective
+
+Refactor the API backend from a single-service, MongoDB-only architecture to a multi-protocol, multi-database architecture that supports:
+
+1. **Gin** replaces `net/http` + `http.ServeMux` for REST API routing, middleware, and request handling
+2. **gqlgen** enhanced with **dynamic schema generation** — each content-type JSON definition auto-generates GraphQL types and query/mutation fields at startup (no static schema file)
+3. **gRPC** for inter-service communication — the CMS exposes a gRPC server mirroring the full REST surface AND acts as a gRPC client to call external microservices
+4. **GORM** for MySQL/PostgreSQL as an alternative to MongoDB — every entity supports both a GORM and a MongoDB adapter, selectable per-entity via config
+5. **mongo-driver** continues as the MongoDB adapter (already in place)
+
+**Target users:** CMS developers and administrators. External services consuming CMS content via gRPC.
+
+**Constraint:** All existing REST API endpoints retain the same URL paths and response shapes. The frontend requires zero changes from this refactoring.
+
+---
+
+### 11.2 Tech Stack Summary
+
+| Layer | Current | After Refactor |
+|-------|---------|----------------|
+| REST framework | `net/http` + `http.ServeMux` | **Gin** (`github.com/gin-gonic/gin`) |
+| GraphQL | `gqlgen` (static schema) | `gqlgen` + **dynamic schema generation** per content-type |
+| gRPC | *(none)* | **gRPC server + client** (`google.golang.org/grpc`) |
+| SQL database | *(none)* | **GORM** (`gorm.io/gorm`) with MySQL + PostgreSQL drivers |
+| MongoDB | `go.mongodb.org/mongo-driver` | *(unchanged)* |
+| DB selection | MongoDB only | **Configurable per entity** via env vars |
+
+---
+
+### 11.3 Project Structure (After Refactor)
+
+```
+apps/api/
+├── cmd/
+│   └── server/
+│       └── main.go                           # Wires all protocols: Gin, gRPC, GraphQL
+├── content-types/                            # JSON schema-as-code definitions (unchanged)
+├── proto/                                    # gRPC protocol buffer definitions
+│   └── cms/
+│       └── v1/
+│           ├── document.proto
+│           ├── content_type.proto
+│           ├── media.proto
+│           └── auth.proto
+├── graphql/
+│   ├── dynamic/                              # Dynamic schema builder (new)
+│   │   ├── schema_builder.go                 # Builds SDL from content-type definitions
+│   │   ├── schema_builder_test.go
+│   │   ├── resolver_factory.go               # Creates resolvers per content-type
+│   │   └── resolver_factory_test.go
+│   ├── codegen/                              # Retained for base types codegen
+│   ├── generated/                            # gqlgen-generated code (base types only)
+│   ├── model/
+│   └── resolver/
+│       ├── resolver.go
+│       ├── directive.go
+│       └── schema.resolvers.go               # Base resolvers (contentTypes query, etc.)
+├── internal/
+│   ├── config/
+│   │   └── config.go                         # Extended with GORM, gRPC, per-entity DB config
+│   ├── domain/
+│   │   ├── entity/                           # Entities gain GORM struct tags alongside bson
+│   │   │   ├── content_type.go
+│   │   │   ├── document.go
+│   │   │   ├── user.go
+│   │   │   └── media_asset.go
+│   │   └── repository/                       # Interfaces unchanged
+│   │       ├── document_repository.go
+│   │       ├── content_type_repository.go
+│   │       ├── user_repository.go
+│   │       ├── media_asset_repository.go
+│   │       └── storage_adapter.go
+│   ├── usecase/                              # Business logic unchanged — DB-agnostic
+│   │   ├── auth/
+│   │   ├── document/
+│   │   ├── content_type/
+│   │   └── media/
+│   ├── infrastructure/
+│   │   ├── mongodb/                          # Existing MongoDB adapters (unchanged)
+│   │   ├── gormdb/                           # NEW: GORM-based adapters
+│   │   │   ├── client.go                     # GORM connection + auto-migrate
+│   │   │   ├── client_test.go
+│   │   │   ├── user_repository.go
+│   │   │   ├── user_repository_test.go
+│   │   │   ├── content_type_repository.go
+│   │   │   ├── content_type_repository_test.go
+│   │   │   ├── document_repository.go        # Uses JSONB for flexible data
+│   │   │   ├── document_repository_test.go
+│   │   │   ├── media_asset_repository.go
+│   │   │   └── media_asset_repository_test.go
+│   │   ├── cloudinary/
+│   │   └── s3/
+│   ├── delivery/
+│   │   ├── http/                             # Gin-based handlers (refactored)
+│   │   │   ├── handler/
+│   │   │   │   ├── auth_handler.go           # Gin handler signatures
+│   │   │   │   ├── document_handler.go
+│   │   │   │   ├── content_type_handler.go
+│   │   │   │   ├── media_handler.go
+│   │   │   │   └── locale_handler.go
+│   │   │   ├── middleware/
+│   │   │   │   ├── auth.go                   # Gin middleware
+│   │   │   │   ├── cors.go
+│   │   │   │   ├── ratelimit.go
+│   │   │   │   ├── bodylimit.go
+│   │   │   │   └── security_headers.go
+│   │   │   └── router.go                     # Gin router setup
+│   │   └── grpc/                             # NEW: gRPC delivery layer
+│   │       ├── server.go                     # gRPC server setup
+│   │       ├── document_service.go           # DocumentService implementation
+│   │       ├── content_type_service.go
+│   │       ├── media_service.go
+│   │       ├── auth_service.go
+│   │       └── interceptor/
+│   │           ├── auth.go                   # JWT auth interceptor
+│   │           └── logging.go
+│   └── grpcclient/                           # NEW: gRPC client adapters
+│       ├── client.go                         # Connection manager
+│       └── registry.go                       # Service discovery/registry
+├── pkg/
+│   ├── jwt/
+│   └── errors/
+├── go.mod
+└── go.sum
+```
+
+---
+
+### 11.4 Phase A — Gin Migration (REST Framework)
+
+Replace `net/http` + `http.ServeMux` with Gin. All existing endpoints keep the same paths and response shapes.
+
+#### 11.4.1 Dependencies
+
+```
+github.com/gin-gonic/gin v1.10+
+```
+
+#### 11.4.2 Handler Signature Changes
+
+All handlers change from `func(w http.ResponseWriter, r *http.Request)` to `func(c *gin.Context)`.
+
+**Before:**
+```go
+func (h *DocumentHandler) GetSingleType(w http.ResponseWriter, r *http.Request) {
+    slug := r.PathValue("slug")
+    doc, status, err := h.uc.GetSingleType(r.Context(), slug, localeParam(r))
+    if err != nil {
+        writeErr(w, err)
+        return
+    }
+    writeJSON(w, http.StatusOK, toSummary(doc, status))
+}
+```
+
+**After:**
+```go
+func (h *DocumentHandler) GetSingleType(c *gin.Context) {
+    slug := c.Param("slug")
+    doc, status, err := h.uc.GetSingleType(c.Request.Context(), slug, c.Query("locale"))
+    if err != nil {
+        writeErr(c, err)
+        return
+    }
+    c.JSON(http.StatusOK, toSummary(doc, status))
+}
+```
+
+#### 11.4.3 Middleware Migration
+
+| Current (`net/http`) | Gin equivalent |
+|---|---|
+| `middleware.Auth(handler)` | `gin.HandlerFunc` — extracts JWT from `Authorization` header, sets `userID` in `c.Set("userID", id)` |
+| `middleware.RequireRole("admin", h)` | `gin.HandlerFunc` — checks role from JWT claims in context |
+| `middleware.CORS(origins)` | `gin.HandlerFunc` or use `github.com/gin-contrib/cors` |
+| `middleware.RateLimit(rps, burst)` | `gin.HandlerFunc` — same token-bucket logic |
+| `middleware.BodyLimit(maxBytes)` | `c.Request.Body = http.MaxBytesReader(...)` in middleware |
+| `middleware.SecurityHeaders` | `gin.HandlerFunc` — sets response headers |
+
+The `middleware.UserID(ctx)` helper changes to read from Gin context:
+```go
+func UserID(c *gin.Context) string {
+    id, _ := c.Get("userID")
+    return id.(string)
+}
+```
+
+#### 11.4.4 Router Setup (`internal/delivery/http/router.go`)
+
+Extract route registration from `main.go` into a dedicated router setup function:
+
+```go
+func SetupRouter(
+    authHandler *AuthHandler,
+    ctHandler *ContentTypeHandler,
+    docHandler *DocumentHandler,
+    mediaHandler *MediaHandler,
+    localeHandler *LocaleHandler,
+    gqlHandler http.Handler,
+    cfg *config.Config,
+) *gin.Engine {
+    r := gin.New()
+    r.Use(gin.Recovery())
+    r.Use(middleware.CORS(cfg.CORSOrigins))
+    r.Use(middleware.SecurityHeaders())
+    r.Use(middleware.BodyLimit(cfg.BodyLimitBytes))
+
+    r.GET("/health", func(c *gin.Context) {
+        c.JSON(200, gin.H{"status": "ok"})
+    })
+
+    // Auth routes (public)
+    auth := r.Group("/auth")
+    auth.Use(middleware.RateLimit(cfg.RateLimitRPS, cfg.RateLimitBurst))
+    {
+        auth.GET("/setup", authHandler.SetupStatus)
+        auth.POST("/register", authHandler.Register)
+        auth.POST("/login", authHandler.Login)
+        auth.POST("/refresh", authHandler.Refresh)
+        auth.POST("/logout", authHandler.Logout)
+    }
+
+    // Protected API routes
+    api := r.Group("/api")
+    api.Use(middleware.Auth())
+    {
+        // Content types
+        admin := api.Group("")
+        admin.Use(middleware.RequireRole("admin"))
+        {
+            admin.GET("/content-types", ctHandler.ListSummary)
+            admin.GET("/content-types/:identifier", ctHandler.Get)
+        }
+
+        // Single-type document routes
+        st := api.Group("/document-manager/single-type")
+        {
+            st.GET("/:slug", docHandler.GetSingleType)
+            st.PUT("/:slug", middleware.RequireRole("admin"), docHandler.SaveSingleType)
+            st.POST("/:slug/publish", middleware.RequireRole("admin"), docHandler.PublishSingleType)
+            st.POST("/:slug/unpublish", middleware.RequireRole("admin"), docHandler.UnpublishSingleType)
+        }
+
+        // Collection-type document routes
+        ct := api.Group("/document-manager/collection-type")
+        {
+            ct.GET("/:slug", docHandler.ListCollection)
+            ct.GET("/:slug/:documentId", docHandler.GetCollection)
+            ct.POST("/:slug", middleware.RequireRole("admin"), docHandler.CreateCollection)
+            ct.PUT("/:slug/:documentId", middleware.RequireRole("admin"), docHandler.UpdateCollection)
+            ct.DELETE("/:slug/:documentId", middleware.RequireRole("admin"), docHandler.DeleteCollection)
+            ct.POST("/:slug/:documentId/publish", middleware.RequireRole("admin"), docHandler.PublishCollection)
+            ct.POST("/:slug/:documentId/unpublish", middleware.RequireRole("admin"), docHandler.UnpublishCollection)
+        }
+
+        // Media routes
+        media := api.Group("/media")
+        media.Use(middleware.RequireRole("admin"))
+        {
+            media.GET("", mediaHandler.List)
+            media.POST("/upload", mediaHandler.Upload)
+            media.DELETE("/:id", mediaHandler.Delete)
+        }
+
+        api.GET("/locales", localeHandler.List)
+    }
+
+    // Public document route (no auth)
+    r.GET("/api/public/document-manager/:slug/:documentId", docHandler.GetPublic)
+
+    // GraphQL — mounted as a Gin-wrapped net/http handler
+    r.Any(cfg.GraphQL.Path, gin.WrapH(gqlHandler))
+
+    return r
+}
+```
+
+#### 11.4.5 Error Handling
+
+Replace `writeErr(w, err)` with a Gin-compatible version:
+
+```go
+func writeErr(c *gin.Context, err error) {
+    switch {
+    case pkgerrors.Is(err, pkgerrors.ErrNotFound):
+        c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+    case pkgerrors.Is(err, pkgerrors.ErrValidation):
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+    case pkgerrors.Is(err, pkgerrors.ErrConflict):
+        c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+    default:
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+    }
+}
+```
+
+#### 11.4.6 `main.go` Changes
+
+```go
+func main() {
+    // ... config, DB, repos, usecases, sync (unchanged)
+
+    // Build handlers
+    authHandler := handler.NewAuthHandler(authUC, cfg.CookieSecure)
+    ctHandler := handler.NewContentTypeHandler(ctUC)
+    docHandler := handler.NewDocumentHandler(documentUC, ctUC)
+    mediaHandler := handler.NewMediaHandler(mediaUC)
+    localeHandler := handler.NewLocaleHandler(cfg.SupportedLocales)
+
+    // GraphQL
+    gqlSrv := buildGraphQLServer(documentUC, ctUC, contentTypeDefs)
+
+    // Gin router
+    router := handler.SetupRouter(authHandler, ctHandler, docHandler, mediaHandler, localeHandler, gqlSrv, cfg)
+
+    // Start Gin server
+    addr := ":" + cfg.Port
+    log.Printf("REST server listening on %s", addr)
+    if err := router.Run(addr); err != nil {
+        log.Fatal(err)
+    }
+}
+```
+
+---
+
+### 11.5 Phase B — Dynamic GraphQL Schema Generation
+
+Replace the single static `schema.graphqls` with a dynamic schema builder that auto-generates GraphQL types and query/mutation fields from content-type JSON definitions at startup.
+
+#### 11.5.1 How It Works
+
+On startup, after content-type JSON definitions are loaded and synced:
+
+1. **Schema builder** reads all `ContentTypeDefinition` structs
+2. For each content-type, generates:
+   - A **GraphQL type** named after the content-type (PascalCase of slug), e.g. `BlogPost`, `AboutPage`
+   - Fields mapped from the content-type's field definitions
+3. For each **collection-type**, generates:
+   - `Query.<slug>(<slug>Id: ID!, locale: String): <Type>` — fetch one document
+   - `Query.<slugPlural>(start: Int, size: Int, locale: String): <Type>Connection` — paginated list
+   - `Mutation.create<Type>(data: <Type>Input!): <Type>! @auth`
+   - `Mutation.update<Type>(<slug>Id: ID!, data: <Type>Input!): <Type>! @auth`
+   - `Mutation.delete<Type>(<slug>Id: ID!): Boolean! @auth`
+   - `Mutation.publish<Type>(<slug>Id: ID!, locale: String): <Type>! @auth`
+   - `Mutation.unpublish<Type>(<slug>Id: ID!, locale: String): <Type>! @auth`
+4. For each **single-type**, generates:
+   - `Query.<slug>(locale: String): <Type>` — fetch the singleton
+   - `Mutation.save<Type>(data: <Type>Input!, locale: String): <Type>! @auth`
+   - `Mutation.publish<Type>(locale: String): <Type>! @auth`
+   - `Mutation.unpublish<Type>(locale: String): <Type>! @auth`
+
+#### 11.5.2 Field Type Mapping
+
+| Content-Type Field `type` | GraphQL Type |
+|---|---|
+| `text` | `String` |
+| `richtext` | `String` |
+| `number` | `Float` |
+| `boolean` | `Boolean` |
+| `media` | `String` (URL) |
+| `json` | `JSON` (scalar) |
+| `component` | Nested object type (recursive) |
+
+#### 11.5.3 Generated Schema Example
+
+Given `content-types/blog-posts.json`:
+```json
+{
+  "slug": "blog-posts",
+  "name": "Blog Posts",
+  "kind": "collection",
+  "listFields": ["title", "slug", "featured"],
+  "fields": [
+    { "name": "title", "type": "text" },
+    { "name": "slug", "type": "text" },
+    { "name": "coverImage", "type": "media" },
+    { "name": "excerpt", "type": "text" },
+    { "name": "body", "type": "richtext" },
+    { "name": "readingTime", "type": "number" },
+    { "name": "featured", "type": "boolean" },
+    { "name": "metadata", "type": "json" }
+  ]
+}
+```
+
+Generated SDL (merged into runtime schema):
+```graphql
+type BlogPost {
+  documentId: ID!
+  title: String
+  slug: String
+  coverImage: String
+  excerpt: String
+  body: String
+  readingTime: Float
+  featured: Boolean
+  metadata: JSON
+  locale: String!
+  status: String!
+  createdAt: Time!
+  updatedAt: Time!
+  publishedAt: Time
+}
+
+type BlogPostConnection {
+  items: [BlogPost!]!
+  total: Int!
+  start: Int!
+  size: Int!
+}
+
+input BlogPostInput {
+  title: String
+  slug: String
+  coverImage: String
+  excerpt: String
+  body: String
+  readingTime: Float
+  featured: Boolean
+  metadata: JSON
+}
+
+extend type Query {
+  blogPost(blogPostId: ID!, locale: String): BlogPost
+  blogPosts(start: Int, size: Int, locale: String): BlogPostConnection!
+}
+
+extend type Mutation {
+  createBlogPost(data: BlogPostInput!): BlogPost! @auth
+  updateBlogPost(blogPostId: ID!, data: BlogPostInput!): BlogPost! @auth
+  deleteBlogPost(blogPostId: ID!): Boolean! @auth
+  publishBlogPost(blogPostId: ID!, locale: String): BlogPost! @auth
+  unpublishBlogPost(blogPostId: ID!, locale: String): BlogPost! @auth
+}
+```
+
+#### 11.5.4 Schema Builder (`graphql/dynamic/schema_builder.go`)
+
+```go
+type SchemaBuilder struct {
+    defs []contenttype.ContentTypeDefinition
+}
+
+func NewSchemaBuilder(defs []contenttype.ContentTypeDefinition) *SchemaBuilder
+
+// BuildSDL generates the complete SDL string for all content-type-derived
+// types, queries, and mutations. This SDL is merged with the base schema
+// at runtime.
+func (b *SchemaBuilder) BuildSDL() (string, error)
+```
+
+Naming conventions:
+- Type name: PascalCase of slug (`blog-posts` → `BlogPost`)
+- Input name: `<Type>Input`
+- Connection name: `<Type>Connection`
+- Query single: camelCase of slug (`blogPost`)
+- Query list: camelCase plural (`blogPosts`)
+- Mutations: `create<Type>`, `update<Type>`, `delete<Type>`, `publish<Type>`, `unpublish<Type>`
+- For single-type: `save<Type>` instead of create/update
+
+#### 11.5.5 Resolver Factory (`graphql/dynamic/resolver_factory.go`)
+
+Creates resolver functions per content-type that delegate to the existing document usecase:
+
+```go
+type ResolverFactory struct {
+    documentUC  *document.UseCase
+    contentTypeUC *contenttype.UseCase
+}
+
+func NewResolverFactory(docUC *document.UseCase, ctUC *contenttype.UseCase) *ResolverFactory
+
+// BuildFieldResolvers returns a map of field name → resolver function
+// for all dynamically generated query and mutation fields.
+func (f *ResolverFactory) BuildFieldResolvers(defs []contenttype.ContentTypeDefinition) map[string]graphql.FieldResolveFn
+```
+
+Each generated resolver internally calls the same usecase methods as the REST handlers — no business logic duplication.
+
+#### 11.5.6 Runtime Schema Assembly
+
+In `main.go`, after content-type sync:
+
+```go
+// Build dynamic GraphQL schema from content-type definitions
+schemaBuilder := dynamic.NewSchemaBuilder(defs)
+dynamicSDL, err := schemaBuilder.BuildSDL()
+if err != nil {
+    log.Fatalf("graphql dynamic schema: %v", err)
+}
+
+// Merge base schema + dynamic SDL
+// Use gqlgen's runtime schema merging or graphql-go/graphql for dynamic execution
+resolverFactory := dynamic.NewResolverFactory(documentUC, ctUC)
+fieldResolvers := resolverFactory.BuildFieldResolvers(defs)
+
+gqlSrv := buildGraphQLServer(dynamicSDL, fieldResolvers, documentUC, ctUC)
+```
+
+#### 11.5.7 Base Schema (Static)
+
+The static schema retains only base types and non-content-type queries:
+
+```graphql
+scalar JSON
+scalar Time
+
+directive @auth on FIELD_DEFINITION
+
+type ContentType {
+  id: ID!
+  name: String!
+  slug: String!
+  kind: String!
+  createdAt: Time!
+  updatedAt: Time!
+}
+
+type Query {
+  contentTypes: [ContentType!]!
+}
+```
+
+All `Document`-related types and resolvers are generated dynamically.
+
+---
+
+### 11.6 Phase C — GORM Adapters (Multi-Database Support)
+
+Every entity gets a GORM-based repository adapter alongside the existing MongoDB adapter. A config flag per entity selects which adapter to use at startup.
+
+#### 11.6.1 Dependencies
+
+```
+gorm.io/gorm v1.26+
+gorm.io/driver/mysql v1.5+
+gorm.io/driver/postgres v1.5+
+```
+
+#### 11.6.2 Entity Struct Tag Changes
+
+Entities gain GORM struct tags alongside existing `bson` and `json` tags:
+
+```go
+type User struct {
+    ID           string    `bson:"_id,omitempty"  gorm:"column:id;primaryKey"   json:"-"`
+    DocumentID   string    `bson:"documentId"     gorm:"column:document_id;uniqueIndex" json:"documentId"`
+    Email        string    `bson:"email"          gorm:"column:email;uniqueIndex"        json:"email"`
+    PasswordHash string    `bson:"passwordHash"   gorm:"column:password_hash"            json:"-"`
+    Role         Role      `bson:"role"           gorm:"column:role;type:varchar(20)"     json:"role"`
+    CreatedAt    time.Time `bson:"createdAt"      gorm:"column:created_at"               json:"createdAt"`
+}
+
+type ContentType struct {
+    ID         string            `bson:"_id,omitempty" gorm:"column:id;primaryKey"   json:"-"`
+    Name       string            `bson:"name"          gorm:"column:name"             json:"name"`
+    Slug       string            `bson:"slug"          gorm:"column:slug;uniqueIndex" json:"slug"`
+    Kind       ContentKind       `bson:"kind"          gorm:"column:kind;type:varchar(20)" json:"kind"`
+    Fields     []FieldDefinition `bson:"fields,omitempty"     gorm:"column:fields;serializer:json"      json:"Fields,omitempty"`
+    ListFields []string          `bson:"listFields,omitempty" gorm:"column:list_fields;serializer:json"  json:"listFields,omitempty"`
+    CreatedAt  time.Time         `bson:"createdAt"     gorm:"column:created_at"       json:"createdAt"`
+    UpdatedAt  time.Time         `bson:"updatedAt"     gorm:"column:updated_at"       json:"updatedAt"`
+}
+
+type Document struct {
+    DocumentID    string          `bson:"documentId"     gorm:"column:document_id;index"        json:"documentId"`
+    Version       DocumentVersion `bson:"version"        gorm:"column:version;type:varchar(20)"  json:"version"`
+    ContentTypeID string          `bson:"contentTypeId"  gorm:"column:content_type_id;index"     json:"contentTypeId"`
+    Data          map[string]any  `bson:"data"           gorm:"column:data;serializer:json"      json:"data"`
+    Locale        string          `bson:"locale"         gorm:"column:locale"                    json:"locale"`
+    CreatedAt     time.Time       `bson:"createdAt"      gorm:"column:created_at"                json:"createdAt"`
+    UpdatedAt     time.Time       `bson:"updatedAt"      gorm:"column:updated_at"                json:"updatedAt"`
+    PublishedAt   time.Time       `bson:"publishedAt,omitempty"  gorm:"column:published_at"      json:"publishedAt,omitempty"`
+    CreatedBy     string          `bson:"createdBy"      gorm:"column:created_by"                json:"createdBy"`
+    UpdatedBy     string          `bson:"updatedBy"      gorm:"column:updated_by"                json:"updatedBy"`
+    PublishedBy   string          `bson:"publishedBy,omitempty"  gorm:"column:published_by"      json:"publishedBy,omitempty"`
+    Slug          string          `bson:"-"              gorm:"column:slug;index"                json:"-"`
+}
+
+type MediaAsset struct {
+    ID            string    `bson:"_id,omitempty"  gorm:"column:id;primaryKey"        json:"ID"`
+    DocumentID    string    `bson:"documentId"     gorm:"column:document_id"          json:"documentId"`
+    URL           string    `bson:"url"            gorm:"column:url"                  json:"url"`
+    ThumbnailURL  string    `bson:"thumbnailUrl"   gorm:"column:thumbnail_url"        json:"thumbnailUrl"`
+    PublicID      string    `bson:"publicId"       gorm:"column:public_id"            json:"publicId"`
+    FileName      string    `bson:"fileName"       gorm:"column:file_name"            json:"fileName"`
+    FileExt       string    `bson:"fileExt"        gorm:"column:file_ext"             json:"fileExt"`
+    Hash          string    `bson:"hash"           gorm:"column:hash"                 json:"hash"`
+    ContentTypeID string    `bson:"contentTypeId"  gorm:"column:content_type_id"      json:"contentTypeId"`
+    DocumentRef   string    `bson:"documentRef"    gorm:"column:document_ref;index"   json:"documentRef"`
+    CreatedAt     time.Time `bson:"createdAt"      gorm:"column:created_at"           json:"createdAt"`
+}
+```
+
+#### 11.6.3 GORM Client (`internal/infrastructure/gormdb/client.go`)
+
+```go
+func NewClient(driver string, dsn string) (*gorm.DB, error) {
+    var dialector gorm.Dialector
+    switch driver {
+    case "mysql":
+        dialector = mysql.Open(dsn)
+    case "postgres":
+        dialector = postgres.Open(dsn)
+    default:
+        return nil, fmt.Errorf("unsupported GORM driver: %s", driver)
+    }
+    db, err := gorm.Open(dialector, &gorm.Config{})
+    if err != nil {
+        return nil, fmt.Errorf("gorm connect (%s): %w", driver, err)
+    }
+    return db, nil
+}
+
+func AutoMigrate(db *gorm.DB) error {
+    return db.AutoMigrate(
+        &entity.User{},
+        &entity.ContentType{},
+        &entity.Document{},
+        &entity.MediaAsset{},
+    )
+}
+```
+
+#### 11.6.4 GORM Document Repository
+
+The MongoDB adapter uses per-content-type collections (`documents_<slug>`). The GORM adapter uses a **single `documents` table** with a `slug` column for content-type routing:
+
+```sql
+CREATE TABLE documents (
+    document_id VARCHAR(24) NOT NULL,
+    version VARCHAR(20) NOT NULL,
+    content_type_id VARCHAR(255),
+    slug VARCHAR(63) NOT NULL,           -- content-type slug, replaces per-collection routing
+    data JSON NOT NULL,                  -- JSONB in PostgreSQL, JSON in MySQL
+    locale VARCHAR(10) NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
+    published_at TIMESTAMP,
+    created_by VARCHAR(255),
+    updated_by VARCHAR(255),
+    published_by VARCHAR(255),
+    PRIMARY KEY (document_id, version, locale, slug),
+    INDEX idx_slug_version_locale (slug, version, locale),
+    INDEX idx_document_ref (document_id)
+);
+```
+
+Key difference: MongoDB routes by collection name, GORM routes by `WHERE slug = ?`.
+
+**`FindDraftByDocumentID`:**
+```go
+func (r *DocumentRepository) FindDraftByDocumentID(ctx context.Context, contentTypeSlug, documentID, locale string) (*entity.Document, error) {
+    var doc entity.Document
+    result := r.db.WithContext(ctx).
+        Where("slug = ? AND document_id = ? AND version = ? AND locale = ?",
+            contentTypeSlug, documentID, entity.VersionDraft, locale).
+        First(&doc)
+    if result.Error != nil {
+        if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+            return nil, pkgerrors.ErrNotFound
+        }
+        return nil, result.Error
+    }
+    return &doc, nil
+}
+```
+
+**`UpsertDraft`:**
+```go
+func (r *DocumentRepository) UpsertDraft(ctx context.Context, contentTypeSlug string, doc *entity.Document) error {
+    doc.Version = entity.VersionDraft
+    doc.Slug = contentTypeSlug
+    result := r.db.WithContext(ctx).
+        Where("slug = ? AND document_id = ? AND version = ? AND locale = ?",
+            contentTypeSlug, doc.DocumentID, entity.VersionDraft, doc.Locale).
+        Assign(doc).
+        FirstOrCreate(doc)
+    return result.Error
+}
+```
+
+**`EnsureCollection` / `DropCollection`:**
+These are no-ops in the GORM adapter — the single `documents` table is auto-migrated on startup, so per-content-type collection management doesn't apply.
+
+```go
+func (r *DocumentRepository) EnsureCollection(ctx context.Context, contentTypeSlug string) error {
+    return nil // single table, no per-slug collection needed
+}
+
+func (r *DocumentRepository) DropCollection(ctx context.Context, contentTypeSlug string) error {
+    return nil // DeleteAllByContentType handles data cleanup
+}
+```
+
+#### 11.6.5 Configuration — Per-Entity DB Selection
+
+```go
+type DBConfig struct {
+    Driver     string // DB_DRIVER: "mongo" | "mysql" | "postgres"
+    Mongo      MongoConfig
+    SQL        SQLConfig
+    EntityDB   EntityDBConfig
+}
+
+type SQLConfig struct {
+    Driver string // SQL_DRIVER: "mysql" | "postgres"
+    DSN    string // SQL_DSN: full connection string
+}
+
+type EntityDBConfig struct {
+    User        string // DB_USER: "mongo" | "sql" (default: value of DB_DRIVER)
+    ContentType string // DB_CONTENT_TYPE: "mongo" | "sql"
+    Document    string // DB_DOCUMENT: "mongo" | "sql"
+    Media       string // DB_MEDIA: "mongo" | "sql"
+}
+```
+
+Environment variables:
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DB_DRIVER` | Default database driver | `mongo` |
+| `SQL_DRIVER` | SQL dialect when using GORM | `postgres` |
+| `SQL_DSN` | SQL connection string | *(required when any entity uses SQL)* |
+| `DB_USER` | DB adapter for User entity | value of `DB_DRIVER` |
+| `DB_CONTENT_TYPE` | DB adapter for ContentType entity | value of `DB_DRIVER` |
+| `DB_DOCUMENT` | DB adapter for Document entity | value of `DB_DRIVER` |
+| `DB_MEDIA` | DB adapter for MediaAsset entity | value of `DB_DRIVER` |
+
+#### 11.6.6 Repository Factory (`main.go`)
+
+```go
+func newUserRepository(cfg *config.Config, mongoDB *mongo.Database, gormDB *gorm.DB) repository.UserRepository {
+    switch cfg.DB.EntityDB.User {
+    case "sql":
+        return gormdb.NewUserRepository(gormDB)
+    default:
+        return mongodb.NewUserRepository(mongoDB)
+    }
+}
+// Repeat for ContentType, Document, MediaAsset
+```
+
+Both `mongoDB` and `gormDB` are initialized at startup (if configured). Only the adapters selected by config are actually used.
+
+---
+
+### 11.7 Phase D — gRPC Server & Client
+
+#### 11.7.1 Dependencies
+
+```
+google.golang.org/grpc v1.70+
+google.golang.org/protobuf v1.36+
+```
+
+#### 11.7.2 Proto Definitions
+
+**`proto/cms/v1/document.proto`:**
+```protobuf
+syntax = "proto3";
+package cms.v1;
+option go_package = "project-abyssoftime-cms-v2/api/proto/cms/v1";
+
+import "google/protobuf/timestamp.proto";
+
+message Document {
+  string document_id = 1;
+  string version = 2;
+  string content_type_id = 3;
+  bytes data = 4;                     // JSON-encoded map[string]any
+  string locale = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+  google.protobuf.Timestamp published_at = 8;
+  string created_by = 9;
+  string updated_by = 10;
+  string published_by = 11;
+  string status = 12;                // computed: draft/modified/published
+}
+
+message GetDocumentRequest {
+  string content_type_slug = 1;
+  string document_id = 2;
+  string locale = 3;
+}
+
+message ListDocumentsRequest {
+  string content_type_slug = 1;
+  int32 start = 2;
+  int32 size = 3;
+  string locale = 4;
+}
+
+message ListDocumentsResponse {
+  repeated Document items = 1;
+  int64 total = 2;
+  int32 start = 3;
+  int32 size = 4;
+}
+
+message SaveDocumentRequest {
+  string content_type_slug = 1;
+  string document_id = 2;
+  bytes data = 3;
+  string locale = 4;
+}
+
+message PublishDocumentRequest {
+  string content_type_slug = 1;
+  string document_id = 2;
+  string locale = 3;
+}
+
+message DeleteDocumentRequest {
+  string content_type_slug = 1;
+  string document_id = 2;
+}
+
+message DeleteDocumentResponse {
+  bool success = 1;
+}
+
+// Single-type operations
+message GetSingleTypeRequest {
+  string content_type_slug = 1;
+  string locale = 2;
+}
+
+message SaveSingleTypeRequest {
+  string content_type_slug = 1;
+  bytes data = 2;
+  string locale = 3;
+}
+
+service DocumentService {
+  // Collection-type operations
+  rpc GetDocument(GetDocumentRequest) returns (Document);
+  rpc ListDocuments(ListDocumentsRequest) returns (ListDocumentsResponse);
+  rpc SaveDocument(SaveDocumentRequest) returns (Document);
+  rpc PublishDocument(PublishDocumentRequest) returns (Document);
+  rpc UnpublishDocument(PublishDocumentRequest) returns (Document);
+  rpc DeleteDocument(DeleteDocumentRequest) returns (DeleteDocumentResponse);
+
+  // Single-type operations
+  rpc GetSingleType(GetSingleTypeRequest) returns (Document);
+  rpc SaveSingleType(SaveSingleTypeRequest) returns (Document);
+  rpc PublishSingleType(GetSingleTypeRequest) returns (Document);
+  rpc UnpublishSingleType(GetSingleTypeRequest) returns (Document);
+}
+```
+
+**`proto/cms/v1/content_type.proto`:**
+```protobuf
+syntax = "proto3";
+package cms.v1;
+option go_package = "project-abyssoftime-cms-v2/api/proto/cms/v1";
+
+import "google/protobuf/timestamp.proto";
+
+message FieldDefinition {
+  string name = 1;
+  string type = 2;
+  repeated string ext = 3;
+  repeated FieldDefinition fields = 4;
+}
+
+message ContentType {
+  string id = 1;
+  string name = 2;
+  string slug = 3;
+  string kind = 4;
+  repeated FieldDefinition fields = 5;
+  repeated string list_fields = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+}
+
+message GetContentTypeRequest {
+  string slug = 1;
+}
+
+message ListContentTypesRequest {}
+
+message ListContentTypesResponse {
+  repeated ContentType content_types = 1;
+}
+
+service ContentTypeService {
+  rpc GetContentType(GetContentTypeRequest) returns (ContentType);
+  rpc ListContentTypes(ListContentTypesRequest) returns (ListContentTypesResponse);
+}
+```
+
+**`proto/cms/v1/media.proto`:**
+```protobuf
+syntax = "proto3";
+package cms.v1;
+option go_package = "project-abyssoftime-cms-v2/api/proto/cms/v1";
+
+import "google/protobuf/timestamp.proto";
+
+message MediaAsset {
+  string id = 1;
+  string document_id = 2;
+  string url = 3;
+  string thumbnail_url = 4;
+  string public_id = 5;
+  string file_name = 6;
+  string file_ext = 7;
+  string hash = 8;
+  string content_type_id = 9;
+  string document_ref = 10;
+  google.protobuf.Timestamp created_at = 11;
+}
+
+message ListMediaRequest {
+  int32 page = 1;
+  int32 limit = 2;
+}
+
+message ListMediaResponse {
+  repeated MediaAsset assets = 1;
+  int64 total = 2;
+}
+
+message DeleteMediaRequest {
+  string id = 1;
+}
+
+message DeleteMediaResponse {
+  bool success = 1;
+}
+
+service MediaService {
+  rpc ListMedia(ListMediaRequest) returns (ListMediaResponse);
+  rpc DeleteMedia(DeleteMediaRequest) returns (DeleteMediaResponse);
+}
+```
+
+**`proto/cms/v1/auth.proto`:**
+```protobuf
+syntax = "proto3";
+package cms.v1;
+option go_package = "project-abyssoftime-cms-v2/api/proto/cms/v1";
+
+message LoginRequest {
+  string email = 1;
+  string password = 2;
+}
+
+message LoginResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+}
+
+message RegisterRequest {
+  string email = 1;
+  string password = 2;
+}
+
+message RegisterResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+}
+
+message RefreshRequest {
+  string refresh_token = 1;
+}
+
+message RefreshResponse {
+  string access_token = 1;
+}
+
+message SetupStatusRequest {}
+
+message SetupStatusResponse {
+  bool has_admin = 1;
+}
+
+service AuthService {
+  rpc Login(LoginRequest) returns (LoginResponse);
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+  rpc Refresh(RefreshRequest) returns (RefreshResponse);
+  rpc SetupStatus(SetupStatusRequest) returns (SetupStatusResponse);
+}
+```
+
+#### 11.7.3 gRPC Server Implementation (`internal/delivery/grpc/`)
+
+Each gRPC service implementation wraps the same usecase layer used by REST handlers:
+
+```go
+type DocumentServiceServer struct {
+    pb.UnimplementedDocumentServiceServer
+    documentUC *document.UseCase
+}
+
+func NewDocumentServiceServer(docUC *document.UseCase) *DocumentServiceServer {
+    return &DocumentServiceServer{documentUC: docUC}
+}
+
+func (s *DocumentServiceServer) GetDocument(ctx context.Context, req *pb.GetDocumentRequest) (*pb.Document, error) {
+    doc, status, err := s.documentUC.GetForEdit(ctx, req.ContentTypeSlug, req.DocumentId, req.Locale)
+    if err != nil {
+        return nil, toGRPCError(err)
+    }
+    return toProtoDocument(doc, status), nil
+}
+```
+
+**Error mapping:**
+```go
+func toGRPCError(err error) error {
+    switch {
+    case pkgerrors.Is(err, pkgerrors.ErrNotFound):
+        return status.Error(codes.NotFound, "not found")
+    case pkgerrors.Is(err, pkgerrors.ErrValidation):
+        return status.Error(codes.InvalidArgument, err.Error())
+    case pkgerrors.Is(err, pkgerrors.ErrConflict):
+        return status.Error(codes.AlreadyExists, err.Error())
+    default:
+        return status.Error(codes.Internal, "internal error")
+    }
+}
+```
+
+#### 11.7.4 gRPC Auth Interceptor
+
+```go
+func AuthUnaryInterceptor(jwtSecret string) grpc.UnaryServerInterceptor {
+    return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+        // Skip auth for public methods
+        if isPublicMethod(info.FullMethod) {
+            return handler(ctx, req)
+        }
+        md, ok := metadata.FromIncomingContext(ctx)
+        if !ok {
+            return nil, status.Error(codes.Unauthenticated, "missing metadata")
+        }
+        token := extractBearerToken(md)
+        claims, err := pkgjwt.Validate(token)
+        if err != nil {
+            return nil, status.Error(codes.Unauthenticated, "invalid token")
+        }
+        ctx = context.WithValue(ctx, userIDKey, claims.UserID)
+        return handler(ctx, req)
+    }
+}
+```
+
+#### 11.7.5 gRPC Client (`internal/grpcclient/`)
+
+For calling external microservices:
+
+```go
+type ClientManager struct {
+    conns map[string]*grpc.ClientConn
+}
+
+func NewClientManager() *ClientManager
+
+// Connect establishes a gRPC connection to an external service.
+// Service addresses are configured via env vars.
+func (m *ClientManager) Connect(ctx context.Context, serviceName, address string, opts ...grpc.DialOption) error
+
+// GetConnection returns an established connection by service name.
+func (m *ClientManager) GetConnection(serviceName string) (*grpc.ClientConn, error)
+
+// Close closes all connections.
+func (m *ClientManager) Close() error
+```
+
+Configuration:
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `GRPC_PORT` | gRPC server listen port | `9090` |
+| `GRPC_SERVICES` | Comma-separated list of `name=address` pairs for client connections | *(empty)* |
+
+Example: `GRPC_SERVICES=search=search-svc:9091,notification=notify-svc:9092`
+
+#### 11.7.6 `main.go` — Dual Server Startup
+
+```go
+func main() {
+    // ... config, DB, repos, usecases, sync
+
+    // --- REST (Gin) ---
+    router := handler.SetupRouter(...)
+    go func() {
+        addr := ":" + cfg.Port
+        log.Printf("REST server listening on %s", addr)
+        if err := router.Run(addr); err != nil {
+            log.Fatal(err)
+        }
+    }()
+
+    // --- gRPC Server ---
+    grpcServer := grpc.NewServer(
+        grpc.UnaryInterceptor(grpcdelivery.AuthUnaryInterceptor(cfg.JWTSecret)),
+    )
+    pb.RegisterDocumentServiceServer(grpcServer, grpcdelivery.NewDocumentServiceServer(documentUC))
+    pb.RegisterContentTypeServiceServer(grpcServer, grpcdelivery.NewContentTypeServiceServer(ctUC))
+    pb.RegisterMediaServiceServer(grpcServer, grpcdelivery.NewMediaServiceServer(mediaUC))
+    pb.RegisterAuthServiceServer(grpcServer, grpcdelivery.NewAuthServiceServer(authUC))
+
+    lis, err := net.Listen("tcp", ":"+cfg.GRPCPort)
+    if err != nil {
+        log.Fatalf("grpc listen: %v", err)
+    }
+    log.Printf("gRPC server listening on :%s", cfg.GRPCPort)
+
+    // --- gRPC Client connections ---
+    clientMgr := grpcclient.NewClientManager()
+    defer clientMgr.Close()
+    for name, addr := range cfg.GRPCServices {
+        if err := clientMgr.Connect(ctx, name, addr); err != nil {
+            log.Printf("grpc client %s: %v (non-fatal)", name, err)
+        }
+    }
+
+    // Block on gRPC server
+    if err := grpcServer.Serve(lis); err != nil {
+        log.Fatal(err)
+    }
+}
+```
+
+---
+
+### 11.8 Configuration (Full)
+
+All new environment variables introduced by this refactoring:
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DB_DRIVER` | Default database driver for all entities | `mongo` |
+| `SQL_DRIVER` | SQL dialect (`mysql` or `postgres`) | `postgres` |
+| `SQL_DSN` | SQL connection string | *(required when any entity uses SQL)* |
+| `DB_USER` | DB adapter override for User entity | value of `DB_DRIVER` |
+| `DB_CONTENT_TYPE` | DB adapter override for ContentType entity | value of `DB_DRIVER` |
+| `DB_DOCUMENT` | DB adapter override for Document entity | value of `DB_DRIVER` |
+| `DB_MEDIA` | DB adapter override for MediaAsset entity | value of `DB_DRIVER` |
+| `GRPC_PORT` | gRPC server listen port | `9090` |
+| `GRPC_SERVICES` | External gRPC services (`name=address,...`) | *(empty)* |
+
+Existing env vars are unchanged.
+
+---
+
+### 11.9 Testing
+
+#### Phase A — Gin Migration
+
+- **Handler tests**: Replace `httptest.NewRequest` + `httptest.ResponseRecorder` with Gin's test mode (`gin.SetMode(gin.TestMode)`) and `httptest`.
+- **Middleware tests**: Test each Gin middleware in isolation with `gin.CreateTestContext`.
+- **Integration test**: Start Gin server, hit every endpoint, verify same response shapes as before migration.
+- **Regression**: Response bodies must be byte-for-byte identical (same JSON key ordering, same status codes) to prove backward compatibility.
+
+#### Phase B — Dynamic GraphQL
+
+- **SchemaBuilder unit tests**: Given content-type definitions, assert generated SDL contains correct types, queries, mutations.
+- **Single-type SDL test**: Single-type definitions produce `save<Type>` mutations (not create/update/delete).
+- **Collection-type SDL test**: Collection definitions produce full CRUD mutations + `<Type>Connection` for pagination.
+- **Field type mapping test**: Each field type maps to correct GraphQL type.
+- **ResolverFactory tests**: Mock usecase, call generated resolvers, verify correct usecase methods invoked.
+- **End-to-end**: Boot server with test content-type definitions, execute GraphQL queries against generated schema.
+
+#### Phase C — GORM Adapters
+
+- **Each GORM repository tested with same test cases as MongoDB counterpart** — identical test functions, different setup (GORM with SQLite in-memory for unit tests, PostgreSQL in Docker for integration tests).
+- **GORM Document repository**:
+  - `FindDraftByDocumentID`: filters by `slug`, `document_id`, `version`, `locale`
+  - `UpsertDraft`: creates or updates correctly
+  - `FindDraftsByContentTypePaginated`: pagination, locale filter, sort order
+  - `FindPublishedByDocumentIDs`: batch lookup with `$in`-equivalent (`WHERE document_id IN (?)`)
+  - `EnsureCollection` / `DropCollection`: no-ops that don't error
+  - `DeleteAllByContentType`: `DELETE WHERE slug = ?`
+- **Auto-migration test**: `AutoMigrate` creates all expected tables with correct columns.
+- **Mixed-mode test**: User on MongoDB, Document on PostgreSQL — verify both work simultaneously.
+
+#### Phase D — gRPC
+
+- **Service tests**: Mock usecase, call each gRPC method, verify correct response.
+- **Error mapping tests**: Domain errors map to correct gRPC status codes.
+- **Auth interceptor test**: Valid token → passes; invalid/missing → `Unauthenticated`.
+- **Integration test**: Start gRPC server, connect client, execute full CRUD flow.
+
+---
+
+### 11.10 Implementation Order
+
+The four phases have dependencies and should be implemented in order:
+
+```
+Phase A (Gin)           → Foundation: replaces the HTTP framework
+Phase B (Dynamic GQL)   → Depends on A: GraphQL mounted on Gin router
+Phase C (GORM)          → Independent of A/B: new infrastructure adapters
+Phase D (gRPC)          → Depends on A: runs alongside Gin server
+```
+
+Recommended sequence: **A → C → B → D**
+
+- A first: all subsequent work builds on Gin
+- C next: purely additive (new adapters), no risk to existing code
+- B next: replaces static GraphQL schema with dynamic — needs careful testing
+- D last: new protocol, most isolated, lowest risk to existing functionality
+
+Each phase should be a separate PR with its own tests passing before merging.
+
+---
+
+### 11.11 Files Changed (Summary)
+
+**New files:**
+```
+apps/api/proto/cms/v1/document.proto
+apps/api/proto/cms/v1/content_type.proto
+apps/api/proto/cms/v1/media.proto
+apps/api/proto/cms/v1/auth.proto
+apps/api/graphql/dynamic/schema_builder.go
+apps/api/graphql/dynamic/schema_builder_test.go
+apps/api/graphql/dynamic/resolver_factory.go
+apps/api/graphql/dynamic/resolver_factory_test.go
+apps/api/internal/infrastructure/gormdb/client.go
+apps/api/internal/infrastructure/gormdb/client_test.go
+apps/api/internal/infrastructure/gormdb/user_repository.go
+apps/api/internal/infrastructure/gormdb/user_repository_test.go
+apps/api/internal/infrastructure/gormdb/content_type_repository.go
+apps/api/internal/infrastructure/gormdb/content_type_repository_test.go
+apps/api/internal/infrastructure/gormdb/document_repository.go
+apps/api/internal/infrastructure/gormdb/document_repository_test.go
+apps/api/internal/infrastructure/gormdb/media_asset_repository.go
+apps/api/internal/infrastructure/gormdb/media_asset_repository_test.go
+apps/api/internal/delivery/grpc/server.go
+apps/api/internal/delivery/grpc/document_service.go
+apps/api/internal/delivery/grpc/document_service_test.go
+apps/api/internal/delivery/grpc/content_type_service.go
+apps/api/internal/delivery/grpc/content_type_service_test.go
+apps/api/internal/delivery/grpc/media_service.go
+apps/api/internal/delivery/grpc/media_service_test.go
+apps/api/internal/delivery/grpc/auth_service.go
+apps/api/internal/delivery/grpc/auth_service_test.go
+apps/api/internal/delivery/grpc/interceptor/auth.go
+apps/api/internal/delivery/grpc/interceptor/auth_test.go
+apps/api/internal/delivery/grpc/interceptor/logging.go
+apps/api/internal/delivery/http/router.go
+apps/api/internal/grpcclient/client.go
+apps/api/internal/grpcclient/registry.go
+```
+
+**Modified files:**
+```
+apps/api/go.mod                                                    ← add gin, gorm, grpc dependencies
+apps/api/cmd/server/main.go                                        ← dual server startup, repository factory
+apps/api/internal/config/config.go                                 ← SQL, gRPC, per-entity DB config
+apps/api/internal/domain/entity/content_type.go                    ← add gorm struct tags
+apps/api/internal/domain/entity/document.go                        ← add gorm struct tags + Slug field
+apps/api/internal/domain/entity/user.go                            ← add gorm struct tags
+apps/api/internal/domain/entity/media_asset.go                     ← add gorm struct tags
+apps/api/internal/delivery/http/handler/auth_handler.go            ← gin.Context signatures
+apps/api/internal/delivery/http/handler/auth_handler_test.go       ← gin test mode
+apps/api/internal/delivery/http/handler/document_handler.go        ← gin.Context signatures
+apps/api/internal/delivery/http/handler/document_handler_test.go   ← gin test mode
+apps/api/internal/delivery/http/handler/content_type_handler.go    ← gin.Context signatures
+apps/api/internal/delivery/http/handler/content_type_handler_test.go
+apps/api/internal/delivery/http/handler/media_handler.go           ← gin.Context signatures
+apps/api/internal/delivery/http/handler/media_handler_test.go
+apps/api/internal/delivery/http/handler/locale_handler.go          ← gin.Context signatures
+apps/api/internal/delivery/http/handler/locale_handler_test.go
+apps/api/internal/delivery/http/middleware/auth.go                 ← gin middleware
+apps/api/internal/delivery/http/middleware/auth_test.go
+apps/api/internal/delivery/http/middleware/cors.go                 ← gin middleware
+apps/api/internal/delivery/http/middleware/ratelimit.go            ← gin middleware
+apps/api/internal/delivery/http/middleware/bodylimit.go            ← gin middleware
+apps/api/internal/delivery/http/middleware/security_headers.go     ← gin middleware
+apps/api/graphql/resolver/resolver.go                              ← integrate dynamic resolvers
+apps/api/graphql/resolver/schema.resolvers.go                      ← remove static Document queries
+apps/api/Dockerfile                                                ← install protoc for proto compilation
+```
+
+**Removed files:**
+```
+apps/api/graphql/schema.graphqls                                   ← replaced by dynamic generation
+apps/api/graphql/generated/generated.go                            ← regenerated for base types only
+apps/api/graphql/model/models_gen.go                               ← regenerated for base types only
+```
+
+---
+
+### 11.12 Acceptance Criteria
+
+**Phase A — Gin:**
+- [ ] All existing REST endpoints return identical responses (same status codes, same JSON shapes)
+- [ ] All middleware (auth, CORS, rate limit, body limit, security headers) works under Gin
+- [ ] `gin.SetMode(gin.ReleaseMode)` in production; `gin.TestMode` in tests
+- [ ] Route registration moved from `main.go` to `router.go`
+- [ ] Frontend works without any changes
+
+**Phase B — Dynamic GraphQL:**
+- [ ] Each content-type JSON definition auto-generates a typed GraphQL type at startup
+- [ ] Collection-types get: single query, list query (with `Connection` type), create/update/delete/publish/unpublish mutations
+- [ ] Single-types get: single query, save/publish/unpublish mutations (no delete)
+- [ ] Field types map correctly: text→String, number→Float, boolean→Boolean, media→String, json→JSON, richtext→String
+- [ ] Dynamic resolvers call existing usecase methods — no business logic duplication
+- [ ] `contentTypes` base query continues to work
+- [ ] `@auth` directive enforced on all mutations
+- [ ] Schema regenerates on restart when content-type definitions change
+
+**Phase C — GORM:**
+- [ ] Every GORM repository passes the same test cases as its MongoDB counterpart
+- [ ] `DB_DRIVER=postgres` with `SQL_DSN` starts the app with all entities on PostgreSQL
+- [ ] `DB_DRIVER=mongo` (default) behavior is unchanged
+- [ ] Per-entity overrides work: e.g. `DB_DRIVER=mongo DB_DOCUMENT=sql` uses MongoDB for everything except documents
+- [ ] GORM auto-migration creates correct tables and indexes
+- [ ] Document flexible `data` field stored as JSONB (PostgreSQL) / JSON (MySQL)
+- [ ] `EnsureCollection` / `DropCollection` are safe no-ops in GORM adapter
+
+**Phase D — gRPC:**
+- [ ] gRPC server starts on `GRPC_PORT` alongside Gin on `PORT`
+- [ ] All proto services compile and register
+- [ ] DocumentService mirrors full REST document API surface
+- [ ] ContentTypeService exposes read-only content-type queries
+- [ ] MediaService exposes list + delete
+- [ ] AuthService exposes login, register, refresh, setup-status
+- [ ] JWT auth interceptor protects mutations; public queries pass without auth
+- [ ] gRPC client manager connects to external services configured via `GRPC_SERVICES`
+- [ ] Domain errors map to correct gRPC status codes (NotFound, InvalidArgument, etc.)
+
+---
+
+### 11.13 Out of Scope
+
+- Frontend changes — the web app is not modified in this refactoring
+- Database data migration tooling (SQL ↔ MongoDB data sync)
+- gRPC streaming (server-streaming or bidirectional) — unary RPCs only
+- gRPC-Gateway (HTTP-to-gRPC proxy) — REST and gRPC coexist as separate protocols
+- GraphQL subscriptions
+- Connection pooling tuning for GORM
+- Read replicas or multi-primary database topology
+- Service mesh / load balancing for gRPC
+- Media upload via gRPC (multipart upload remains REST-only)
+- gRPC health checking protocol (future enhancement)
+
+---
+
+### 11.14 Boundaries
+
+| Rule | Detail |
+|---|---|
+| **Always** | Keep REST endpoint paths and response shapes identical after Gin migration — zero frontend changes |
+| **Always** | Route dynamic GraphQL queries/mutations through the same usecase layer as REST — no business logic in resolvers |
+| **Always** | Use GORM's `serializer:json` tag for flexible data fields (Fields, ListFields, Data) — never raw SQL JSON functions |
+| **Always** | Map domain errors to protocol-appropriate codes in every delivery layer (HTTP status, gRPC status) |
+| **Always** | Initialize both MongoDB and SQL connections at startup when configured — lazy init risks runtime failures |
+| **Always** | Run `AutoMigrate` for GORM entities on startup (matches MongoDB's `EnsureIndexes` pattern) |
+| **Always** | Use `gin.SetMode(gin.TestMode)` in all test files to suppress Gin debug logging |
+| **Always** | Proto files live under `proto/cms/v1/` with `option go_package` matching the module path |
+| **Never** | Duplicate business logic across REST handlers, GraphQL resolvers, and gRPC services — all three must call usecase methods |
+| **Never** | Use MongoDB-specific logic (ObjectID, bson primitives) in usecase or delivery layers — only in `infrastructure/mongodb/` |
+| **Never** | Use GORM-specific logic (gorm.DB, gorm.Model) outside `infrastructure/gormdb/` |
+| **Never** | Allow `EnsureCollection` / `DropCollection` to fail in the GORM adapter — they must be safe no-ops |
+| **Never** | Expose media upload via gRPC — multipart upload remains REST-only |
+| **Never** | Hard-code SQL dialect-specific queries in GORM repositories — use GORM's abstraction layer |
+| **Ask first** | Choosing between PostgreSQL and MySQL for production deployment |
+| **Ask first** | Adding new gRPC client service connections beyond the initial configured set |
+| **Ask first** | Changing the gRPC port default from 9090 |

@@ -11,17 +11,17 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/gin-gonic/gin"
+
 	"project-abyssoftime-cms-v2/api/internal/delivery/http/handler"
 	"project-abyssoftime-cms-v2/api/internal/domain/entity"
 	pkgerrors "project-abyssoftime-cms-v2/api/pkg/errors"
 )
 
-// ---- mock usecase ----------------------------------------------------------
-
 type mockMediaUC struct {
-	uploadFn   func(ctx context.Context, file io.Reader, filename, documentRef, contentTypeID string) (*entity.MediaAsset, error)
-	listFn     func(ctx context.Context, page, limit int) ([]*entity.MediaAsset, int64, error)
-	deleteFn   func(ctx context.Context, id string) error
+	uploadFn func(ctx context.Context, file io.Reader, filename, documentRef, contentTypeID string) (*entity.MediaAsset, error)
+	listFn   func(ctx context.Context, page, limit int) ([]*entity.MediaAsset, int64, error)
+	deleteFn func(ctx context.Context, id string) error
 }
 
 func (m *mockMediaUC) Upload(ctx context.Context, file io.Reader, filename, documentRef, contentTypeID string) (*entity.MediaAsset, error) {
@@ -36,9 +36,35 @@ func (m *mockMediaUC) Delete(ctx context.Context, id string) error {
 	return m.deleteFn(ctx, id)
 }
 
-// ---- Upload ----------------------------------------------------------------
+func buildMultipartForm(t *testing.T, filename string, content []byte, documentRef, contentTypeID string) (*bytes.Buffer, string) {
+	t.Helper()
+	var buf bytes.Buffer
+	w := multipart.NewWriter(&buf)
+
+	fw, err := w.CreateFormFile("file", filename)
+	if err != nil {
+		t.Fatalf("CreateFormFile: %v", err)
+	}
+	fw.Write(content)
+
+	w.WriteField("documentRef", documentRef)
+	w.WriteField("contentTypeId", contentTypeID)
+	w.Close()
+
+	return &buf, w.FormDataContentType()
+}
+
+func jsonKeys(m map[string]any) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
+}
 
 func TestMediaHandler_Upload_OK(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
 	uc := &mockMediaUC{}
 	uc.uploadFn = func(_ context.Context, _ io.Reader, filename, _, _ string) (*entity.MediaAsset, error) {
 		return &entity.MediaAsset{
@@ -49,11 +75,13 @@ func TestMediaHandler_Upload_OK(t *testing.T) {
 	h := handler.NewMediaHandler(uc)
 
 	body, contentType := buildMultipartForm(t, "photo.jpg", []byte("fake-image-data"), "doc-1", "ct-1")
+	w := httptest.NewRecorder()
+	_, r := gin.CreateTestContext(w)
+	r.POST("/api/media/upload", h.Upload)
+
 	req := httptest.NewRequest(http.MethodPost, "/api/media/upload", body)
 	req.Header.Set("Content-Type", contentType)
-	w := httptest.NewRecorder()
-
-	h.Upload(w, req)
+	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusCreated {
 		t.Errorf("Upload() status = %d, want %d", w.Code, http.StatusCreated)
@@ -71,15 +99,9 @@ func TestMediaHandler_Upload_OK(t *testing.T) {
 	}
 }
 
-func jsonKeys(m map[string]any) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	return keys
-}
-
 func TestMediaHandler_List_OK(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
 	uc := &mockMediaUC{}
 	uc.listFn = func(_ context.Context, page, limit int) ([]*entity.MediaAsset, int64, error) {
 		return []*entity.MediaAsset{
@@ -88,9 +110,12 @@ func TestMediaHandler_List_OK(t *testing.T) {
 	}
 	h := handler.NewMediaHandler(uc)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/media?page=1&limit=10", nil)
 	w := httptest.NewRecorder()
-	h.List(w, req)
+	_, r := gin.CreateTestContext(w)
+	r.GET("/api/media", h.List)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/media?page=1&limit=10", nil)
+	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("List() status = %d, want 200", w.Code)
@@ -111,83 +136,72 @@ func TestMediaHandler_List_OK(t *testing.T) {
 }
 
 func TestMediaHandler_Upload_MissingFile_BadRequest(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
 	uc := &mockMediaUC{}
 	h := handler.NewMediaHandler(uc)
 
+	w := httptest.NewRecorder()
+	_, r := gin.CreateTestContext(w)
+	r.POST("/api/media/upload", h.Upload)
+
 	req := httptest.NewRequest(http.MethodPost, "/api/media/upload", nil)
 	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-
-	h.Upload(w, req)
+	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("Upload() status = %d, want %d", w.Code, http.StatusBadRequest)
 	}
 }
 
-// buildMultipartForm builds a multipart body with a file field and metadata fields.
-func buildMultipartForm(t *testing.T, filename string, content []byte, documentRef, contentTypeID string) (*bytes.Buffer, string) {
+func ginServeDelete(t *testing.T, h *handler.MediaHandler, id string) *httptest.ResponseRecorder {
 	t.Helper()
-	var buf bytes.Buffer
-	w := multipart.NewWriter(&buf)
-
-	fw, err := w.CreateFormFile("file", filename)
-	if err != nil {
-		t.Fatalf("CreateFormFile: %v", err)
-	}
-	fw.Write(content)
-
-	w.WriteField("documentRef", documentRef)
-	w.WriteField("contentTypeId", contentTypeID)
-	w.Close()
-
-	return &buf, w.FormDataContentType()
-}
-
-// ---- Delete ----------------------------------------------------------------
-
-func serveDelete(t *testing.T, h *handler.MediaHandler, id string) *httptest.ResponseRecorder {
-	t.Helper()
-	mux := http.NewServeMux()
-	mux.HandleFunc("DELETE /api/media/{id}", h.Delete)
-	req := httptest.NewRequest(http.MethodDelete, "/api/media/"+id, nil)
 	w := httptest.NewRecorder()
-	mux.ServeHTTP(w, req)
+	_, r := gin.CreateTestContext(w)
+	r.DELETE("/api/media/:id", h.Delete)
+	req := httptest.NewRequest(http.MethodDelete, "/api/media/"+id, nil)
+	r.ServeHTTP(w, req)
 	return w
 }
 
 func TestMediaHandler_Delete_Returns204(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
 	uc := &mockMediaUC{}
 	uc.deleteFn = func(_ context.Context, _ string) error { return nil }
 	h := handler.NewMediaHandler(uc)
 
-	w := serveDelete(t, h, "asset-1")
+	w := ginServeDelete(t, h, "asset-1")
 	if w.Code != http.StatusNoContent {
 		t.Errorf("Delete() status = %d, want 204", w.Code)
 	}
 }
 
 func TestMediaHandler_Delete_NotFound_Returns404(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
 	uc := &mockMediaUC{}
 	uc.deleteFn = func(_ context.Context, _ string) error {
 		return pkgerrors.ErrNotFound
 	}
 	h := handler.NewMediaHandler(uc)
 
-	w := serveDelete(t, h, "missing")
+	w := ginServeDelete(t, h, "missing")
 	if w.Code != http.StatusNotFound {
 		t.Errorf("Delete() status = %d, want 404", w.Code)
 	}
 }
 
 func TestMediaHandler_Delete_UseCaseError_Returns500(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
 	uc := &mockMediaUC{}
 	uc.deleteFn = func(_ context.Context, _ string) error {
 		return errors.New("storage error")
 	}
 	h := handler.NewMediaHandler(uc)
 
-	w := serveDelete(t, h, "asset-1")
+	w := ginServeDelete(t, h, "asset-1")
 	if w.Code != http.StatusInternalServerError {
 		t.Errorf("Delete() status = %d, want 500", w.Code)
 	}

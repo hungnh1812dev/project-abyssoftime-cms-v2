@@ -2,10 +2,11 @@ package handler
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/gin-gonic/gin"
 
 	"project-abyssoftime-cms-v2/api/internal/delivery/http/middleware"
 	"project-abyssoftime-cms-v2/api/internal/domain/entity"
@@ -71,10 +72,6 @@ type paginatedResponse struct {
 	Size  int                 `json:"size"`
 }
 
-func localeParam(r *http.Request) string {
-	return r.URL.Query().Get("locale")
-}
-
 func toSummary(doc *entity.Document, status string) entrySummary {
 	return entrySummary{
 		DocumentID:    doc.DocumentID,
@@ -99,9 +96,9 @@ func projectData(data map[string]any, fields []string) map[string]any {
 	return projected
 }
 
-func paginationParams(r *http.Request) (start, size int) {
-	start, _ = strconv.Atoi(r.URL.Query().Get("start"))
-	size, _ = strconv.Atoi(r.URL.Query().Get("size"))
+func ginPaginationParams(c *gin.Context) (start, size int) {
+	start, _ = strconv.Atoi(c.Query("start"))
+	size, _ = strconv.Atoi(c.Query("size"))
 	if start < 0 {
 		start = 0
 	}
@@ -116,63 +113,63 @@ func paginationParams(r *http.Request) (start, size int) {
 
 // --- Single-type handlers ---
 
-func (h *DocumentHandler) GetSingleType(w http.ResponseWriter, r *http.Request) {
-	slug := r.PathValue("slug")
-	doc, status, err := h.uc.GetSingleType(r.Context(), slug, localeParam(r))
+func (h *DocumentHandler) GetSingleType(c *gin.Context) {
+	slug := c.Param("slug")
+	doc, status, err := h.uc.GetSingleType(c.Request.Context(), slug, c.Query("locale"))
 	if err != nil {
-		writeErr(w, err)
+		ginWriteErr(c, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, toSummary(doc, status))
+	c.JSON(http.StatusOK, toSummary(doc, status))
 }
 
-func (h *DocumentHandler) SaveSingleType(w http.ResponseWriter, r *http.Request) {
+func (h *DocumentHandler) SaveSingleType(c *gin.Context) {
 	var req documentRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ginWriteError(c, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	slug := r.PathValue("slug")
-	saved, err := h.uc.SaveSingleType(r.Context(), slug, req.Data, localeParam(r), middleware.UserID(r.Context()))
+	slug := c.Param("slug")
+	saved, err := h.uc.SaveSingleType(c.Request.Context(), slug, req.Data, c.Query("locale"), middleware.UserID(c.Request.Context()))
 	if err != nil {
-		writeErr(w, err)
+		ginWriteErr(c, err)
 		return
 	}
-	doc, status, err := h.uc.GetSingleType(r.Context(), slug, saved.Locale)
+	doc, status, err := h.uc.GetSingleType(c.Request.Context(), slug, saved.Locale)
 	if err != nil {
-		writeErr(w, err)
+		ginWriteErr(c, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, toSummary(doc, status))
+	c.JSON(http.StatusOK, toSummary(doc, status))
 }
 
-func (h *DocumentHandler) PublishSingleType(w http.ResponseWriter, r *http.Request) {
-	slug := r.PathValue("slug")
-	if err := h.uc.PublishSingleType(r.Context(), slug, localeParam(r), middleware.UserID(r.Context())); err != nil {
-		writeErr(w, err)
+func (h *DocumentHandler) PublishSingleType(c *gin.Context) {
+	slug := c.Param("slug")
+	if err := h.uc.PublishSingleType(c.Request.Context(), slug, c.Query("locale"), middleware.UserID(c.Request.Context())); err != nil {
+		ginWriteErr(c, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "published"})
+	c.JSON(http.StatusOK, gin.H{"status": "published"})
 }
 
-func (h *DocumentHandler) UnpublishSingleType(w http.ResponseWriter, r *http.Request) {
-	slug := r.PathValue("slug")
-	if err := h.uc.UnpublishSingleType(r.Context(), slug, localeParam(r)); err != nil {
-		writeErr(w, err)
+func (h *DocumentHandler) UnpublishSingleType(c *gin.Context) {
+	slug := c.Param("slug")
+	if err := h.uc.UnpublishSingleType(c.Request.Context(), slug, c.Query("locale")); err != nil {
+		ginWriteErr(c, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "draft"})
+	c.JSON(http.StatusOK, gin.H{"status": "draft"})
 }
 
 // --- Collection-type handlers ---
 
-func (h *DocumentHandler) ListCollection(w http.ResponseWriter, r *http.Request) {
-	slug := r.PathValue("slug")
-	start, size := paginationParams(r)
+func (h *DocumentHandler) ListCollection(c *gin.Context) {
+	slug := c.Param("slug")
+	start, size := ginPaginationParams(c)
 
-	ct, err := h.ctUC.FindBySlug(r.Context(), slug)
+	ct, err := h.ctUC.FindBySlug(c.Request.Context(), slug)
 	if err != nil {
-		writeErr(w, err)
+		ginWriteErr(c, err)
 		return
 	}
 	listFields := ct.ListFields
@@ -187,9 +184,9 @@ func (h *DocumentHandler) ListCollection(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
-	docs, statuses, total, err := h.uc.GetAllPaginated(r.Context(), slug, start, size, localeParam(r))
+	docs, statuses, total, err := h.uc.GetAllPaginated(c.Request.Context(), slug, start, size, c.Query("locale"))
 	if err != nil {
-		writeErr(w, err)
+		ginWriteErr(c, err)
 		return
 	}
 
@@ -204,7 +201,7 @@ func (h *DocumentHandler) ListCollection(w http.ResponseWriter, r *http.Request)
 			UpdatedAt:  doc.UpdatedAt,
 		}
 	}
-	writeJSON(w, http.StatusOK, paginatedResponse{
+	c.JSON(http.StatusOK, paginatedResponse{
 		Items: items,
 		Total: total,
 		Start: start,
@@ -212,98 +209,98 @@ func (h *DocumentHandler) ListCollection(w http.ResponseWriter, r *http.Request)
 	})
 }
 
-func (h *DocumentHandler) GetCollection(w http.ResponseWriter, r *http.Request) {
-	slug := r.PathValue("slug")
-	documentID := r.PathValue("documentId")
-	draft, status, err := h.uc.GetForEdit(r.Context(), slug, documentID, localeParam(r))
+func (h *DocumentHandler) GetCollection(c *gin.Context) {
+	slug := c.Param("slug")
+	documentID := c.Param("documentId")
+	draft, status, err := h.uc.GetForEdit(c.Request.Context(), slug, documentID, c.Query("locale"))
 	if err != nil {
-		writeErr(w, err)
+		ginWriteErr(c, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, toSummary(draft, status))
+	c.JSON(http.StatusOK, toSummary(draft, status))
 }
 
-func (h *DocumentHandler) CreateCollection(w http.ResponseWriter, r *http.Request) {
+func (h *DocumentHandler) CreateCollection(c *gin.Context) {
 	var req documentRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ginWriteError(c, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	slug := r.PathValue("slug")
-	doc := &entity.Document{Data: req.Data, Locale: localeParam(r)}
-	saved, err := h.uc.Save(r.Context(), slug, doc, middleware.UserID(r.Context()))
+	slug := c.Param("slug")
+	doc := &entity.Document{Data: req.Data, Locale: c.Query("locale")}
+	saved, err := h.uc.Save(c.Request.Context(), slug, doc, middleware.UserID(c.Request.Context()))
 	if err != nil {
-		writeErr(w, err)
+		ginWriteErr(c, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, toSummary(saved, "draft"))
+	c.JSON(http.StatusCreated, toSummary(saved, "draft"))
 }
 
-func (h *DocumentHandler) UpdateCollection(w http.ResponseWriter, r *http.Request) {
+func (h *DocumentHandler) UpdateCollection(c *gin.Context) {
 	var req documentRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ginWriteError(c, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	slug := r.PathValue("slug")
-	documentID := r.PathValue("documentId")
+	slug := c.Param("slug")
+	documentID := c.Param("documentId")
 	doc := &entity.Document{
 		DocumentID: documentID,
 		Data:       req.Data,
-		Locale:     localeParam(r),
+		Locale:     c.Query("locale"),
 	}
-	saved, err := h.uc.Save(r.Context(), slug, doc, middleware.UserID(r.Context()))
+	saved, err := h.uc.Save(c.Request.Context(), slug, doc, middleware.UserID(c.Request.Context()))
 	if err != nil {
-		writeErr(w, err)
+		ginWriteErr(c, err)
 		return
 	}
-	_, status, err := h.uc.GetForEdit(r.Context(), slug, saved.DocumentID, saved.Locale)
+	_, status, err := h.uc.GetForEdit(c.Request.Context(), slug, saved.DocumentID, saved.Locale)
 	if err != nil {
-		writeErr(w, err)
+		ginWriteErr(c, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, toSummary(saved, status))
+	c.JSON(http.StatusOK, toSummary(saved, status))
 }
 
-func (h *DocumentHandler) DeleteCollection(w http.ResponseWriter, r *http.Request) {
-	slug := r.PathValue("slug")
-	documentID := r.PathValue("documentId")
-	if err := h.uc.Delete(r.Context(), slug, documentID); err != nil {
-		writeErr(w, err)
+func (h *DocumentHandler) DeleteCollection(c *gin.Context) {
+	slug := c.Param("slug")
+	documentID := c.Param("documentId")
+	if err := h.uc.Delete(c.Request.Context(), slug, documentID); err != nil {
+		ginWriteErr(c, err)
 		return
 	}
-	w.WriteHeader(http.StatusNoContent)
+	c.Status(http.StatusNoContent)
 }
 
-func (h *DocumentHandler) PublishCollection(w http.ResponseWriter, r *http.Request) {
-	slug := r.PathValue("slug")
-	documentID := r.PathValue("documentId")
-	if err := h.uc.Publish(r.Context(), slug, documentID, localeParam(r), middleware.UserID(r.Context())); err != nil {
-		writeErr(w, err)
+func (h *DocumentHandler) PublishCollection(c *gin.Context) {
+	slug := c.Param("slug")
+	documentID := c.Param("documentId")
+	if err := h.uc.Publish(c.Request.Context(), slug, documentID, c.Query("locale"), middleware.UserID(c.Request.Context())); err != nil {
+		ginWriteErr(c, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "published"})
+	c.JSON(http.StatusOK, gin.H{"status": "published"})
 }
 
-func (h *DocumentHandler) UnpublishCollection(w http.ResponseWriter, r *http.Request) {
-	slug := r.PathValue("slug")
-	documentID := r.PathValue("documentId")
-	if err := h.uc.Unpublish(r.Context(), slug, documentID, localeParam(r)); err != nil {
-		writeErr(w, err)
+func (h *DocumentHandler) UnpublishCollection(c *gin.Context) {
+	slug := c.Param("slug")
+	documentID := c.Param("documentId")
+	if err := h.uc.Unpublish(c.Request.Context(), slug, documentID, c.Query("locale")); err != nil {
+		ginWriteErr(c, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "draft"})
+	c.JSON(http.StatusOK, gin.H{"status": "draft"})
 }
 
-// --- Public handler (unchanged) ---
+// --- Public handler ---
 
-func (h *DocumentHandler) GetPublic(w http.ResponseWriter, r *http.Request) {
-	slug := r.PathValue("slug")
-	documentID := r.PathValue("documentId")
-	doc, err := h.uc.GetPublished(r.Context(), slug, documentID, localeParam(r))
+func (h *DocumentHandler) GetPublic(c *gin.Context) {
+	slug := c.Param("slug")
+	documentID := c.Param("documentId")
+	doc, err := h.uc.GetPublished(c.Request.Context(), slug, documentID, c.Query("locale"))
 	if err != nil {
-		writeErr(w, err)
+		ginWriteErr(c, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, doc)
+	c.JSON(http.StatusOK, doc)
 }

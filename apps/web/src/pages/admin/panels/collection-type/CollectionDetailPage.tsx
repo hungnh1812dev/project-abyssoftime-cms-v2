@@ -16,9 +16,5 @@ export function CollectionDetailPage() {
     );
   }
 
-  if (!id) {
-    return <p className="text-muted-foreground">No document ID provided.</p>;
-  }
-
-  return <ContentTypePanel contentType={contentType} id={id} />;
+  return <ContentTypePanel contentType={contentType} id={id} isNew={!id} />;
 }

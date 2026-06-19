@@ -1,85 +1,81 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { Button } from '@/components/ui/button'
-import { useCollectionDocuments, useDeleteCollectionDocument, useCreateCollectionDocument } from '@/hooks/useCollectionDocuments'
-import { useLocales } from '@/hooks/useLocales'
-import { getRegistration, type CollectionColumnDef } from '@/content-type-registry'
-import type { ContentType, Document, FieldDefinition } from '@/types/cms'
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { useCollectionDocuments, useDeleteCollectionDocument } from '@/hooks/useCollectionDocuments';
+import { useLocales } from '@/hooks/useLocales';
+import { getRegistration, type CollectionColumnDef } from '@/content-type-registry';
+import type { ContentType, Document, FieldDefinition } from '@/types/cms';
 
 interface Props {
-  contentType: ContentType
+  contentType: ContentType;
 }
 
 function deriveColumns(contentType: ContentType): CollectionColumnDef[] {
-  const registration = getRegistration(contentType.Slug)
-  if (registration?.columns) return registration.columns
+  const registration = getRegistration(contentType.Slug);
+  if (registration?.columns) return registration.columns;
 
-  const listFieldNames = contentType.listFields ?? []
-  const fields = contentType.Fields ?? []
-  const fieldMap = new Map<string, FieldDefinition>()
-  for (const f of fields) fieldMap.set(f.name, f)
+  const listFieldNames = contentType.listFields ?? [];
+  const fields = contentType.Fields ?? [];
+  const fieldMap = new Map<string, FieldDefinition>();
+  for (const f of fields) fieldMap.set(f.name, f);
 
-  const names = listFieldNames.length > 0
-    ? listFieldNames
-    : fields.slice(0, 3).map((f) => f.name)
+  const names = listFieldNames.length > 0 ? listFieldNames : fields.slice(0, 3).map((f) => f.name);
 
   return names.map((name) => {
-    const f = fieldMap.get(name)
-    const fieldType = f?.type ?? 'text'
-    let colType: CollectionColumnDef['type'] = 'text'
-    if (fieldType === 'boolean') colType = 'boolean'
-    else if (fieldType === 'number') colType = 'number'
-    else if (fieldType === 'media') colType = 'image'
-    return { key: name, label: name, type: colType }
-  })
+    const f = fieldMap.get(name);
+    const fieldType = f?.type ?? 'text';
+    let colType: CollectionColumnDef['type'] = 'text';
+    if (fieldType === 'boolean') colType = 'boolean';
+    else if (fieldType === 'number') colType = 'number';
+    else if (fieldType === 'media') colType = 'image';
+    return { key: name, label: name, type: colType };
+  });
 }
 
 function cellValue(doc: Document, col: CollectionColumnDef): React.ReactNode {
-  const raw = doc.data[col.key]
+  const raw = doc.data[col.key];
   switch (col.type) {
     case 'boolean':
-      return raw ? '✓' : '—'
+      return raw ? '✓' : '—';
     case 'number':
-      return String(raw ?? '')
+      return String(raw ?? '');
     case 'image':
-      return <img src={String(raw ?? '')} alt={col.label} className="h-8 w-8 object-cover" />
+      return <img src={String(raw ?? '')} alt={col.label} className="h-8 w-8 object-cover" />;
     default:
-      return String(raw ?? '')
+      return String(raw ?? '');
   }
 }
 
-const PAGE_SIZE = 20
+const PAGE_SIZE = 20;
 
 export function CollectionListPage({ contentType }: Props) {
-  const [start, setStart] = useState(0)
-  const { data: locales = [] } = useLocales()
-  const activeLocale = locales[0] || ''
+  const [start, setStart] = useState(0);
+  const { data: locales = [] } = useLocales();
+  const activeLocale = locales[0] || '';
 
-  const { data: page, isLoading } = useCollectionDocuments(contentType.Slug, start, PAGE_SIZE, activeLocale)
-  const { mutate: deleteDoc } = useDeleteCollectionDocument()
-  const { mutateAsync: createDoc } = useCreateCollectionDocument()
-  const navigate = useNavigate()
+  const { data: page, isLoading } = useCollectionDocuments(contentType.Slug, start, PAGE_SIZE, activeLocale);
+  const { mutate: deleteDoc } = useDeleteCollectionDocument();
+  const navigate = useNavigate();
 
-  const columns = deriveColumns(contentType)
-  const docs = page?.items ?? []
-  const total = page?.total ?? 0
+  const columns = deriveColumns(contentType);
+  const docs = page?.items ?? [];
+  const total = page?.total ?? 0;
 
-  async function handleCreate() {
-    const newDoc = await createDoc({ contentTypeSlug: contentType.Slug, data: {} })
-    navigate(`/admin/content-type/collection-type/${contentType.Slug}/${newDoc.documentId}`)
+  function handleCreate() {
+    navigate(`/admin/content-type/collection-type/${contentType.Slug}/new`);
   }
 
   function handleDelete(doc: Document) {
-    if (!window.confirm('Delete this entry?')) return
-    deleteDoc({ contentTypeSlug: contentType.Slug, id: doc.documentId })
+    if (!window.confirm('Delete this entry?')) return;
+    deleteDoc({ contentTypeSlug: contentType.Slug, id: doc.documentId });
   }
 
   if (isLoading) {
-    return <p className="text-muted-foreground">Loading…</p>
+    return <p className="text-muted-foreground">Loading…</p>;
   }
 
-  const showingFrom = total === 0 ? 0 : start + 1
-  const showingTo = Math.min(start + PAGE_SIZE, total)
+  const showingFrom = total === 0 ? 0 : start + 1;
+  const showingTo = Math.min(start + PAGE_SIZE, total);
 
   return (
     <div className="space-y-4">
@@ -113,18 +109,11 @@ export function CollectionListPage({ contentType }: Props) {
                     </td>
                   ))}
                   <td className="py-2 pr-4 capitalize">{doc.status}</td>
-                  <td className="py-2 flex gap-2">
-                    <Link
-                      to={`/admin/content-type/collection-type/${contentType.Slug}/${doc.documentId}`}
-                      className="text-primary underline-offset-4 hover:underline"
-                    >
+                  <td className="flex gap-2 py-2">
+                    <Link to={`/admin/content-type/collection-type/${contentType.Slug}/${doc.documentId}`} className="text-primary underline-offset-4 hover:underline">
                       Edit
                     </Link>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => handleDelete(doc)}
-                    >
+                    <Button variant="destructive" size="sm" onClick={() => handleDelete(doc)}>
                       Delete
                     </Button>
                   </td>
@@ -133,23 +122,15 @@ export function CollectionListPage({ contentType }: Props) {
             </tbody>
           </table>
 
-          <div className="flex items-center justify-between text-sm text-muted-foreground">
-            <span>Showing {showingFrom}–{showingTo} of {total}</span>
+          <div className="text-muted-foreground flex items-center justify-between text-sm">
+            <span>
+              Showing {showingFrom}–{showingTo} of {total}
+            </span>
             <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={start === 0}
-                onClick={() => setStart(Math.max(0, start - PAGE_SIZE))}
-              >
+              <Button variant="outline" size="sm" disabled={start === 0} onClick={() => setStart(Math.max(0, start - PAGE_SIZE))}>
                 Previous
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={start + PAGE_SIZE >= total}
-                onClick={() => setStart(start + PAGE_SIZE)}
-              >
+              <Button variant="outline" size="sm" disabled={start + PAGE_SIZE >= total} onClick={() => setStart(start + PAGE_SIZE)}>
                 Next
               </Button>
             </div>
@@ -157,5 +138,5 @@ export function CollectionListPage({ contentType }: Props) {
         </>
       )}
     </div>
-  )
+  );
 }

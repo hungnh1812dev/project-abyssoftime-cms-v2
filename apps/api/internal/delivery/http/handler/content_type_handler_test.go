@@ -7,12 +7,12 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/gin-gonic/gin"
+
 	"project-abyssoftime-cms-v2/api/internal/delivery/http/handler"
 	"project-abyssoftime-cms-v2/api/internal/domain/entity"
 	pkgerrors "project-abyssoftime-cms-v2/api/pkg/errors"
 )
-
-// ---- mock usecase ----------------------------------------------------------
 
 type mockContentTypeUC struct {
 	findByIDFn   func(ctx context.Context, id string) (*entity.ContentType, error)
@@ -30,9 +30,9 @@ func (m *mockContentTypeUC) FindAll(ctx context.Context) ([]*entity.ContentType,
 	return m.findAllFn(ctx)
 }
 
-// ---- List ------------------------------------------------------------------
-
 func TestContentTypeHandler_ListSummary(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
 	uc := &mockContentTypeUC{}
 	uc.findAllFn = func(_ context.Context) ([]*entity.ContentType, error) {
 		return []*entity.ContentType{
@@ -42,9 +42,12 @@ func TestContentTypeHandler_ListSummary(t *testing.T) {
 	}
 	h := handler.NewContentTypeHandler(uc)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/content-types/all", nil)
 	w := httptest.NewRecorder()
-	h.ListSummary(w, req)
+	_, r := gin.CreateTestContext(w)
+	r.GET("/api/content-types", h.ListSummary)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/content-types", nil)
+	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("ListSummary() status = %d, want 200", w.Code)
@@ -58,9 +61,9 @@ func TestContentTypeHandler_ListSummary(t *testing.T) {
 	}
 }
 
-// ---- ListSummary excludes Fields and timestamps ----------------------------
-
 func TestContentTypeHandler_ListSummary_ExcludesFieldsAndTimestamps(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
 	uc := &mockContentTypeUC{}
 	uc.findAllFn = func(_ context.Context) ([]*entity.ContentType, error) {
 		return []*entity.ContentType{
@@ -77,9 +80,12 @@ func TestContentTypeHandler_ListSummary_ExcludesFieldsAndTimestamps(t *testing.T
 	}
 	h := handler.NewContentTypeHandler(uc)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/content-types/all", nil)
 	w := httptest.NewRecorder()
-	h.ListSummary(w, req)
+	_, r := gin.CreateTestContext(w)
+	r.GET("/api/content-types", h.ListSummary)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/content-types", nil)
+	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("ListSummary() status = %d, want 200", w.Code)
@@ -103,9 +109,9 @@ func TestContentTypeHandler_ListSummary_ExcludesFieldsAndTimestamps(t *testing.T
 	}
 }
 
-// ---- Get (unified: ObjectID → FindByID, otherwise → FindBySlug) -----------
-
 func TestContentTypeHandler_Get(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
 	tests := []struct {
 		name       string
 		identifier string
@@ -160,10 +166,12 @@ func TestContentTypeHandler_Get(t *testing.T) {
 			tt.setupUC(uc)
 			h := handler.NewContentTypeHandler(uc)
 
-			req := httptest.NewRequest(http.MethodGet, "/api/content-types/"+tt.identifier, nil)
-			req.SetPathValue("identifier", tt.identifier)
 			w := httptest.NewRecorder()
-			h.Get(w, req)
+			_, r := gin.CreateTestContext(w)
+			r.GET("/api/content-types/:identifier", h.Get)
+
+			req := httptest.NewRequest(http.MethodGet, "/api/content-types/"+tt.identifier, nil)
+			r.ServeHTTP(w, req)
 
 			if w.Code != tt.wantStatus {
 				t.Errorf("Get() status = %d, want %d", w.Code, tt.wantStatus)

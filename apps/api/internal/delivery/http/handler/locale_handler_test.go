@@ -6,15 +6,21 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/gin-gonic/gin"
+
 	"project-abyssoftime-cms-v2/api/internal/delivery/http/handler"
 )
 
 func TestLocaleHandler_List_ReturnsSupportedLocales(t *testing.T) {
+	gin.SetMode(gin.TestMode)
 	h := handler.NewLocaleHandler([]string{"en", "vi"})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/locales", nil)
 	w := httptest.NewRecorder()
-	h.List(w, req)
+	_, r := gin.CreateTestContext(w)
+	r.GET("/api/locales", h.List)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/locales", nil)
+	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("List() status = %d, want 200", w.Code)

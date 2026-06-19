@@ -5,9 +5,15 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"image"
+	_ "image/gif"
+	_ "image/jpeg"
+	_ "image/png"
 	"io"
 	"path/filepath"
 	"strings"
+
+	_ "golang.org/x/image/webp"
 
 	"project-abyssoftime-cms-v2/api/internal/domain/entity"
 	"project-abyssoftime-cms-v2/api/internal/domain/repository"
@@ -55,6 +61,12 @@ func (uc *UseCase) Upload(ctx context.Context, file io.Reader, filename, documen
 	if err != nil {
 		return nil, err
 	}
+	var width, height int
+	if cfg, _, err := image.DecodeConfig(bytes.NewReader(data)); err == nil {
+		width = cfg.Width
+		height = cfg.Height
+	}
+
 	asset := &entity.MediaAsset{
 		URL:           result.URL,
 		ThumbnailURL:  result.ThumbnailURL,
@@ -62,6 +74,8 @@ func (uc *UseCase) Upload(ctx context.Context, file io.Reader, filename, documen
 		FileName:      hashedFilename,
 		FileExt:       ext,
 		Hash:          hash12,
+		Width:         width,
+		Height:        height,
 		DocumentRef:   documentRef,
 		ContentTypeID: contentTypeID,
 	}

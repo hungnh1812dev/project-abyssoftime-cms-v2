@@ -1,0 +1,86 @@
+syntax = "proto3";
+package cms.v1;
+option go_package = "project-abyssoftime-cms-v2/api/proto/cms/v1;cmsv1";
+
+import "google/protobuf/timestamp.proto";
+
+message Document {
+  string document_id = 1;
+  string version = 2;
+  string content_type_id = 3;
+  bytes data = 4;
+  string locale = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+  google.protobuf.Timestamp published_at = 8;
+  string created_by = 9;
+  string updated_by = 10;
+  string published_by = 11;
+  string status = 12;
+}
+
+message GetDocumentRequest {
+  string content_type_slug = 1;
+  string document_id = 2;
+  string locale = 3;
+}
+
+message ListDocumentsRequest {
+  string content_type_slug = 1;
+  int32 start = 2;
+  int32 size = 3;
+  string locale = 4;
+}
+
+message ListDocumentsResponse {
+  repeated Document items = 1;
+  int64 total = 2;
+  int32 start = 3;
+  int32 size = 4;
+}
+
+message SaveDocumentRequest {
+  string content_type_slug = 1;
+  string document_id = 2;
+  bytes data = 3;
+  string locale = 4;
+}
+
+message PublishDocumentRequest {
+  string content_type_slug = 1;
+  string document_id = 2;
+  string locale = 3;
+}
+
+message DeleteDocumentRequest {
+  string content_type_slug = 1;
+  string document_id = 2;
+}
+
+message DeleteDocumentResponse {
+  bool success = 1;
+}
+
+message GetSingleTypeRequest {
+  string content_type_slug = 1;
+  string locale = 2;
+}
+
+message SaveSingleTypeRequest {
+  string content_type_slug = 1;
+  bytes data = 2;
+  string locale = 3;
+}
+
+service DocumentService {
+  rpc GetDocument(GetDocumentRequest) returns (Document);
+  rpc ListDocuments(ListDocumentsRequest) returns (ListDocumentsResponse);
+  rpc SaveDocument(SaveDocumentRequest) returns (Document);
+  rpc PublishDocument(PublishDocumentRequest) returns (Document);
+  rpc UnpublishDocument(PublishDocumentRequest) returns (Document);
+  rpc DeleteDocument(DeleteDocumentRequest) returns (DeleteDocumentResponse);
+  rpc GetSingleType(GetSingleTypeRequest) returns (Document);
+  rpc SaveSingleType(SaveSingleTypeRequest) returns (Document);
+  rpc PublishSingleType(GetSingleTypeRequest) returns (Document);
+  rpc UnpublishSingleType(GetSingleTypeRequest) returns (Document);
+}

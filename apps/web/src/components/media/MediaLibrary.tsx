@@ -61,17 +61,46 @@ export function MediaLibrary({ isOpen, onClose, onSelect, ext }: MediaLibraryPro
         </div>
 
         {showUpload && (
-          <div className="p-4 border-b space-y-2">
-            <input
-              type="file"
-              multiple
-              accept={ext ? ext.map((e) => `.${e}`).join(',') : 'image/*'}
-              onChange={(e) => setStagedFiles(Array.from(e.target.files ?? []))}
-            />
+          <div className="p-4 border-b space-y-3">
+            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-muted-foreground/30 bg-muted/30 px-4 py-3 text-sm font-medium text-foreground/70 transition-colors hover:border-primary/50 hover:bg-muted/50">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+              {stagedFiles.length > 0
+                ? `${stagedFiles.length} file${stagedFiles.length !== 1 ? 's' : ''} selected`
+                : 'Choose files to upload'}
+              <input
+                type="file"
+                multiple
+                accept={ext ? ext.map((e) => `.${e}`).join(',') : 'image/*'}
+                onChange={(e) => setStagedFiles(Array.from(e.target.files ?? []))}
+                className="sr-only"
+              />
+            </label>
             {stagedFiles.length > 0 && (
-              <Button size="sm" onClick={handleUpload} disabled={upload.isPending}>
-                Start Upload
-              </Button>
+              <>
+                <div className="grid grid-cols-4 gap-2">
+                  {stagedFiles.map((file, i) => (
+                    <div key={i} className="relative rounded-lg border overflow-hidden aspect-square bg-muted">
+                      <img
+                        src={URL.createObjectURL(file)}
+                        alt={file.name}
+                        className="w-full h-full object-cover"
+                        onLoad={(e) => URL.revokeObjectURL((e.target as HTMLImageElement).src)}
+                      />
+                      <button
+                        type="button"
+                        className="absolute top-1 right-1 rounded-full bg-background/80 p-0.5 text-muted-foreground hover:text-destructive transition-colors"
+                        onClick={() => setStagedFiles((prev) => prev.filter((_, j) => j !== i))}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
+                      </button>
+                      <span className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[10px] px-1 py-0.5 truncate">{file.name}</span>
+                    </div>
+                  ))}
+                </div>
+                <Button size="sm" className="w-full" onClick={handleUpload} disabled={upload.isPending}>
+                  {upload.isPending ? 'Uploading…' : `Upload ${stagedFiles.length} file${stagedFiles.length !== 1 ? 's' : ''}`}
+                </Button>
+              </>
             )}
           </div>
         )}
@@ -85,8 +114,10 @@ export function MediaLibrary({ isOpen, onClose, onSelect, ext }: MediaLibraryPro
                 <div key={asset.ID} className="relative group">
                   <button
                     type="button"
-                    className={`w-full border rounded overflow-hidden aspect-square hover:border-ring transition-colors ${
-                      ext && !ext.includes(asset.fileExt) ? 'opacity-40' : ''
+                    className={`w-full rounded-lg border-2 overflow-hidden aspect-square transition-all ${
+                      ext && !ext.includes(asset.fileExt)
+                        ? 'opacity-40 border-muted'
+                        : 'border-border hover:border-primary hover:ring-2 hover:ring-primary/20 hover:shadow-md'
                     }`}
                     disabled={deleteMedia.isPending}
                     onClick={() => { onSelect(asset); onClose() }}

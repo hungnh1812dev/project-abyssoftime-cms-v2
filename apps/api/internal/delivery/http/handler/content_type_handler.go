@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"regexp"
 
+	"github.com/gin-gonic/gin"
+
 	"project-abyssoftime-cms-v2/api/internal/domain/entity"
 )
 
@@ -31,10 +33,10 @@ type contentTypeSummary struct {
 	Kind entity.ContentKind `json:"Kind"`
 }
 
-func (h *ContentTypeHandler) ListSummary(w http.ResponseWriter, r *http.Request) {
-	cts, err := h.uc.FindAll(r.Context())
+func (h *ContentTypeHandler) ListSummary(c *gin.Context) {
+	cts, err := h.uc.FindAll(c.Request.Context())
 	if err != nil {
-		writeErr(w, err)
+		ginWriteErr(c, err)
 		return
 	}
 	summaries := make([]contentTypeSummary, len(cts))
@@ -46,23 +48,23 @@ func (h *ContentTypeHandler) ListSummary(w http.ResponseWriter, r *http.Request)
 			Kind: ct.Kind,
 		}
 	}
-	writeJSON(w, http.StatusOK, summaries)
+	c.JSON(http.StatusOK, summaries)
 }
 
-func (h *ContentTypeHandler) Get(w http.ResponseWriter, r *http.Request) {
-	identifier := r.PathValue("identifier")
+func (h *ContentTypeHandler) Get(c *gin.Context) {
+	identifier := c.Param("identifier")
 	var (
 		ct  *entity.ContentType
 		err error
 	)
 	if objectIDRe.MatchString(identifier) {
-		ct, err = h.uc.FindByID(r.Context(), identifier)
+		ct, err = h.uc.FindByID(c.Request.Context(), identifier)
 	} else {
-		ct, err = h.uc.FindBySlug(r.Context(), identifier)
+		ct, err = h.uc.FindBySlug(c.Request.Context(), identifier)
 	}
 	if err != nil {
-		writeErr(w, err)
+		ginWriteErr(c, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, ct)
+	c.JSON(http.StatusOK, ct)
 }
