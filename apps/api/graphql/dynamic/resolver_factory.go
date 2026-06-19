@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/graphql-go/graphql"
+	"github.com/graphql-go/graphql/language/ast"
 	gqlhandler "github.com/graphql-go/handler"
 
 	"project-abyssoftime-cms-v2/api/internal/delivery/http/middleware"
@@ -52,6 +53,9 @@ func (f *ResolverFactory) BuildHandler(defs []contenttype.ContentTypeDefinition)
 		},
 		ParseValue: func(value any) any {
 			return value
+		},
+		ParseLiteral: func(valueAST ast.Value) any {
+			return valueAST.GetValue()
 		},
 	})
 	timeScalar := graphql.DateTime
