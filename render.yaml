@@ -33,7 +33,7 @@ services:
   - type: web
     name: cms-web
     runtime: static
-    buildCommand: cd apps/web && npm ci && npm run build
+    buildCommand: cd apps/web && bun install --frozen-lockfile && bun run build
     staticPublishPath: apps/web/dist
     headers:
       - path: /*
