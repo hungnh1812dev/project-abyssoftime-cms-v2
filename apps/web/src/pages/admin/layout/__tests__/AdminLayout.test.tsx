@@ -16,6 +16,7 @@ function makeToken(payload: Record<string, unknown>) {
 }
 
 const ADMIN_TOKEN = makeToken({ userId: 'u1', role: 'admin', exp: 9999999999 })
+const SUPER_ADMIN_TOKEN = makeToken({ userId: 'u1', role: 'super_admin', exp: 9999999999 })
 
 const contentTypes: ContentType[] = [
   { ID: '1', DocumentID: 'd1', Name: 'Blog', Slug: 'blog', Kind: 'collection', CreatedAt: '', UpdatedAt: '' },
@@ -34,17 +35,27 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
+function renderSidebar(token = SUPER_ADMIN_TOKEN) {
+  mock.onPost('/auth/refresh').reply(200, { accessToken: token })
+  return renderWithProviders(
+    <AuthProvider>
+      <Sidebar />
+    </AuthProvider>,
+    { initialEntries: ['/admin'] },
+  )
+}
+
 describe('Sidebar', () => {
   it('renders content type names fetched from the API', async () => {
     mock.onGet('/api/content-types/all').reply(200, contentTypes)
-    renderWithProviders(<Sidebar />, { initialEntries: ['/admin'] })
+    renderSidebar()
     await waitFor(() => expect(screen.getByText('Blog')).toBeInTheDocument())
     expect(screen.getByText('About')).toBeInTheDocument()
   })
 
   it('renders nav links pointing to new content-type routes by kind', async () => {
     mock.onGet('/api/content-types/all').reply(200, contentTypes)
-    renderWithProviders(<Sidebar />, { initialEntries: ['/admin'] })
+    renderSidebar()
     await waitFor(() => expect(screen.getByRole('link', { name: 'Blog' })).toBeInTheDocument())
     expect(screen.getByRole('link', { name: 'Blog' })).toHaveAttribute(
       'href',
@@ -58,7 +69,7 @@ describe('Sidebar', () => {
 
   it('renders no content-type links when no content types exist', async () => {
     mock.onGet('/api/content-types/all').reply(200, [])
-    renderWithProviders(<Sidebar />, { initialEntries: ['/admin'] })
+    renderSidebar()
     await waitFor(() =>
       expect(screen.getByRole('link', { name: /media library/i })).toBeInTheDocument(),
     )
@@ -68,7 +79,7 @@ describe('Sidebar', () => {
 
   it('groups content types into Single Types and Collection Types sections', async () => {
     mock.onGet('/api/content-types/all').reply(200, contentTypes)
-    renderWithProviders(<Sidebar />, { initialEntries: ['/admin'] })
+    renderSidebar()
 
     await waitFor(() => expect(screen.getByText('Blog')).toBeInTheDocument())
 
@@ -77,8 +88,6 @@ describe('Sidebar', () => {
     const aboutLink = screen.getByRole('link', { name: 'About' })
     const blogLink = screen.getByRole('link', { name: 'Blog' })
 
-    // "About" (single) appears after the Single Types heading and before
-    // the Collection Types heading; "Blog" (collection) appears after it.
     expect(
       singleHeading.compareDocumentPosition(aboutLink) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy()
@@ -92,7 +101,7 @@ describe('Sidebar', () => {
 
   it('omits a section heading when no content type of that kind exists', async () => {
     mock.onGet('/api/content-types/all').reply(200, [contentTypes[0]]) // collection only
-    renderWithProviders(<Sidebar />, { initialEntries: ['/admin'] })
+    renderSidebar()
 
     await waitFor(() => expect(screen.getByText('Blog')).toBeInTheDocument())
     expect(screen.queryByText('Single Types')).not.toBeInTheDocument()
@@ -101,7 +110,7 @@ describe('Sidebar', () => {
 
   it('renders a Settings section with a Media Library link to /admin/settings/media', async () => {
     mock.onGet('/api/content-types/all').reply(200, [])
-    renderWithProviders(<Sidebar />, { initialEntries: ['/admin'] })
+    renderSidebar()
 
     await waitFor(() =>
       expect(screen.getByRole('link', { name: /media library/i })).toBeInTheDocument(),

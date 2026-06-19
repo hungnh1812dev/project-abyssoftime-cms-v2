@@ -160,3 +160,41 @@ func TestGinRequireRole_Forbidden(t *testing.T) {
 		t.Errorf("error = %q, want %q", body["error"], "forbidden")
 	}
 }
+
+func TestGinRequireMinRole(t *testing.T) {
+	tests := []struct {
+		name     string
+		userRole string
+		minRole  string
+		wantCode int
+	}{
+		{"super_admin passes editor", "super_admin", "editor", http.StatusOK},
+		{"admin passes editor", "admin", "editor", http.StatusOK},
+		{"editor passes editor", "editor", "editor", http.StatusOK},
+		{"guest fails editor", "guest", "editor", http.StatusForbidden},
+		{"admin passes admin", "admin", "admin", http.StatusOK},
+		{"admin fails super_admin", "admin", "super_admin", http.StatusForbidden},
+		{"super_admin passes super_admin", "super_admin", "super_admin", http.StatusOK},
+		{"editor fails admin", "editor", "admin", http.StatusForbidden},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tok := ginValidToken(t, "user-1", tt.userRole)
+
+			w := httptest.NewRecorder()
+			_, r := gin.CreateTestContext(w)
+
+			r.GET("/test", middleware.GinAuth(), middleware.GinRequireMinRole(tt.minRole), func(c *gin.Context) {
+				c.Status(http.StatusOK)
+			})
+
+			req := httptest.NewRequest(http.MethodGet, "/test", nil)
+			req.Header.Set("Authorization", "Bearer "+tok)
+			r.ServeHTTP(w, req)
+
+			if w.Code != tt.wantCode {
+				t.Errorf("status = %d, want %d", w.Code, tt.wantCode)
+			}
+		})
+	}
+}

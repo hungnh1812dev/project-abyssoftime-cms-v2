@@ -15,8 +15,11 @@ type RouterConfig struct {
 	DocHandler     *handler.DocumentHandler
 	MediaHandler   *handler.MediaHandler
 	LocaleHandler  *handler.LocaleHandler
-	GraphQLHandler http.Handler
-	GraphQLPath    string
+	UserHandler        *handler.UserHandler
+	InviteHandler      *handler.InviteHandler
+	AccessTokenHandler *handler.AccessTokenHandler
+	GraphQLHandler     http.Handler
+	GraphQLPath        string
 }
 
 func SetupRouter(cfg RouterConfig) *gin.Engine {
@@ -37,8 +40,8 @@ func SetupRouter(cfg RouterConfig) *gin.Engine {
 		authGroup.POST("/logout", cfg.AuthHandler.Logout)
 	}
 
-	// Content type routes (admin only)
-	ctGroup := r.Group("/api/content-types", middleware.GinAuth(), middleware.GinRequireRole("admin"))
+	// Content type routes (admin+)
+	ctGroup := r.Group("/api/content-types", middleware.GinAuth(), middleware.GinRequireMinRole("admin"))
 	{
 		ctGroup.GET("", cfg.CTHandler.ListSummary)
 		ctGroup.GET("/:identifier", cfg.CTHandler.Get)
@@ -48,9 +51,9 @@ func SetupRouter(cfg RouterConfig) *gin.Engine {
 	stGroup := r.Group("/api/document-manager/single-type", middleware.GinAuth())
 	{
 		stGroup.GET("/:slug", cfg.DocHandler.GetSingleType)
-		stGroup.PUT("/:slug", middleware.GinRequireRole("admin"), cfg.DocHandler.SaveSingleType)
-		stGroup.POST("/:slug/publish", middleware.GinRequireRole("admin"), cfg.DocHandler.PublishSingleType)
-		stGroup.POST("/:slug/unpublish", middleware.GinRequireRole("admin"), cfg.DocHandler.UnpublishSingleType)
+		stGroup.PUT("/:slug", middleware.GinRequireMinRole("editor"), cfg.DocHandler.SaveSingleType)
+		stGroup.POST("/:slug/publish", middleware.GinRequireMinRole("editor"), cfg.DocHandler.PublishSingleType)
+		stGroup.POST("/:slug/unpublish", middleware.GinRequireMinRole("editor"), cfg.DocHandler.UnpublishSingleType)
 	}
 
 	// Document routes — collection-type
@@ -58,22 +61,50 @@ func SetupRouter(cfg RouterConfig) *gin.Engine {
 	{
 		colGroup.GET("/:slug", cfg.DocHandler.ListCollection)
 		colGroup.GET("/:slug/:documentId", cfg.DocHandler.GetCollection)
-		colGroup.POST("/:slug", middleware.GinRequireRole("admin"), cfg.DocHandler.CreateCollection)
-		colGroup.PUT("/:slug/:documentId", middleware.GinRequireRole("admin"), cfg.DocHandler.UpdateCollection)
-		colGroup.DELETE("/:slug/:documentId", middleware.GinRequireRole("admin"), cfg.DocHandler.DeleteCollection)
-		colGroup.POST("/:slug/:documentId/publish", middleware.GinRequireRole("admin"), cfg.DocHandler.PublishCollection)
-		colGroup.POST("/:slug/:documentId/unpublish", middleware.GinRequireRole("admin"), cfg.DocHandler.UnpublishCollection)
+		colGroup.POST("/:slug", middleware.GinRequireMinRole("editor"), cfg.DocHandler.CreateCollection)
+		colGroup.PUT("/:slug/:documentId", middleware.GinRequireMinRole("editor"), cfg.DocHandler.UpdateCollection)
+		colGroup.DELETE("/:slug/:documentId", middleware.GinRequireMinRole("editor"), cfg.DocHandler.DeleteCollection)
+		colGroup.POST("/:slug/:documentId/publish", middleware.GinRequireMinRole("editor"), cfg.DocHandler.PublishCollection)
+		colGroup.POST("/:slug/:documentId/unpublish", middleware.GinRequireMinRole("editor"), cfg.DocHandler.UnpublishCollection)
 	}
 
 	// Public document route (no auth)
 	r.GET("/api/public/document-manager/:slug/:documentId", cfg.DocHandler.GetPublic)
 
-	// Media routes (admin only)
-	mediaGroup := r.Group("/api/media", middleware.GinAuth(), middleware.GinRequireRole("admin"))
+	// Media routes (editor+)
+	mediaGroup := r.Group("/api/media", middleware.GinAuth(), middleware.GinRequireMinRole("editor"))
 	{
 		mediaGroup.GET("", cfg.MediaHandler.List)
 		mediaGroup.POST("/upload", cfg.MediaHandler.Upload)
 		mediaGroup.DELETE("/:id", cfg.MediaHandler.Delete)
+	}
+
+	// User management routes (admin+)
+	userGroup := r.Group("/api/users", middleware.GinAuth(), middleware.GinRequireMinRole("admin"))
+	{
+		userGroup.GET("", cfg.UserHandler.List)
+		userGroup.GET("/:id", cfg.UserHandler.Get)
+		userGroup.PUT("/:id/role", cfg.UserHandler.UpdateRole)
+		userGroup.DELETE("/:id", cfg.UserHandler.Delete)
+	}
+
+	// Invite routes (admin+)
+	inviteGroup := r.Group("/api/invites", middleware.GinAuth(), middleware.GinRequireMinRole("admin"))
+	{
+		inviteGroup.POST("", cfg.InviteHandler.Create)
+		inviteGroup.GET("", cfg.InviteHandler.List)
+		inviteGroup.DELETE("/:id", cfg.InviteHandler.Revoke)
+	}
+
+	// Public invite accept
+	authGroup.POST("/invite/:token", cfg.InviteHandler.Accept)
+
+	// Access token routes (super_admin only)
+	tokenGroup := r.Group("/api/access-tokens", middleware.GinAuth(), middleware.GinRequireMinRole("super_admin"))
+	{
+		tokenGroup.POST("", cfg.AccessTokenHandler.Create)
+		tokenGroup.GET("", cfg.AccessTokenHandler.List)
+		tokenGroup.DELETE("/:id", cfg.AccessTokenHandler.Delete)
 	}
 
 	// Locales (public)

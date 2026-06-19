@@ -21,21 +21,20 @@ func New(repo repository.UserRepository) *UseCase {
 }
 
 func (uc *UseCase) Register(ctx context.Context, email, password string) (*entity.User, error) {
+	hasSA, err := uc.repo.HasSuperAdmin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if hasSA {
+		return nil, pkgerrors.ErrForbidden
+	}
+
 	existing, err := uc.repo.FindByEmail(ctx, email)
 	if err != nil && !pkgerrors.Is(err, pkgerrors.ErrNotFound) {
 		return nil, err
 	}
 	if existing != nil {
 		return nil, pkgerrors.ErrConflict
-	}
-
-	role := entity.RoleGuest
-	adminCount, err := uc.repo.CountAdmins(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if adminCount == 0 {
-		role = entity.RoleAdmin
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
@@ -46,7 +45,7 @@ func (uc *UseCase) Register(ctx context.Context, email, password string) (*entit
 	user := &entity.User{
 		Email:        email,
 		PasswordHash: string(hash),
-		Role:         role,
+		Role:         entity.RoleSuperAdmin,
 	}
 	if err := uc.repo.Create(ctx, user); err != nil {
 		return nil, err
@@ -55,11 +54,7 @@ func (uc *UseCase) Register(ctx context.Context, email, password string) (*entit
 }
 
 func (uc *UseCase) SetupStatus(ctx context.Context) (bool, error) {
-	count, err := uc.repo.CountAdmins(ctx)
-	if err != nil {
-		return false, err
-	}
-	return count > 0, nil
+	return uc.repo.HasSuperAdmin(ctx)
 }
 
 func (uc *UseCase) Login(ctx context.Context, email, password string) (accessToken, refreshToken string, err error) {

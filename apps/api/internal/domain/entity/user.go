@@ -5,9 +5,26 @@ import "time"
 type Role string
 
 const (
-	RoleAdmin Role = "admin"
-	RoleGuest Role = "guest"
+	RoleSuperAdmin Role = "super_admin"
+	RoleAdmin      Role = "admin"
+	RoleEditor     Role = "editor"
+	RoleGuest      Role = "guest"
 )
+
+func RoleLevel(role Role) int {
+	switch role {
+	case RoleSuperAdmin:
+		return 4
+	case RoleAdmin:
+		return 3
+	case RoleEditor:
+		return 2
+	case RoleGuest:
+		return 1
+	default:
+		return 0
+	}
+}
 
 type User struct {
 	ID           string    `bson:"_id,omitempty" gorm:"column:id;primaryKey"`

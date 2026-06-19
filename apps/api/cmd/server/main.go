@@ -21,7 +21,10 @@ import (
 	"project-abyssoftime-cms-v2/api/internal/usecase/auth"
 	contenttype "project-abyssoftime-cms-v2/api/internal/usecase/content_type"
 	docuc "project-abyssoftime-cms-v2/api/internal/usecase/document"
+	accesstokenuc "project-abyssoftime-cms-v2/api/internal/usecase/access_token"
+	inviteuc "project-abyssoftime-cms-v2/api/internal/usecase/invite"
 	mediauc "project-abyssoftime-cms-v2/api/internal/usecase/media"
+	useruc "project-abyssoftime-cms-v2/api/internal/usecase/user"
 	pkgjwt "project-abyssoftime-cms-v2/api/pkg/jwt"
 )
 
@@ -127,10 +130,17 @@ func main() {
 	}
 	log.Printf("storage provider: %s", cfg.Media.Driver)
 
+	// --- invite + access token repositories ---
+	inviteRepo := mongodb.NewInviteRepository(mongoDB)
+	accessTokenRepo := mongodb.NewAccessTokenRepository(mongoDB)
+
 	authUC := auth.New(userRepo)
 	ctUC := contenttype.New(ctRepo)
 	documentUC := docuc.New(docRepo, mediaRepo, cfg.SupportedLocales)
 	mediaUC := mediauc.New(mediaRepo, storage, cfg.Media.GenerateThumbnail)
+	userUC := useruc.New(userRepo)
+	inviteUC := inviteuc.New(inviteRepo, userRepo)
+	accessTokenUC := accesstokenuc.New(accessTokenRepo)
 
 	defsDir := cfg.ContentTypeDir
 	defs, err := contenttype.LoadDefinitions(defsDir)
@@ -156,8 +166,11 @@ func main() {
 		DocHandler:     deliveryhandler.NewDocumentHandler(documentUC, ctUC),
 		MediaHandler:   deliveryhandler.NewMediaHandler(mediaUC),
 		LocaleHandler:  deliveryhandler.NewLocaleHandler(cfg.SupportedLocales),
-		GraphQLHandler: gqlHandler,
-		GraphQLPath:    cfg.GraphQL.Path,
+		UserHandler:        deliveryhandler.NewUserHandler(userUC),
+		InviteHandler:      deliveryhandler.NewInviteHandler(inviteUC),
+		AccessTokenHandler: deliveryhandler.NewAccessTokenHandler(accessTokenUC),
+		GraphQLHandler:     gqlHandler,
+		GraphQLPath:        cfg.GraphQL.Path,
 	})
 
 	// gRPC server

@@ -11,6 +11,8 @@ type MediaAsset struct {
 	FileName      string    `bson:"fileName"       json:"fileName"      gorm:"column:file_name"`
 	FileExt       string    `bson:"fileExt"        json:"fileExt"       gorm:"column:file_ext"`
 	Hash          string    `bson:"hash"           json:"hash"          gorm:"column:hash"`
+	Width         int       `bson:"width"          json:"width"         gorm:"column:width"`
+	Height        int       `bson:"height"         json:"height"        gorm:"column:height"`
 	ContentTypeID string    `bson:"contentTypeId"  json:"contentTypeId" gorm:"column:content_type_id"`
 	DocumentRef   string    `bson:"documentRef"    json:"documentRef"   gorm:"column:document_ref;index"`
 	CreatedAt     time.Time `bson:"createdAt"      json:"createdAt"     gorm:"column:created_at"`

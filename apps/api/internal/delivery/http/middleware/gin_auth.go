@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"project-abyssoftime-cms-v2/api/internal/domain/entity"
 	pkgjwt "project-abyssoftime-cms-v2/api/pkg/jwt"
 )
 
@@ -40,9 +41,24 @@ func GinAuth() gin.HandlerFunc {
 }
 
 // GinRequireRole aborts with 403 if the role in context does not match.
+// Deprecated: use GinRequireMinRole for hierarchy-aware checks.
 func GinRequireRole(role string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if c.GetString("role") != role {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+			return
+		}
+		c.Next()
+	}
+}
+
+// GinRequireMinRole aborts with 403 if the authenticated user's role level
+// is below the specified minimum role.
+func GinRequireMinRole(minRole string) gin.HandlerFunc {
+	minLevel := entity.RoleLevel(entity.Role(minRole))
+	return func(c *gin.Context) {
+		actual := entity.RoleLevel(entity.Role(c.GetString("role")))
+		if actual < minLevel {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 			return
 		}

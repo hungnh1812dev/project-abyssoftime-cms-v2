@@ -1,5 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import { useContentTypes } from '@/hooks/useContentTypes'
+import { useAuth } from '@/context/AuthContext'
+import { roleLevel } from '@/lib/roles'
 import type { ContentTypeSummary } from '@/types/cms'
 
 function navLinkClass({ isActive }: { isActive: boolean }) {
@@ -34,8 +36,12 @@ function NavGroup({ title, items }: { title: string; items: ContentTypeSummary[]
 
 export function Sidebar() {
   const { data: contentTypes } = useContentTypes()
+  const { role } = useAuth()
   const singleTypes = (contentTypes ?? []).filter((ct) => ct.Kind === 'single')
   const collectionTypes = (contentTypes ?? []).filter((ct) => ct.Kind === 'collection')
+
+  const isSuperAdmin = role === 'super_admin'
+  const isAdminOrAbove = roleLevel(role) >= roleLevel('admin')
 
   return (
     <aside className="w-64 border-r flex flex-col shrink-0">
@@ -52,6 +58,21 @@ export function Sidebar() {
           <NavLink to="/admin/settings/media" className={navLinkClass}>
             Media Library
           </NavLink>
+          {isAdminOrAbove && (
+            <NavLink to="/admin/settings/users" className={navLinkClass}>
+              Users
+            </NavLink>
+          )}
+          {isSuperAdmin && (
+            <NavLink to="/admin/settings/access-tokens" className={navLinkClass}>
+              Access Tokens
+            </NavLink>
+          )}
+          {isSuperAdmin && (
+            <NavLink to="/admin/settings/roles" className={navLinkClass}>
+              Roles
+            </NavLink>
+          )}
         </div>
       </nav>
     </aside>

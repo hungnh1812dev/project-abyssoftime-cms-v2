@@ -84,27 +84,103 @@ func TestUserRepository_FindByEmail_NotFound(t *testing.T) {
 	}
 }
 
-func TestUserRepository_CountAdmins(t *testing.T) {
+func TestUserRepository_HasSuperAdmin(t *testing.T) {
 	db := setupUserDB(t)
 	repo := NewUserRepository(db)
 	ctx := context.Background()
 
-	count, err := repo.CountAdmins(ctx)
+	has, err := repo.HasSuperAdmin(ctx)
 	if err != nil {
-		t.Fatalf("CountAdmins: %v", err)
+		t.Fatalf("HasSuperAdmin: %v", err)
 	}
-	if count != 0 {
-		t.Errorf("count = %d, want 0", count)
+	if has {
+		t.Error("expected false when no users exist")
 	}
 
-	_ = repo.Create(ctx, &entity.User{ID: "u1", Email: "admin@x.com", Role: entity.RoleAdmin})
-	_ = repo.Create(ctx, &entity.User{ID: "u2", Email: "guest@x.com", Role: entity.RoleGuest})
+	_ = repo.Create(ctx, &entity.User{ID: "u1", DocumentID: "d1", Email: "admin@x.com", Role: entity.RoleAdmin})
 
-	count, err = repo.CountAdmins(ctx)
+	has, err = repo.HasSuperAdmin(ctx)
 	if err != nil {
-		t.Fatalf("CountAdmins: %v", err)
+		t.Fatalf("HasSuperAdmin: %v", err)
 	}
-	if count != 1 {
-		t.Errorf("count = %d, want 1", count)
+	if has {
+		t.Error("expected false when only admin exists (no super_admin)")
+	}
+
+	_ = repo.Create(ctx, &entity.User{ID: "u2", DocumentID: "d2", Email: "sa@x.com", Role: entity.RoleSuperAdmin})
+
+	has, err = repo.HasSuperAdmin(ctx)
+	if err != nil {
+		t.Fatalf("HasSuperAdmin: %v", err)
+	}
+	if !has {
+		t.Error("expected true when super_admin exists")
+	}
+}
+
+func TestUserRepository_FindAll(t *testing.T) {
+	db := setupUserDB(t)
+	repo := NewUserRepository(db)
+	ctx := context.Background()
+
+	_ = repo.Create(ctx, &entity.User{ID: "u1", DocumentID: "d1", Email: "a@x.com", Role: entity.RoleGuest})
+	_ = repo.Create(ctx, &entity.User{ID: "u2", DocumentID: "d2", Email: "b@x.com", Role: entity.RoleAdmin})
+	_ = repo.Create(ctx, &entity.User{ID: "u3", DocumentID: "d3", Email: "c@x.com", Role: entity.RoleEditor})
+
+	users, total, err := repo.FindAll(ctx, 1, 2)
+	if err != nil {
+		t.Fatalf("FindAll: %v", err)
+	}
+	if total != 3 {
+		t.Errorf("total = %d, want 3", total)
+	}
+	if len(users) != 2 {
+		t.Errorf("len(users) = %d, want 2", len(users))
+	}
+}
+
+func TestUserRepository_Update(t *testing.T) {
+	db := setupUserDB(t)
+	repo := NewUserRepository(db)
+	ctx := context.Background()
+
+	_ = repo.Create(ctx, &entity.User{ID: "u1", DocumentID: "d1", Email: "a@x.com", Role: entity.RoleGuest})
+
+	user, _ := repo.FindByID(ctx, "u1")
+	user.Role = entity.RoleEditor
+	if err := repo.Update(ctx, user); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+
+	updated, _ := repo.FindByID(ctx, "u1")
+	if updated.Role != entity.RoleEditor {
+		t.Errorf("role = %q, want %q", updated.Role, entity.RoleEditor)
+	}
+}
+
+func TestUserRepository_Delete(t *testing.T) {
+	db := setupUserDB(t)
+	repo := NewUserRepository(db)
+	ctx := context.Background()
+
+	_ = repo.Create(ctx, &entity.User{ID: "u1", DocumentID: "d1", Email: "a@x.com", Role: entity.RoleGuest})
+
+	if err := repo.Delete(ctx, "u1"); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+
+	_, err := repo.FindByID(ctx, "u1")
+	if !pkgerrors.Is(err, pkgerrors.ErrNotFound) {
+		t.Errorf("expected ErrNotFound after delete, got %v", err)
+	}
+}
+
+func TestUserRepository_Delete_NotFound(t *testing.T) {
+	db := setupUserDB(t)
+	repo := NewUserRepository(db)
+
+	err := repo.Delete(context.Background(), "nonexistent")
+	if !pkgerrors.Is(err, pkgerrors.ErrNotFound) {
+		t.Errorf("err = %v, want ErrNotFound", err)
 	}
 }
