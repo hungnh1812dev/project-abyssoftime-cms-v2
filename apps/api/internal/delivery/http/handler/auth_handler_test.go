@@ -8,19 +8,19 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/gin-gonic/gin"
+
 	"project-abyssoftime-cms-v2/api/internal/delivery/http/handler"
 	"project-abyssoftime-cms-v2/api/internal/domain/entity"
 	pkgerrors "project-abyssoftime-cms-v2/api/pkg/errors"
 )
 
-// ---- mock usecase ----------------------------------------------------------
-
 type mockAuthUC struct {
-	registerFn      func(ctx context.Context, email, password string) (*entity.User, error)
-	loginFn         func(ctx context.Context, email, password string) (string, string, error)
-	refreshTokenFn  func(ctx context.Context, refreshToken string) (string, error)
-	logoutFn        func(ctx context.Context, userID string) error
-	setupStatusFn   func(ctx context.Context) (bool, error)
+	registerFn     func(ctx context.Context, email, password string) (*entity.User, error)
+	loginFn        func(ctx context.Context, email, password string) (string, string, error)
+	refreshTokenFn func(ctx context.Context, refreshToken string) (string, error)
+	logoutFn       func(ctx context.Context, userID string) error
+	setupStatusFn  func(ctx context.Context) (bool, error)
 }
 
 func (m *mockAuthUC) Register(ctx context.Context, email, password string) (*entity.User, error) {
@@ -41,8 +41,6 @@ func (m *mockAuthUC) SetupStatus(ctx context.Context) (bool, error) {
 	}
 	return false, nil
 }
-
-// ---- helpers ---------------------------------------------------------------
 
 func jsonBody(t *testing.T, v any) *bytes.Buffer {
 	t.Helper()
@@ -71,12 +69,13 @@ func cookieByName(resp *http.Response, name string) *http.Cookie {
 	return nil
 }
 
-// ---- Register --------------------------------------------------------------
-
 func TestRegisterHandler(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
 	tests := []struct {
 		name       string
 		uc         *mockAuthUC
+		body       string
 		wantStatus int
 	}{
 		{
@@ -86,6 +85,7 @@ func TestRegisterHandler(t *testing.T) {
 					return &entity.User{ID: "u1", Email: email, Role: entity.RoleGuest}, nil
 				},
 			},
+			body:       `{"email":"a@b.com","password":"secret"}`,
 			wantStatus: http.StatusCreated,
 		},
 		{
@@ -95,11 +95,13 @@ func TestRegisterHandler(t *testing.T) {
 					return nil, pkgerrors.ErrConflict
 				},
 			},
+			body:       `{"email":"a@b.com","password":"secret"}`,
 			wantStatus: http.StatusConflict,
 		},
 		{
 			name:       "bad JSON body → 400",
 			uc:         &mockAuthUC{},
+			body:       "not-json",
 			wantStatus: http.StatusBadRequest,
 		},
 	}
@@ -107,19 +109,13 @@ func TestRegisterHandler(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			h := handler.NewAuthHandler(tc.uc)
-
-			var body *bytes.Buffer
-			if tc.name == "bad JSON body → 400" {
-				body = bytes.NewBufferString("not-json")
-			} else {
-				body = jsonBody(t, map[string]string{"email": "a@b.com", "password": "secret"})
-			}
-
-			r := httptest.NewRequest(http.MethodPost, "/auth/register", body)
-			r.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
+			_, r := gin.CreateTestContext(w)
+			r.POST("/auth/register", h.Register)
 
-			h.Register(w, r)
+			req := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewBufferString(tc.body))
+			req.Header.Set("Content-Type", "application/json")
+			r.ServeHTTP(w, req)
 
 			if w.Code != tc.wantStatus {
 				t.Errorf("status = %d, want %d; body: %s", w.Code, tc.wantStatus, w.Body.String())
@@ -134,12 +130,13 @@ func TestRegisterHandler(t *testing.T) {
 	}
 }
 
-// ---- Login -----------------------------------------------------------------
-
 func TestLoginHandler(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
 	tests := []struct {
 		name       string
 		uc         *mockAuthUC
+		body       string
 		wantStatus int
 		wantCookie bool
 	}{
@@ -150,6 +147,7 @@ func TestLoginHandler(t *testing.T) {
 					return "access-tok", "refresh-tok", nil
 				},
 			},
+			body:       `{"email":"a@b.com","password":"pass"}`,
 			wantStatus: http.StatusOK,
 			wantCookie: true,
 		},
@@ -160,11 +158,13 @@ func TestLoginHandler(t *testing.T) {
 					return "", "", pkgerrors.ErrUnauthorized
 				},
 			},
+			body:       `{"email":"a@b.com","password":"pass"}`,
 			wantStatus: http.StatusUnauthorized,
 		},
 		{
 			name:       "bad JSON → 400",
 			uc:         &mockAuthUC{},
+			body:       "{bad}",
 			wantStatus: http.StatusBadRequest,
 		},
 	}
@@ -172,19 +172,13 @@ func TestLoginHandler(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			h := handler.NewAuthHandler(tc.uc)
-
-			var body *bytes.Buffer
-			if tc.name == "bad JSON → 400" {
-				body = bytes.NewBufferString("{bad}")
-			} else {
-				body = jsonBody(t, map[string]string{"email": "a@b.com", "password": "pass"})
-			}
-
-			r := httptest.NewRequest(http.MethodPost, "/auth/login", body)
-			r.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
+			_, r := gin.CreateTestContext(w)
+			r.POST("/auth/login", h.Login)
 
-			h.Login(w, r)
+			req := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewBufferString(tc.body))
+			req.Header.Set("Content-Type", "application/json")
+			r.ServeHTTP(w, req)
 
 			if w.Code != tc.wantStatus {
 				t.Errorf("status = %d, want %d; body: %s", w.Code, tc.wantStatus, w.Body.String())
@@ -210,9 +204,9 @@ func TestLoginHandler(t *testing.T) {
 	}
 }
 
-// ---- Refresh ---------------------------------------------------------------
-
 func TestRefreshHandler(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
 	tests := []struct {
 		name       string
 		cookie     *http.Cookie
@@ -249,14 +243,15 @@ func TestRefreshHandler(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			h := handler.NewAuthHandler(tc.uc)
-
-			r := httptest.NewRequest(http.MethodPost, "/auth/refresh", nil)
-			if tc.cookie != nil {
-				r.AddCookie(tc.cookie)
-			}
 			w := httptest.NewRecorder()
+			_, r := gin.CreateTestContext(w)
+			r.POST("/auth/refresh", h.Refresh)
 
-			h.Refresh(w, r)
+			req := httptest.NewRequest(http.MethodPost, "/auth/refresh", nil)
+			if tc.cookie != nil {
+				req.AddCookie(tc.cookie)
+			}
+			r.ServeHTTP(w, req)
 
 			if w.Code != tc.wantStatus {
 				t.Errorf("status = %d, want %d; body: %s", w.Code, tc.wantStatus, w.Body.String())
@@ -271,9 +266,9 @@ func TestRefreshHandler(t *testing.T) {
 	}
 }
 
-// ---- SetupStatus -----------------------------------------------------------
-
 func TestSetupStatusHandler(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
 	tests := []struct {
 		name       string
 		uc         *mockAuthUC
@@ -301,11 +296,12 @@ func TestSetupStatusHandler(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			h := handler.NewAuthHandler(tc.uc)
-
-			r := httptest.NewRequest(http.MethodGet, "/auth/setup", nil)
 			w := httptest.NewRecorder()
+			_, r := gin.CreateTestContext(w)
+			r.GET("/auth/setup", h.SetupStatus)
 
-			h.SetupStatus(w, r)
+			req := httptest.NewRequest(http.MethodGet, "/auth/setup", nil)
+			r.ServeHTTP(w, req)
 
 			if w.Code != tc.wantStatus {
 				t.Errorf("status = %d, want %d; body: %s", w.Code, tc.wantStatus, w.Body.String())
@@ -319,17 +315,19 @@ func TestSetupStatusHandler(t *testing.T) {
 	}
 }
 
-// ---- Logout ----------------------------------------------------------------
-
 func TestLogoutHandler(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
 	h := handler.NewAuthHandler(&mockAuthUC{
 		logoutFn: func(_ context.Context, _ string) error { return nil },
 	})
 
-	r := httptest.NewRequest(http.MethodPost, "/auth/logout", nil)
 	w := httptest.NewRecorder()
+	_, r := gin.CreateTestContext(w)
+	r.POST("/auth/logout", h.Logout)
 
-	h.Logout(w, r)
+	req := httptest.NewRequest(http.MethodPost, "/auth/logout", nil)
+	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
 		t.Errorf("status = %d, want 200", w.Code)
