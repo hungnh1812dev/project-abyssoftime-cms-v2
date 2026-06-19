@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useAcceptInvite } from '@/hooks/useInvites'
 import { Button } from '@/components/ui/button'
@@ -20,11 +20,11 @@ export function InviteAcceptPage() {
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     formState: { errors },
   } = useForm<AcceptFields>()
 
-  const password = watch('password')
+  const password = useWatch({ control, name: 'password' })
 
   function onSubmit(data: AcceptFields) {
     if (!token) return
