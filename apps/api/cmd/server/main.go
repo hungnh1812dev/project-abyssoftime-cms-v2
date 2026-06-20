@@ -10,6 +10,7 @@ import (
 	grpcdelivery "project-abyssoftime-cms-v2/api/internal/delivery/grpc"
 	deliveryhttp "project-abyssoftime-cms-v2/api/internal/delivery/http"
 	deliveryhandler "project-abyssoftime-cms-v2/api/internal/delivery/http/handler"
+	"project-abyssoftime-cms-v2/api/internal/delivery/http/middleware"
 	"project-abyssoftime-cms-v2/api/internal/domain/repository"
 	cloudinaryadapter "project-abyssoftime-cms-v2/api/internal/infrastructure/cloudinary"
 	"project-abyssoftime-cms-v2/api/internal/infrastructure/gormdb"
@@ -24,6 +25,7 @@ import (
 	accesstokenuc "project-abyssoftime-cms-v2/api/internal/usecase/access_token"
 	inviteuc "project-abyssoftime-cms-v2/api/internal/usecase/invite"
 	mediauc "project-abyssoftime-cms-v2/api/internal/usecase/media"
+	roleuc "project-abyssoftime-cms-v2/api/internal/usecase/role"
 	useruc "project-abyssoftime-cms-v2/api/internal/usecase/user"
 	pkgjwt "project-abyssoftime-cms-v2/api/pkg/jwt"
 )
@@ -130,17 +132,37 @@ func main() {
 	}
 	log.Printf("storage provider: %s", cfg.Media.Driver)
 
+	// --- role repository ---
+	var roleRepo repository.RoleRepository
+	if cfg.DB.EntityDB.User == "sql" {
+		roleRepo = gormdb.NewRoleRepository(sqlDB)
+	} else {
+		roleRepo = mongodb.NewRoleRepository(mongoDB)
+	}
+
 	// --- invite + access token repositories ---
 	inviteRepo := mongodb.NewInviteRepository(mongoDB)
 	accessTokenRepo := mongodb.NewAccessTokenRepository(mongoDB)
 
-	authUC := auth.New(userRepo)
+	authUC := auth.New(userRepo, roleRepo)
 	ctUC := contenttype.New(ctRepo)
 	documentUC := docuc.New(docRepo, mediaRepo, cfg.SupportedLocales)
 	mediaUC := mediauc.New(mediaRepo, storage, cfg.Media.GenerateThumbnail)
-	userUC := useruc.New(userRepo)
-	inviteUC := inviteuc.New(inviteRepo, userRepo)
+	userUC := useruc.New(userRepo, roleRepo)
+	inviteUC := inviteuc.New(inviteRepo, userRepo, roleRepo)
 	accessTokenUC := accesstokenuc.New(accessTokenRepo)
+	roleUC := roleuc.New(roleRepo, userRepo)
+
+	// Seed default roles on first startup
+	if err := roleUC.SeedDefaults(ctx); err != nil {
+		log.Fatalf("seed default roles: %v", err)
+	}
+
+	// Role permission cache
+	roleCache := middleware.NewRoleCache()
+	if allRoles, err := roleUC.FindAll(ctx); err == nil {
+		roleCache.Load(allRoles)
+	}
 
 	defsDir := cfg.ContentTypeDir
 	defs, err := contenttype.LoadDefinitions(defsDir)
@@ -161,14 +183,16 @@ func main() {
 
 	// Gin router (REST + GraphQL)
 	router := deliveryhttp.SetupRouter(deliveryhttp.RouterConfig{
-		AuthHandler:    deliveryhandler.NewAuthHandler(authUC),
-		CTHandler:      deliveryhandler.NewContentTypeHandler(ctUC),
-		DocHandler:     deliveryhandler.NewDocumentHandler(documentUC, ctUC),
-		MediaHandler:   deliveryhandler.NewMediaHandler(mediaUC),
-		LocaleHandler:  deliveryhandler.NewLocaleHandler(cfg.SupportedLocales),
+		AuthHandler:        deliveryhandler.NewAuthHandler(authUC),
+		CTHandler:          deliveryhandler.NewContentTypeHandler(ctUC),
+		DocHandler:         deliveryhandler.NewDocumentHandler(documentUC, ctUC),
+		MediaHandler:       deliveryhandler.NewMediaHandler(mediaUC),
+		LocaleHandler:      deliveryhandler.NewLocaleHandler(cfg.SupportedLocales),
 		UserHandler:        deliveryhandler.NewUserHandler(userUC),
 		InviteHandler:      deliveryhandler.NewInviteHandler(inviteUC),
 		AccessTokenHandler: deliveryhandler.NewAccessTokenHandler(accessTokenUC),
+		RoleHandler:        deliveryhandler.NewRoleHandler(roleUC, roleCache),
+		RoleCache:          roleCache,
 		GraphQLHandler:     gqlHandler,
 		GraphQLPath:        cfg.GraphQL.Path,
 	})

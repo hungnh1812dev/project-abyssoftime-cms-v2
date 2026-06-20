@@ -10,6 +10,33 @@ import (
 	pkgerrors "project-abyssoftime-cms-v2/api/pkg/errors"
 )
 
+var testRoles = map[string]*entity.RoleEntity{
+	"role-sa":     {DocumentID: "role-sa", Slug: "super_admin", Level: 100},
+	"role-admin":  {DocumentID: "role-admin", Slug: "admin", Level: 80},
+	"role-editor": {DocumentID: "role-editor", Slug: "editor", Level: 60},
+	"role-guest":  {DocumentID: "role-guest", Slug: "guest", Level: 20},
+}
+
+func defaultRoleRepo() *repomock.RoleRepository {
+	return &repomock.RoleRepository{
+		FindByIDFn: func(_ context.Context, id string) (*entity.RoleEntity, error) {
+			if r, ok := testRoles[id]; ok {
+				return r, nil
+			}
+			return nil, pkgerrors.ErrNotFound
+		},
+		FindBySlugFn: func(_ context.Context, slug string) (*entity.RoleEntity, error) {
+			for _, r := range testRoles {
+				if r.Slug == slug {
+					return r, nil
+				}
+			}
+			return nil, pkgerrors.ErrNotFound
+		},
+		HasAnyFn: func(_ context.Context) (bool, error) { return true, nil },
+	}
+}
+
 func makeUserRepo(users map[string]*entity.User) *repomock.UserRepository {
 	return &repomock.UserRepository{
 		FindByIDFn: func(_ context.Context, id string) (*entity.User, error) {
@@ -46,57 +73,57 @@ func makeUserRepo(users map[string]*entity.User) *repomock.UserRepository {
 
 func TestUpdateRole(t *testing.T) {
 	tests := []struct {
-		name    string
-		actor   *entity.User
-		target  *entity.User
-		newRole entity.Role
-		wantErr error
+		name      string
+		actor     *entity.User
+		target    *entity.User
+		newRoleID string
+		wantErr   error
 	}{
 		{
-			name:    "super_admin promotes guest to editor",
-			actor:   &entity.User{ID: "sa", Role: entity.RoleSuperAdmin},
-			target:  &entity.User{ID: "g", Role: entity.RoleGuest},
-			newRole: entity.RoleEditor,
+			name:      "super_admin promotes guest to editor",
+			actor:     &entity.User{ID: "sa", RoleID: "role-sa"},
+			target:    &entity.User{ID: "g", RoleID: "role-guest"},
+			newRoleID: "role-editor",
 		},
 		{
-			name:    "super_admin promotes editor to admin",
-			actor:   &entity.User{ID: "sa", Role: entity.RoleSuperAdmin},
-			target:  &entity.User{ID: "e", Role: entity.RoleEditor},
-			newRole: entity.RoleAdmin,
+			name:      "super_admin promotes editor to admin",
+			actor:     &entity.User{ID: "sa", RoleID: "role-sa"},
+			target:    &entity.User{ID: "e", RoleID: "role-editor"},
+			newRoleID: "role-admin",
 		},
 		{
-			name:    "admin demotes editor to guest",
-			actor:   &entity.User{ID: "a", Role: entity.RoleAdmin},
-			target:  &entity.User{ID: "e", Role: entity.RoleEditor},
-			newRole: entity.RoleGuest,
+			name:      "admin demotes editor to guest",
+			actor:     &entity.User{ID: "a", RoleID: "role-admin"},
+			target:    &entity.User{ID: "e", RoleID: "role-editor"},
+			newRoleID: "role-guest",
 		},
 		{
-			name:    "admin cannot change another admin",
-			actor:   &entity.User{ID: "a1", Role: entity.RoleAdmin},
-			target:  &entity.User{ID: "a2", Role: entity.RoleAdmin},
-			newRole: entity.RoleEditor,
-			wantErr: pkgerrors.ErrForbidden,
+			name:      "admin cannot change another admin",
+			actor:     &entity.User{ID: "a1", RoleID: "role-admin"},
+			target:    &entity.User{ID: "a2", RoleID: "role-admin"},
+			newRoleID: "role-editor",
+			wantErr:   pkgerrors.ErrForbidden,
 		},
 		{
-			name:    "admin cannot promote to admin",
-			actor:   &entity.User{ID: "a", Role: entity.RoleAdmin},
-			target:  &entity.User{ID: "e", Role: entity.RoleEditor},
-			newRole: entity.RoleAdmin,
-			wantErr: pkgerrors.ErrForbidden,
+			name:      "admin cannot promote to admin",
+			actor:     &entity.User{ID: "a", RoleID: "role-admin"},
+			target:    &entity.User{ID: "e", RoleID: "role-editor"},
+			newRoleID: "role-admin",
+			wantErr:   pkgerrors.ErrForbidden,
 		},
 		{
-			name:    "editor cannot promote guest to editor (equal to own role)",
-			actor:   &entity.User{ID: "e", Role: entity.RoleEditor},
-			target:  &entity.User{ID: "g", Role: entity.RoleGuest},
-			newRole: entity.RoleEditor,
-			wantErr: pkgerrors.ErrForbidden,
+			name:      "editor cannot promote guest to editor (equal to own role)",
+			actor:     &entity.User{ID: "e", RoleID: "role-editor"},
+			target:    &entity.User{ID: "g", RoleID: "role-guest"},
+			newRoleID: "role-editor",
+			wantErr:   pkgerrors.ErrForbidden,
 		},
 		{
-			name:    "cannot change own role",
-			actor:   &entity.User{ID: "sa", Role: entity.RoleSuperAdmin},
-			target:  &entity.User{ID: "sa", Role: entity.RoleSuperAdmin},
-			newRole: entity.RoleAdmin,
-			wantErr: pkgerrors.ErrForbidden,
+			name:      "cannot change own role",
+			actor:     &entity.User{ID: "sa", RoleID: "role-sa"},
+			target:    &entity.User{ID: "sa", RoleID: "role-sa"},
+			newRoleID: "role-admin",
+			wantErr:   pkgerrors.ErrForbidden,
 		},
 	}
 
@@ -109,9 +136,9 @@ func TestUpdateRole(t *testing.T) {
 				users[tt.target.ID] = tt.target
 			}
 			repo := makeUserRepo(users)
-			uc := user.New(repo)
+			uc := user.New(repo, defaultRoleRepo())
 
-			err := uc.UpdateRole(context.Background(), tt.actor.ID, tt.target.ID, tt.newRole)
+			err := uc.UpdateRole(context.Background(), tt.actor.ID, tt.target.ID, tt.newRoleID)
 			if tt.wantErr != nil {
 				if !pkgerrors.Is(err, tt.wantErr) {
 					t.Errorf("err = %v, want %v", err, tt.wantErr)
@@ -121,8 +148,8 @@ func TestUpdateRole(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if users[tt.target.ID].Role != tt.newRole {
-				t.Errorf("role = %q, want %q", users[tt.target.ID].Role, tt.newRole)
+			if users[tt.target.ID].RoleID != tt.newRoleID {
+				t.Errorf("roleID = %q, want %q", users[tt.target.ID].RoleID, tt.newRoleID)
 			}
 		})
 	}
@@ -137,24 +164,24 @@ func TestDelete(t *testing.T) {
 	}{
 		{
 			name:   "super_admin deletes admin",
-			actor:  &entity.User{ID: "sa", Role: entity.RoleSuperAdmin},
-			target: &entity.User{ID: "a", Role: entity.RoleAdmin},
+			actor:  &entity.User{ID: "sa", RoleID: "role-sa"},
+			target: &entity.User{ID: "a", RoleID: "role-admin"},
 		},
 		{
 			name:   "admin deletes editor",
-			actor:  &entity.User{ID: "a", Role: entity.RoleAdmin},
-			target: &entity.User{ID: "e", Role: entity.RoleEditor},
+			actor:  &entity.User{ID: "a", RoleID: "role-admin"},
+			target: &entity.User{ID: "e", RoleID: "role-editor"},
 		},
 		{
 			name:    "admin cannot delete another admin",
-			actor:   &entity.User{ID: "a1", Role: entity.RoleAdmin},
-			target:  &entity.User{ID: "a2", Role: entity.RoleAdmin},
+			actor:   &entity.User{ID: "a1", RoleID: "role-admin"},
+			target:  &entity.User{ID: "a2", RoleID: "role-admin"},
 			wantErr: pkgerrors.ErrForbidden,
 		},
 		{
 			name:    "cannot delete self",
-			actor:   &entity.User{ID: "sa", Role: entity.RoleSuperAdmin},
-			target:  &entity.User{ID: "sa", Role: entity.RoleSuperAdmin},
+			actor:   &entity.User{ID: "sa", RoleID: "role-sa"},
+			target:  &entity.User{ID: "sa", RoleID: "role-sa"},
 			wantErr: pkgerrors.ErrForbidden,
 		},
 	}
@@ -168,7 +195,7 @@ func TestDelete(t *testing.T) {
 				users[tt.target.ID] = tt.target
 			}
 			repo := makeUserRepo(users)
-			uc := user.New(repo)
+			uc := user.New(repo, defaultRoleRepo())
 
 			err := uc.Delete(context.Background(), tt.actor.ID, tt.target.ID)
 			if tt.wantErr != nil {

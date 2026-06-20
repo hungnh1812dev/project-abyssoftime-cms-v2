@@ -9,12 +9,37 @@ services:
     envVars:
       - key: PORT
         value: "8080"
+
+      # ── Database: Supabase PostgreSQL ──────────────────────────────────────
+      - key: DB_DRIVER
+        value: "sql"
+      - key: SQL_DRIVER
+        value: "postgres"
+      - key: SQL_DSN
+        sync: false # Set manually — use Supabase connection string:
+        # postgres://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres
+
+      # ── MongoDB (kept for backward compat — set to empty to skip) ─────────
       - key: MONGODB_URI
-        sync: false # Set manually — use MongoDB Atlas connection string
+        sync: false
       - key: MONGODB_DB
         value: "abyssoftime-cms"
+
+      # ── Per-entity DB routing (all on SQL via Supabase) ───────────────────
+      - key: DB_USER
+        value: "sql"
+      - key: DB_CONTENT_TYPE
+        value: "sql"
+      - key: DB_DOCUMENT
+        value: "sql"
+      - key: DB_MEDIA
+        value: "sql"
+
+      # ── Auth ──────────────────────────────────────────────────────────────
       - key: JWT_SECRET
         generateValue: true
+
+      # ── Media storage ─────────────────────────────────────────────────────
       - key: STORAGE_PROVIDER
         value: "cloudinary"
       - key: CLOUDINARY_CLOUD_NAME
@@ -23,6 +48,8 @@ services:
         sync: false
       - key: CLOUDINARY_API_SECRET
         sync: false
+
+      # ── App config ────────────────────────────────────────────────────────
       - key: SUPPORTED_LOCALES
         value: "en,vi"
       - key: CONTENT_TYPES_DIR

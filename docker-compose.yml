@@ -10,6 +10,21 @@ services:
       timeout: 5s
       retries: 5
 
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cms
+      POSTGRES_PASSWORD: cms
+      POSTGRES_DB: cms
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cms"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   api:
     build:
       context: ./apps/api
@@ -19,6 +34,8 @@ services:
     depends_on:
       mongodb:
         condition: service_healthy
+      postgres:
+        condition: service_healthy
     environment:
       PORT: "8080"
       MONGODB_URI: "mongodb://mongodb:27017/cms"
@@ -26,6 +43,13 @@ services:
       CLOUDINARY_CLOUD_NAME: "${CLOUDINARY_CLOUD_NAME}"
       CLOUDINARY_API_KEY: "${CLOUDINARY_API_KEY}"
       CLOUDINARY_API_SECRET: "${CLOUDINARY_API_SECRET}"
+      DB_DRIVER: "${DB_DRIVER:-mongo}"
+      SQL_DRIVER: "postgres"
+      SQL_DSN: "postgres://cms:cms@postgres:5432/cms?sslmode=disable"
+      DB_USER: "${DB_USER:-mongo}"
+      DB_CONTENT_TYPE: "${DB_CONTENT_TYPE:-mongo}"
+      DB_DOCUMENT: "${DB_DOCUMENT:-mongo}"
+      DB_MEDIA: "${DB_MEDIA:-mongo}"
     ports:
       - "8080:8080"
 
@@ -41,3 +65,4 @@ services:
 
 volumes:
   mongo_data:
+  pg_data:

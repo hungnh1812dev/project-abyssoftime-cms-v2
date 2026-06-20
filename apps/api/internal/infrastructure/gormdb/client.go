@@ -48,5 +48,6 @@ func AutoMigrate(db *gorm.DB) error {
 		&entity.ContentType{},
 		&entity.Document{},
 		&entity.MediaAsset{},
+		&entity.RoleEntity{},
 	)
 }

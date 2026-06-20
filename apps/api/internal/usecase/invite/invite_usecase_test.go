@@ -13,6 +13,42 @@ import (
 	pkgerrors "project-abyssoftime-cms-v2/api/pkg/errors"
 )
 
+func defaultInviteRoleRepo() *repomock.RoleRepository {
+	roles := map[string]*entity.RoleEntity{
+		"super_admin": {DocumentID: "role-sa", Slug: "super_admin", Level: 100},
+		"admin":       {DocumentID: "role-admin", Slug: "admin", Level: 80},
+		"editor":      {DocumentID: "role-editor", Slug: "editor", Level: 60},
+		"guest":       {DocumentID: "role-guest", Slug: "guest", Level: 20},
+	}
+	return &repomock.RoleRepository{
+		FindBySlugFn: func(_ context.Context, slug string) (*entity.RoleEntity, error) {
+			if r, ok := roles[slug]; ok {
+				return r, nil
+			}
+			return nil, pkgerrors.ErrNotFound
+		},
+		FindByIDFn: func(_ context.Context, id string) (*entity.RoleEntity, error) {
+			for _, r := range roles {
+				if r.DocumentID == id {
+					return r, nil
+				}
+			}
+			return nil, pkgerrors.ErrNotFound
+		},
+		HasAnyFn: func(_ context.Context) (bool, error) { return true, nil },
+	}
+}
+
+func roleIDForSlug(slug entity.Role) string {
+	m := map[entity.Role]string{
+		entity.RoleSuperAdmin: "role-sa",
+		entity.RoleAdmin:      "role-admin",
+		entity.RoleEditor:     "role-editor",
+		entity.RoleGuest:      "role-guest",
+	}
+	return m[slug]
+}
+
 func TestCreate_HierarchyEnforcement(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -31,7 +67,7 @@ func TestCreate_HierarchyEnforcement(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			userRepo := &repomock.UserRepository{
 				FindByIDFn: func(_ context.Context, _ string) (*entity.User, error) {
-					return &entity.User{ID: "actor", Role: tt.actorRole}, nil
+					return &entity.User{ID: "actor", Role: tt.actorRole, RoleID: roleIDForSlug(tt.actorRole)}, nil
 				},
 				FindByEmailFn: func(_ context.Context, _ string) (*entity.User, error) {
 					return nil, pkgerrors.ErrNotFound
@@ -51,7 +87,7 @@ func TestCreate_HierarchyEnforcement(t *testing.T) {
 				},
 			}
 
-			uc := invite.New(inviteRepo, userRepo)
+			uc := invite.New(inviteRepo, userRepo, defaultInviteRoleRepo())
 			_, _, err := uc.Create(context.Background(), "actor", "new@test.com", tt.invRole)
 
 			if tt.wantErr && err == nil {
@@ -68,7 +104,7 @@ func TestCreate_DuplicateEmailReplacesInvite(t *testing.T) {
 	var deletedID string
 	userRepo := &repomock.UserRepository{
 		FindByIDFn: func(_ context.Context, _ string) (*entity.User, error) {
-			return &entity.User{ID: "sa", Role: entity.RoleSuperAdmin}, nil
+			return &entity.User{ID: "sa", Role: entity.RoleSuperAdmin, RoleID: "role-sa"}, nil
 		},
 		FindByEmailFn: func(_ context.Context, _ string) (*entity.User, error) {
 			return nil, pkgerrors.ErrNotFound
@@ -88,7 +124,7 @@ func TestCreate_DuplicateEmailReplacesInvite(t *testing.T) {
 		},
 	}
 
-	uc := invite.New(inviteRepo, userRepo)
+	uc := invite.New(inviteRepo, userRepo, defaultInviteRoleRepo())
 	inv, plaintext, err := uc.Create(context.Background(), "sa", "dup@test.com", entity.RoleEditor)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -104,7 +140,7 @@ func TestCreate_DuplicateEmailReplacesInvite(t *testing.T) {
 func TestCreate_UserAlreadyRegistered(t *testing.T) {
 	userRepo := &repomock.UserRepository{
 		FindByIDFn: func(_ context.Context, _ string) (*entity.User, error) {
-			return &entity.User{ID: "sa", Role: entity.RoleSuperAdmin}, nil
+			return &entity.User{ID: "sa", Role: entity.RoleSuperAdmin, RoleID: "role-sa"}, nil
 		},
 		FindByEmailFn: func(_ context.Context, _ string) (*entity.User, error) {
 			return &entity.User{ID: "existing"}, nil
@@ -112,7 +148,7 @@ func TestCreate_UserAlreadyRegistered(t *testing.T) {
 	}
 	inviteRepo := &repomock.InviteRepository{}
 
-	uc := invite.New(inviteRepo, userRepo)
+	uc := invite.New(inviteRepo, userRepo, defaultInviteRoleRepo())
 	_, _, err := uc.Create(context.Background(), "sa", "exists@test.com", entity.RoleEditor)
 	if !pkgerrors.Is(err, pkgerrors.ErrConflict) {
 		t.Errorf("err = %v, want ErrConflict", err)
@@ -156,7 +192,7 @@ func TestAccept_Success(t *testing.T) {
 		},
 	}
 
-	uc := invite.New(inviteRepo, userRepo)
+	uc := invite.New(inviteRepo, userRepo, defaultInviteRoleRepo())
 	user, err := uc.Accept(context.Background(), plaintext, "password123")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -191,7 +227,7 @@ func TestAccept_ExpiredToken(t *testing.T) {
 	}
 	userRepo := &repomock.UserRepository{}
 
-	uc := invite.New(inviteRepo, userRepo)
+	uc := invite.New(inviteRepo, userRepo, defaultInviteRoleRepo())
 	_, err := uc.Accept(context.Background(), plaintext, "password123")
 	if !pkgerrors.Is(err, pkgerrors.ErrValidation) {
 		t.Errorf("err = %v, want ErrValidation", err)
@@ -206,7 +242,7 @@ func TestAccept_InvalidToken(t *testing.T) {
 	}
 	userRepo := &repomock.UserRepository{}
 
-	uc := invite.New(inviteRepo, userRepo)
+	uc := invite.New(inviteRepo, userRepo, defaultInviteRoleRepo())
 	_, err := uc.Accept(context.Background(), "invalid-token", "password123")
 	if !pkgerrors.Is(err, pkgerrors.ErrNotFound) {
 		t.Errorf("err = %v, want ErrNotFound", err)

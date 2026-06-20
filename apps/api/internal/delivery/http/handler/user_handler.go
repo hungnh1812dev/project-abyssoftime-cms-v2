@@ -13,7 +13,7 @@ import (
 type userUseCase interface {
 	List(ctx context.Context, page, limit int) ([]*entity.User, int64, error)
 	GetByID(ctx context.Context, id string) (*entity.User, error)
-	UpdateRole(ctx context.Context, actorID, targetID string, newRole entity.Role) error
+	UpdateRole(ctx context.Context, actorID, targetID, newRoleID string) error
 	Delete(ctx context.Context, actorID, targetID string) error
 }
 
@@ -26,13 +26,14 @@ func NewUserHandler(uc userUseCase) *UserHandler {
 }
 
 type userResponse struct {
-	ID    string `json:"id"`
-	Email string `json:"email"`
-	Role  string `json:"role"`
+	ID     string `json:"id"`
+	Email  string `json:"email"`
+	Role   string `json:"role"`
+	RoleID string `json:"roleId"`
 }
 
 func toUserResponse(u *entity.User) userResponse {
-	return userResponse{ID: u.ID, Email: u.Email, Role: string(u.Role)}
+	return userResponse{ID: u.ID, Email: u.Email, Role: string(u.Role), RoleID: u.RoleID}
 }
 
 func (h *UserHandler) List(c *gin.Context) {
@@ -69,9 +70,9 @@ func (h *UserHandler) Get(c *gin.Context) {
 
 func (h *UserHandler) UpdateRole(c *gin.Context) {
 	var req struct {
-		Role string `json:"role"`
+		RoleID string `json:"roleId"`
 	}
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil || req.RoleID == "" {
 		ginWriteError(c, http.StatusBadRequest, "invalid request body")
 		return
 	}
@@ -79,7 +80,7 @@ func (h *UserHandler) UpdateRole(c *gin.Context) {
 	actorID := c.GetString("userID")
 	targetID := c.Param("id")
 
-	if err := h.uc.UpdateRole(c.Request.Context(), actorID, targetID, entity.Role(req.Role)); err != nil {
+	if err := h.uc.UpdateRole(c.Request.Context(), actorID, targetID, req.RoleID); err != nil {
 		ginWriteErr(c, err)
 		return
 	}

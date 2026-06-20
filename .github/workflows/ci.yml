@@ -6,8 +6,12 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  # ── Go API tests ────────────────────────────────────────────────────────────
+  # ── Go API: vet + test ─────────────────────────────────────────────────────
   api-test:
     name: API tests
     runs-on: ubuntu-latest
@@ -30,9 +34,9 @@ jobs:
       - name: go test
         run: go test ./... -count=1
 
-  # ── Frontend lint + unit tests ──────────────────────────────────────────────
+  # ── Frontend: lint + test + build ──────────────────────────────────────────
   web-lint:
-    name: Web lint & tests
+    name: Web lint & build
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -56,10 +60,9 @@ jobs:
       - name: Build
         run: bun run build
 
-  # ── Render deploy hook (main only) ──────────────────────────────────────────
-  # API: Render Web Service (Docker) — needs deploy hook trigger.
-  # Web: Render Static Site — auto-deploys from repo, no hook needed.
-  # Docker build runs on Render, not in CI, to save GitHub Actions minutes.
+  # ── Deploy to Render (main only, after tests pass) ─────────────────────────
+  # API: Render Web Service (Docker) — trigger deploy hook
+  # Web: Render Static Site — auto-deploys from repo, no hook needed
   render-deploy:
     name: Deploy to Render
     runs-on: ubuntu-latest
