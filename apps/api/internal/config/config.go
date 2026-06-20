@@ -5,6 +5,7 @@ package config
 
 import (
 	"fmt"
+	"net/http"
 	"net/url"
 	"os"
 	"strconv"
@@ -17,6 +18,9 @@ type Config struct {
 	JWTSecret        string
 	ContentTypeDir   string
 	SupportedLocales []string
+	CookieSecure     bool
+	CookieSameSite   http.SameSite
+	CORSOrigins      []string
 	DB               DBConfig
 	Media            MediaConfig
 	GraphQL          GraphQLConfig
@@ -121,32 +125,46 @@ func getenv(key, fallback string) string {
 	return fallback
 }
 
-func splitLocales(raw string) []string {
+func splitCSV(raw string) []string {
 	parts := strings.Split(raw, ",")
-	locales := make([]string, 0, len(parts))
+	out := make([]string, 0, len(parts))
 	for _, p := range parts {
 		p = strings.TrimSpace(p)
 		if p != "" {
-			locales = append(locales, p)
+			out = append(out, p)
 		}
 	}
-	return locales
+	return out
+}
+
+func parseSameSite(raw string) http.SameSite {
+	switch strings.ToLower(raw) {
+	case "lax":
+		return http.SameSiteLaxMode
+	case "strict":
+		return http.SameSiteStrictMode
+	case "none":
+		return http.SameSiteNoneMode
+	default:
+		return http.SameSiteNoneMode
+	}
+}
+
+func parseBoolDefault(raw string, fallback bool) bool {
+	if raw == "" {
+		return fallback
+	}
+	v, err := strconv.ParseBool(raw)
+	if err != nil {
+		return fallback
+	}
+	return v
 }
 
 // Load reads, defaults, and validates every environment variable the
 // application needs, returning a single typed Config or the first
 // validation error encountered.
 func Load() (*Config, error) {
-	generateThumbnail := true
-	if raw := os.Getenv("MEDIA_AUTO_THUMBNAIL"); raw != "" {
-		v, err := strconv.ParseBool(raw)
-		if err != nil {
-			generateThumbnail = false
-		} else {
-			generateThumbnail = v
-		}
-	}
-
 	driver := getenv("DB_DRIVER", "mongo")
 
 	defaultPort := "27017"
@@ -159,7 +177,10 @@ func Load() (*Config, error) {
 		GRPCPort:         getenv("GRPC_PORT", "9090"),
 		JWTSecret:        getenv("JWT_SECRET", ""),
 		ContentTypeDir:   getenv("CONTENT_TYPES_DIR", "content-types"),
-		SupportedLocales: splitLocales(getenv("SUPPORTED_LOCALES", "en,vi")),
+		SupportedLocales: splitCSV(getenv("SUPPORTED_LOCALES", "en,vi")),
+		CookieSecure:     parseBoolDefault(os.Getenv("COOKIE_SECURE"), true),
+		CookieSameSite:   parseSameSite(getenv("COOKIE_SAMESITE", "none")),
+		CORSOrigins:      splitCSV(getenv("CORS_ORIGINS", "http://localhost:5173")),
 		DB: DBConfig{
 			Driver:   driver,
 			Host:     getenv("DB_HOST", "localhost"),
@@ -177,7 +198,7 @@ func Load() (*Config, error) {
 		},
 		Media: MediaConfig{
 			Driver:            getenv("STORAGE_PROVIDER", "cloudinary"),
-			GenerateThumbnail: generateThumbnail,
+			GenerateThumbnail: parseBoolDefault(os.Getenv("MEDIA_AUTO_THUMBNAIL"), true),
 			Cloudinary: CloudinaryConfig{
 				CloudName: getenv("CLOUDINARY_CLOUD_NAME", ""),
 				APIKey:    getenv("CLOUDINARY_API_KEY", ""),

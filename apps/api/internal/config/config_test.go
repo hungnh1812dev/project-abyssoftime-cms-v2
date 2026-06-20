@@ -1,6 +1,7 @@
 package config_test
 
 import (
+	"net/http"
 	"reflect"
 	"testing"
 
@@ -17,6 +18,7 @@ func clearEnv(t *testing.T) {
 		"DB_DRIVER", "DB_HOST", "DB_PORT", "DB_NAME", "DB_USERNAME", "DB_PASSWORD", "DB_SSL_MODE",
 		"DB_ENTITY_USER", "DB_ENTITY_CONTENT_TYPE", "DB_ENTITY_DOCUMENT", "DB_ENTITY_MEDIA",
 		"GRPC_PORT",
+		"COOKIE_SECURE", "COOKIE_SAMESITE", "CORS_ORIGINS",
 	} {
 		t.Setenv(k, "")
 	}
@@ -37,6 +39,9 @@ func TestLoad_Defaults(t *testing.T) {
 		JWTSecret:        "test-secret",
 		ContentTypeDir:   "content-types",
 		SupportedLocales: []string{"en", "vi"},
+		CookieSecure:     true,
+		CookieSameSite:   http.SameSiteNoneMode,
+		CORSOrigins:      []string{"http://localhost:5173"},
 		DB: config.DBConfig{
 			Driver:  "mongo",
 			Host:    "localhost",

@@ -196,7 +196,7 @@ func main() {
 
 	// Gin router (REST + GraphQL)
 	router := deliveryhttp.SetupRouter(deliveryhttp.RouterConfig{
-		AuthHandler:        deliveryhandler.NewAuthHandler(authUC),
+		AuthHandler:        deliveryhandler.NewAuthHandler(authUC, cfg.CookieSecure, cfg.CookieSameSite),
 		CTHandler:          deliveryhandler.NewContentTypeHandler(ctUC),
 		DocHandler:         deliveryhandler.NewDocumentHandler(documentUC, ctUC),
 		MediaHandler:       deliveryhandler.NewMediaHandler(mediaUC),
@@ -208,6 +208,7 @@ func main() {
 		RoleCache:          roleCache,
 		GraphQLHandler:     gqlHandler,
 		GraphQLPath:        cfg.GraphQL.Path,
+		CORSOrigins:        cfg.CORSOrigins,
 	})
 
 	// gRPC server (optional — skipped if port unavailable)

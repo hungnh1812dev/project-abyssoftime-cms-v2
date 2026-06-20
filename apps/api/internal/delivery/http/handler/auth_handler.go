@@ -11,7 +11,10 @@ import (
 
 const RefreshCookieName = "refresh_token"
 
-const refreshCookieMaxAge = 7 * 24 * 60 * 60 // 7 days
+const (
+	refreshCookieMaxAgeDefault  = 7 * 24 * 60 * 60  // 7 days
+	refreshCookieMaxAgeRemember = 30 * 24 * 60 * 60 // 30 days
+)
 
 type authUseCase interface {
 	Register(ctx context.Context, email, password string) (*entity.User, error)
@@ -22,11 +25,13 @@ type authUseCase interface {
 }
 
 type AuthHandler struct {
-	uc authUseCase
+	uc             authUseCase
+	cookieSecure   bool
+	cookieSameSite http.SameSite
 }
 
-func NewAuthHandler(uc authUseCase) *AuthHandler {
-	return &AuthHandler{uc: uc}
+func NewAuthHandler(uc authUseCase, cookieSecure bool, cookieSameSite http.SameSite) *AuthHandler {
+	return &AuthHandler{uc: uc, cookieSecure: cookieSecure, cookieSameSite: cookieSameSite}
 }
 
 func (h *AuthHandler) Register(c *gin.Context) {
@@ -54,8 +59,9 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
+		Email      string `json:"email"`
+		Password   string `json:"password"`
+		RememberMe bool   `json:"rememberMe"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		ginWriteError(c, http.StatusBadRequest, "invalid request body")
@@ -68,7 +74,12 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	c.SetCookie(RefreshCookieName, refresh, refreshCookieMaxAge, "/", "", false, true)
+	maxAge := refreshCookieMaxAgeDefault
+	if req.RememberMe {
+		maxAge = refreshCookieMaxAgeRemember
+	}
+	c.SetSameSite(h.cookieSameSite)
+	c.SetCookie(RefreshCookieName, refresh, maxAge, "/", "", h.cookieSecure, true)
 
 	c.JSON(http.StatusOK, gin.H{
 		"accessToken": access,
@@ -105,6 +116,7 @@ func (h *AuthHandler) SetupStatus(c *gin.Context) {
 }
 
 func (h *AuthHandler) Logout(c *gin.Context) {
-	c.SetCookie(RefreshCookieName, "", -1, "/", "", false, true)
+	c.SetSameSite(h.cookieSameSite)
+	c.SetCookie(RefreshCookieName, "", -1, "/", "", h.cookieSecure, true)
 	c.Status(http.StatusOK)
 }
