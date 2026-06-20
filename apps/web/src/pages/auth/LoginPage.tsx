@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 interface LoginFields {
   email: string
   password: string
+  rememberMe: boolean
 }
 
 interface LoginResponse {
@@ -102,6 +103,18 @@ export function LoginPage() {
               })}
             />
             {errors.password && <p className="text-destructive text-xs">{errors.password.message}</p>}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              id="rememberMe"
+              type="checkbox"
+              className="h-4 w-4 rounded border-border"
+              {...register('rememberMe')}
+            />
+            <Label htmlFor="rememberMe" className="text-sm font-normal cursor-pointer">
+              Stay logged in
+            </Label>
           </div>
 
           <Button type="submit" className="w-full" disabled={mutation.isPending}>

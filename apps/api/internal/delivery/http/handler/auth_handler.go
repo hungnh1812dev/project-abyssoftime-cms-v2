@@ -11,7 +11,10 @@ import (
 
 const RefreshCookieName = "refresh_token"
 
-const refreshCookieMaxAge = 7 * 24 * 60 * 60 // 7 days
+const (
+	refreshCookieMaxAgeDefault  = 7 * 24 * 60 * 60  // 7 days
+	refreshCookieMaxAgeRemember = 30 * 24 * 60 * 60 // 30 days
+)
 
 type authUseCase interface {
 	Register(ctx context.Context, email, password string) (*entity.User, error)
@@ -54,8 +57,9 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
+		Email      string `json:"email"`
+		Password   string `json:"password"`
+		RememberMe bool   `json:"rememberMe"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		ginWriteError(c, http.StatusBadRequest, "invalid request body")
@@ -68,7 +72,11 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	c.SetCookie(RefreshCookieName, refresh, refreshCookieMaxAge, "/", "", false, true)
+	maxAge := refreshCookieMaxAgeDefault
+	if req.RememberMe {
+		maxAge = refreshCookieMaxAgeRemember
+	}
+	c.SetCookie(RefreshCookieName, refresh, maxAge, "/", "", false, true)
 
 	c.JSON(http.StatusOK, gin.H{
 		"accessToken": access,
