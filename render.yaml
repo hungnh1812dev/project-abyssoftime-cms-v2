@@ -1,12 +1,11 @@
 services:
-  # ── Go API (Web Service, free tier) ──────────────────────────────────────────
+  # ── Go API (Web Service, Docker, free tier) ────────────────────────────────
   - type: web
     name: cms-api
-    runtime: go
+    runtime: docker
     plan: free
-    rootDir: apps/api
-    buildCommand: go build -trimpath -ldflags="-s -w" -o server ./cmd/server
-    startCommand: ./server
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: ./apps/api
     envVars:
       - key: PORT
         value: "8080"
@@ -27,12 +26,13 @@ services:
       - key: SUPPORTED_LOCALES
         value: "en,vi"
       - key: CONTENT_TYPES_DIR
-        value: "content-types"
+        value: "/content-types"
 
   # ── React Frontend (Static Site, free tier) ─────────────────────────────────
   - type: web
     name: cms-web
     runtime: static
+    plan: free
     buildCommand: cd apps/web && bun install --frozen-lockfile && bun run build
     staticPublishPath: apps/web/dist
     headers:
@@ -40,7 +40,6 @@ services:
         name: X-Frame-Options
         value: DENY
     routes:
-      # Proxy API calls to the backend service
       - type: rewrite
         source: /api/*
         destination: https://cms-api.onrender.com/api/*
@@ -53,7 +52,6 @@ services:
       - type: rewrite
         source: /health
         destination: https://cms-api.onrender.com/health
-      # SPA fallback — all other routes serve index.html
       - type: rewrite
         source: /*
         destination: /index.html
