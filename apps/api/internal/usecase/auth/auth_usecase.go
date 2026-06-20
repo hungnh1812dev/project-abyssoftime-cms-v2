@@ -93,23 +93,33 @@ func (uc *UseCase) Login(ctx context.Context, email, password string) (accessTok
 	return access, refresh, nil
 }
 
-func (uc *UseCase) RefreshToken(ctx context.Context, refreshToken string) (string, error) {
+func (uc *UseCase) RefreshToken(ctx context.Context, refreshToken string) (string, string, error) {
 	claims, err := pkgjwt.ValidateToken(refreshToken)
 	if err != nil {
-		return "", pkgerrors.ErrUnauthorized
+		return "", "", pkgerrors.ErrUnauthorized
 	}
 
 	user, err := uc.repo.FindByID(ctx, claims.UserID)
 	if err != nil {
-		return "", pkgerrors.ErrUnauthorized
+		return "", "", pkgerrors.ErrUnauthorized
 	}
 
 	roleSlug, err := uc.resolveRoleSlug(ctx, user)
 	if err != nil {
-		return "", pkgerrors.ErrUnauthorized
+		return "", "", pkgerrors.ErrUnauthorized
 	}
 
-	return pkgjwt.GenerateAccessToken(user.ID, roleSlug)
+	access, err := pkgjwt.GenerateAccessToken(user.ID, roleSlug)
+	if err != nil {
+		return "", "", err
+	}
+
+	newRefresh, err := pkgjwt.GenerateRefreshToken(user.ID)
+	if err != nil {
+		return "", "", err
+	}
+
+	return access, newRefresh, nil
 }
 
 func (uc *UseCase) resolveRoleSlug(ctx context.Context, user *entity.User) (string, error) {

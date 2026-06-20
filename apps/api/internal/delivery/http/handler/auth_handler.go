@@ -19,7 +19,7 @@ const (
 type authUseCase interface {
 	Register(ctx context.Context, email, password string) (*entity.User, error)
 	Login(ctx context.Context, email, password string) (accessToken, refreshToken string, err error)
-	RefreshToken(ctx context.Context, refreshToken string) (string, error)
+	RefreshToken(ctx context.Context, refreshToken string) (string, string, error)
 	Logout(ctx context.Context, userID string) error
 	SetupStatus(ctx context.Context) (bool, error)
 }
@@ -93,11 +93,14 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 		return
 	}
 
-	access, err := h.uc.RefreshToken(c.Request.Context(), cookieVal)
+	access, refresh, err := h.uc.RefreshToken(c.Request.Context(), cookieVal)
 	if err != nil {
 		ginWriteErr(c, err)
 		return
 	}
+
+	c.SetSameSite(h.cookieSameSite)
+	c.SetCookie(RefreshCookieName, refresh, refreshCookieMaxAgeRemember, "/", "", h.cookieSecure, true)
 
 	c.JSON(http.StatusOK, gin.H{
 		"accessToken": access,

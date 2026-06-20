@@ -18,7 +18,7 @@ import (
 type mockAuthUC struct {
 	registerFn     func(ctx context.Context, email, password string) (*entity.User, error)
 	loginFn        func(ctx context.Context, email, password string) (string, string, error)
-	refreshTokenFn func(ctx context.Context, refreshToken string) (string, error)
+	refreshTokenFn func(ctx context.Context, refreshToken string) (string, string, error)
 	logoutFn       func(ctx context.Context, userID string) error
 	setupStatusFn  func(ctx context.Context) (bool, error)
 }
@@ -29,7 +29,7 @@ func (m *mockAuthUC) Register(ctx context.Context, email, password string) (*ent
 func (m *mockAuthUC) Login(ctx context.Context, email, password string) (string, string, error) {
 	return m.loginFn(ctx, email, password)
 }
-func (m *mockAuthUC) RefreshToken(ctx context.Context, rt string) (string, error) {
+func (m *mockAuthUC) RefreshToken(ctx context.Context, rt string) (string, string, error) {
 	return m.refreshTokenFn(ctx, rt)
 }
 func (m *mockAuthUC) Logout(ctx context.Context, userID string) error {
@@ -214,11 +214,11 @@ func TestRefreshHandler(t *testing.T) {
 		wantStatus int
 	}{
 		{
-			name:   "success → 200 with new access token",
+			name:   "success → 200 with new access token and refresh cookie",
 			cookie: &http.Cookie{Name: handler.RefreshCookieName, Value: "valid-refresh"},
 			uc: &mockAuthUC{
-				refreshTokenFn: func(_ context.Context, _ string) (string, error) {
-					return "new-access-tok", nil
+				refreshTokenFn: func(_ context.Context, _ string) (string, string, error) {
+					return "new-access-tok", "new-refresh-tok", nil
 				},
 			},
 			wantStatus: http.StatusOK,
@@ -232,8 +232,8 @@ func TestRefreshHandler(t *testing.T) {
 			name:   "invalid refresh token → 401",
 			cookie: &http.Cookie{Name: handler.RefreshCookieName, Value: "bad"},
 			uc: &mockAuthUC{
-				refreshTokenFn: func(_ context.Context, _ string) (string, error) {
-					return "", pkgerrors.ErrUnauthorized
+				refreshTokenFn: func(_ context.Context, _ string) (string, string, error) {
+					return "", "", pkgerrors.ErrUnauthorized
 				},
 			},
 			wantStatus: http.StatusUnauthorized,
@@ -260,6 +260,13 @@ func TestRefreshHandler(t *testing.T) {
 				out := decodeBody(t, w)
 				if out["accessToken"] == nil {
 					t.Errorf("response missing accessToken: %v", out)
+				}
+				resp := w.Result()
+				c := cookieByName(resp, handler.RefreshCookieName)
+				if c == nil {
+					t.Error("expected refresh_token cookie to be re-issued")
+				} else if c.Value != "new-refresh-tok" {
+					t.Errorf("cookie value = %q, want %q", c.Value, "new-refresh-tok")
 				}
 			}
 		})

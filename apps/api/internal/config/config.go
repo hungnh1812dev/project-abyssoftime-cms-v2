@@ -178,8 +178,8 @@ func Load() (*Config, error) {
 		JWTSecret:        getenv("JWT_SECRET", ""),
 		ContentTypeDir:   getenv("CONTENT_TYPES_DIR", "content-types"),
 		SupportedLocales: splitCSV(getenv("SUPPORTED_LOCALES", "en,vi")),
-		CookieSecure:     parseBoolDefault(os.Getenv("COOKIE_SECURE"), true),
-		CookieSameSite:   parseSameSite(getenv("COOKIE_SAMESITE", "none")),
+		CookieSecure:     parseBoolDefault(os.Getenv("COOKIE_SECURE"), false),
+		CookieSameSite:   parseSameSite(getenv("COOKIE_SAMESITE", "lax")),
 		CORSOrigins:      splitCSV(getenv("CORS_ORIGINS", "http://localhost:5173")),
 		DB: DBConfig{
 			Driver:   driver,

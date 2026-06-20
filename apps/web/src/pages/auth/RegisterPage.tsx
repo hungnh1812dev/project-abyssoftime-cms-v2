@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, Link } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
@@ -14,6 +14,7 @@ interface RegisterFields {
 
 export function RegisterPage() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   const { data: setupData, isLoading: setupLoading } = useQuery({
@@ -35,6 +36,7 @@ export function RegisterPage() {
     mutationFn: (data: RegisterFields) =>
       api.post('/auth/register', data).then((r) => r.data),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['auth-setup'] })
       navigate('/login')
     },
     onError: () => {

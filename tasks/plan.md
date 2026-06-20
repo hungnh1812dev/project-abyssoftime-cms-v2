@@ -1,130 +1,66 @@
-# Plan — Migrate personal-cms to Draft/Publish + Schema-as-Code + Multi-Storage
+# Plan — personal-cms (project-abyssoftime-cms-v2)
 
-## Context
-
-`SPEC.md` was extended with three features that this codebase does not implement yet:
-
-1. Draft/publish as two records per entry (`entryId` + computed status), with audit
-   fields (`createdBy`/`updatedBy`/`publishedBy`/`locale`).
-2. Content-type **structure** defined as JSON files synced into Mongo on boot — never
-   created via API/UI.
-3. Dual media storage (S3 + Cloudinary) behind the existing `StorageAdapter` interface.
-
-> **Status: Phases A–D, W, X complete.** All original features built. Now implementing
-> SPEC §10 — Document Manager API Restructure & Paginated Collections.
+> Completed plans archived in `tasks/archive/plan-phases-A-Y.md`. This file tracks only current and upcoming plans.
 
 ---
 
-## Phase Y — Document Manager API Restructure & Paginated Collections (SPEC §10)
+## Current: Phase Z — Bug Fixes (Auth Flow & Component Naming)
 
-### Context
-
-The document manager API uses flat routes (`/api/document-manager/{slug}`) for all content
-types. This causes: no pagination on collection lists, single-type endpoints returning arrays,
-and list views fetching full document data. Phase Y restructures routes by kind, adds
-server-side pagination, and introduces field projection via `listFields` in content-type
-JSON schemas.
-
-**Key de-risking insight**: Go 1.22 ServeMux literal segments (`single-type`,
-`collection-type`) take precedence over wildcards (`{slug}`), so new routes can coexist
-with old routes during migration.
+See [bugfix-auth-and-naming.md](bugfix-auth-and-naming.md) for full spec (root causes, code samples).
 
 ### Dependency Graph
 
 ```
-Task Y1 (entity/schema/JSON)
+B1 (Register redirect)       — independent, FE only
+B2 (Session persistence)     — independent, BE only (config + usecase + handler + tests)
+B3 (Component table naming)  — independent, BE only (GORM infra)
     ↓
-Task Y2 (repository methods)
-    ↓
-Task Y3 (single-type usecase) ←→ Task Y4 (collection usecase)
-    ↓                                  ↓
-    └────────→ Task Y5 (handler+routes) ←─┘
-                    ↓
-            [Checkpoint A: BE complete]
-                    ↓
-              Task Y6 (FE types+hooks)
-                    ↓
-              Task Y7 (FE components)
-                    ↓
-            [Checkpoint B: full stack]
-                    ↓
-              Task Y8 (cleanup+verify)
+[Checkpoint Z: all three verified]
 ```
 
-### Y1: BE — Entity + Schema + JSON (`listFields` foundation)
+All three are independent — can be done in any order.
 
-**Files:** `entity/content_type.go`, `usecase/content_type/schema_loader.go`,
-`usecase/content_type/sync.go`, `content-types/blog-posts.json`
+### B1: Register → Login Redirect (FE)
 
-- Add `ListFields []string` to `ContentType` entity (json + bson tags)
-- Add `ListFields` to `ContentTypeDefinition` in schema loader
-- Validate each `listFields` entry exists in `fields` — fatal on mismatch
-- Carry `ListFields` through sync (`syncOne`)
-- Add `"listFields": ["title", "slug", "featured"]` to `blog-posts.json`
+- **File:** `apps/web/src/pages/auth/RegisterPage.tsx`
+- **Change:** In register mutation `onSuccess`, call `queryClient.invalidateQueries({ queryKey: ['auth-setup'] })` before `navigate('/login')`
+- **Verify:** Register first user → lands on `/login`, not redirected back
 
-### Y2: BE — Repository (paginated + batch methods)
+### B2: Session Persistence (BE)
 
-**Files:** `repository/document_repository.go`, `repository/mock/document_repository.go`,
-`infrastructure/mongodb/document_repository.go`
+**Sub-changes:**
 
-- `FindDraftsByContentTypePaginated(ctx, slug, start, size, locale) → (docs, total, err)`
-- `FindPublishedByDocumentIDs(ctx, slug, documentIDs, locale) → (docs, err)`
-- MongoDB: paginated Find + CountDocuments; batch $in query for published
+1. **Cookie defaults** (`apps/api/internal/config/config.go`):
+   - `COOKIE_SECURE`: default `true` → `false`
+   - `COOKIE_SAMESITE`: default `none` → `lax`
 
-### Y3: BE — Single-type usecase + tests
+2. **RefreshToken signature** (`apps/api/internal/usecase/auth/auth_usecase.go`):
+   - Before: `(accessToken string, err)` → After: `(accessToken, newRefreshToken string, err)`
+   - Generate new refresh token via `pkgjwt.GenerateRefreshToken(user.ID)`
 
-**Files:** `usecase/document/document_usecase.go`, `document_usecase_test.go`
+3. **Refresh handler** (`apps/api/internal/delivery/http/handler/auth_handler.go`):
+   - Update `AuthUseCase` interface for 3-return signature
+   - Re-set refresh cookie with new token in `Refresh()`
 
-- `GetSingleType(ctx, slug, locale)` → find single draft, compute status, ErrNotFound if none
-- `SaveSingleType(ctx, slug, data, locale, userID)` → find-or-create, delegate to Save
-- `PublishSingleType(ctx, slug, locale, userID)` → find draft, delegate to Publish
-- `UnpublishSingleType(ctx, slug, locale)` → find draft, delegate to Unpublish
+4. **Tests** (`auth_usecase_test.go`, `auth_handler_test.go`): Update for new signature
 
-### Y4: BE — Collection-type paginated usecase + tests
+- **Verify:** `go test ./internal/usecase/auth/... ./internal/delivery/http/handler/...` + login → F5 → stays on admin
 
-**Files:** `usecase/document/document_usecase.go`, `document_usecase_test.go`
+### B3: Component Table Naming (BE)
 
-- `GetAllPaginated(ctx, slug, start, size, locale)` → paginated drafts + batch status computation
+- **File:** `apps/api/internal/infrastructure/gormdb/document_repository.go`
+- **Change:** `component_` prefix → `components_` (plural, consistent with `documents_`)
+- **Verify:** `go test ./internal/infrastructure/gormdb/...`
 
-### Y5: BE — Handler rewrite + route migration + tests
+### Checkpoint Z
 
-**Files:** `handler/document_handler.go`, `document_handler_test.go`, `cmd/server/main.go`
+1. `make test-api` — all backend tests green
+2. `make test-web` — all frontend tests green
+3. Manual smoke: register → login → F5 stays logged in
+4. Update `tasks/todo.md` — mark all complete
 
-- Add `ctUC` dependency to `DocumentHandler` (for ListFields lookup)
-- 11 new handler methods (4 single-type + 7 collection-type)
-- `ListCollection`: fetch content-type for ListFields, paginate, project data
-- `projectData(data, fields)` helper
-- Replace all flat routes with kind-prefixed routes in main.go
-- Keep public route unchanged
+---
 
-### Checkpoint A: BE Complete
+## Upcoming
 
-`go test ./...` all pass. Curl: single-type 404/200, collection paginated, old routes 404.
-
-### Y6: FE — Types + hooks
-
-**Files:** `types/cms.ts`, new `hooks/useSingleTypeDocuments.ts`,
-`hooks/useCollectionDocuments.ts`, `hooks/useLocales.ts`, delete `hooks/useDocuments.ts`
-
-- `ContentType.ListFields`, `PaginatedResponse<T>` types
-- Single-type hooks: query (404→undefined), save, publish, unpublish
-- Collection hooks: paginated list, detail, create, update, delete, publish, unpublish
-
-### Y7: FE — Components (ContentTypePanel + CollectionListPage)
-
-**Files:** `ContentTypePanel.tsx`, `CollectionListPage.tsx`, `content-type-registry/index.ts`
-
-- ContentTypePanel: kind-aware hook selection (single vs collection-detail)
-- CollectionListPage: paginated query, schema-derived columns from ListFields + Fields,
-  Previous/Next controls, "Showing X–Y of Z"
-- Registry `columns` becomes optional override
-
-### Checkpoint B: Full Stack Integration
-
-Browser test all 4 entry points. Dev server + manual verification.
-
-### Y8: Final cleanup + verification
-
-- Grep for stale `/api/document-manager/{slug}` refs in FE
-- Grep for stale `useDocuments` imports
-- Full test suite: `go test ./...` + `npm run build` + `npm run lint`
+*(Add new plans here as they are defined.)*
