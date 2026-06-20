@@ -30,18 +30,6 @@ export function LoginPage() {
     staleTime: 30_000,
   })
 
-  if (setupLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-muted-foreground text-sm">Loading…</p>
-      </div>
-    )
-  }
-
-  if (setupData && !setupData.adminExists) {
-    return <Navigate to="/register" replace />
-  }
-
   const {
     register,
     handleSubmit,
@@ -59,6 +47,18 @@ export function LoginPage() {
       setErrorMsg('Invalid email or password.')
     },
   })
+
+  if (setupLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-muted-foreground text-sm">Loading…</p>
+      </div>
+    )
+  }
+
+  if (setupData && !setupData.adminExists) {
+    return <Navigate to="/register" replace />
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center">
