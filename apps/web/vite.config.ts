@@ -1,3 +1,4 @@
+// ci: test change detection
 import path from 'path'
 import tailwindcss from '@tailwindcss/vite'
 import { defineConfig } from 'vitest/config'
