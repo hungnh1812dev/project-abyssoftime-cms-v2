@@ -1,3 +1,4 @@
+// ci: test change detection
 package main
 
 import (

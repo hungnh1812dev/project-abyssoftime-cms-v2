@@ -1,13 +1,25 @@
+/* eslint-disable react-refresh/only-export-components */
+import { lazy, Suspense } from "react";
 import {
   FormField,
   TextInput,
   BooleanInput,
   NumberInput,
-  JsonInput,
   MediaInput,
-  RichTextInput,
 } from "@/components/form";
 import type { FieldDefinition } from "@/types/cms";
+
+const RichTextInput = lazy(() =>
+  import("@/components/form/inputs/RichTextInput").then((m) => ({
+    default: m.RichTextInput,
+  })),
+);
+
+const JsonInput = lazy(() =>
+  import("@/components/form/inputs/JsonInput").then((m) => ({
+    default: m.JsonInput,
+  })),
+);
 
 function primitiveInput(field: FieldDefinition): React.ReactElement<Record<string, unknown>> {
   switch (field.type) {
@@ -16,9 +28,9 @@ function primitiveInput(field: FieldDefinition): React.ReactElement<Record<strin
     case "boolean":
       return <BooleanInput aria-label={field.name} />;
     case "richtext":
-      return <RichTextInput aria-label={field.name} />;
+      return <Suspense fallback={<div className="h-48 animate-pulse rounded-md bg-muted" />}><RichTextInput aria-label={field.name} /></Suspense>;
     case "json":
-      return <JsonInput aria-label={field.name} />;
+      return <Suspense fallback={<div className="h-48 animate-pulse rounded-md bg-muted" />}><JsonInput aria-label={field.name} /></Suspense>;
     case "media":
       return <MediaInput aria-label={field.name} />;
     default:
