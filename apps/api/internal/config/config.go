@@ -4,6 +4,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -21,27 +22,62 @@ type Config struct {
 }
 
 type DBConfig struct {
-	Driver   string // DB_DRIVER, default "mongo"
-	Mongo    MongoConfig
-	SQL      SQLConfig
+	Driver   string // DB_DRIVER: "mongo" | "postgres", default "mongo"
+	Host     string // DB_HOST
+	Port     string // DB_PORT (default: 27017 for mongo, 5432 for postgres)
+	Name     string // DB_NAME, default "cms"
+	Username string // DB_USERNAME
+	Password string // DB_PASSWORD
+	SSLMode  string // DB_SSL_MODE: "disable" | "require", default "disable"
 	EntityDB EntityDBConfig
 }
 
-type MongoConfig struct {
-	URI  string // MONGODB_URI, default "mongodb://localhost:27017"
-	Name string // MONGODB_DB,  default "cms"
+// MongoURI builds the MongoDB connection string from generic DB_* vars.
+func (d DBConfig) MongoURI() string {
+	host := d.Host
+	if host == "" {
+		host = "localhost"
+	}
+	port := d.Port
+	if port == "" {
+		port = "27017"
+	}
+	if d.Username != "" && d.Password != "" {
+		return fmt.Sprintf("mongodb://%s:%s@%s:%s", d.Username, d.Password, host, port)
+	}
+	return fmt.Sprintf("mongodb://%s:%s", host, port)
 }
 
-type SQLConfig struct {
-	Driver string // SQL_DRIVER: "postgres" (default when any entity uses sql)
-	DSN    string // SQL_DSN: full connection string
+// PostgresDSN builds the PostgreSQL connection string from generic DB_* vars.
+func (d DBConfig) PostgresDSN() string {
+	host := d.Host
+	if host == "" {
+		host = "localhost"
+	}
+	port := d.Port
+	if port == "" {
+		port = "5432"
+	}
+	name := d.Name
+	if name == "" {
+		name = "cms"
+	}
+	sslMode := d.SSLMode
+	if sslMode == "" {
+		sslMode = "disable"
+	}
+	if d.Username != "" {
+		return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s",
+			d.Username, d.Password, host, port, name, sslMode)
+	}
+	return fmt.Sprintf("postgres://%s:%s/%s?sslmode=%s", host, port, name, sslMode)
 }
 
 type EntityDBConfig struct {
-	User        string // DB_USER, default: DB_DRIVER
-	ContentType string // DB_CONTENT_TYPE, default: DB_DRIVER
-	Document    string // DB_DOCUMENT, default: DB_DRIVER
-	Media       string // DB_MEDIA, default: DB_DRIVER
+	User        string // DB_ENTITY_USER, default: DB_DRIVER
+	ContentType string // DB_ENTITY_CONTENT_TYPE, default: DB_DRIVER
+	Document    string // DB_ENTITY_DOCUMENT, default: DB_DRIVER
+	Media       string // DB_ENTITY_MEDIA, default: DB_DRIVER
 }
 
 type MediaConfig struct {
@@ -94,8 +130,16 @@ func Load() (*Config, error) {
 		v, err := strconv.ParseBool(raw)
 		if err != nil {
 			generateThumbnail = false
-		} else{
-		generateThumbnail = v}
+		} else {
+			generateThumbnail = v
+		}
+	}
+
+	driver := getenv("DB_DRIVER", "mongo")
+
+	defaultPort := "27017"
+	if driver == "postgres" {
+		defaultPort = "5432"
 	}
 
 	return &Config{
@@ -104,26 +148,21 @@ func Load() (*Config, error) {
 		JWTSecret:        getenv("JWT_SECRET", ""),
 		ContentTypeDir:   getenv("CONTENT_TYPES_DIR", "content-types"),
 		SupportedLocales: splitLocales(getenv("SUPPORTED_LOCALES", "en,vi")),
-		DB: func() DBConfig {
-			driver := getenv("DB_DRIVER", "mongo")
-			return DBConfig{
-				Driver: driver,
-				Mongo: MongoConfig{
-					URI:  getenv("MONGODB_URI", "mongodb://localhost:27017"),
-					Name: getenv("MONGODB_DB", "cms"),
-				},
-				SQL: SQLConfig{
-					Driver: getenv("SQL_DRIVER", "postgres"),
-					DSN:    getenv("SQL_DSN", ""),
-				},
-				EntityDB: EntityDBConfig{
-					User:        getenv("DB_USER", driver),
-					ContentType: getenv("DB_CONTENT_TYPE", driver),
-					Document:    getenv("DB_DOCUMENT", driver),
-					Media:       getenv("DB_MEDIA", driver),
-				},
-			}
-		}(),
+		DB: DBConfig{
+			Driver:   driver,
+			Host:     getenv("DB_HOST", "localhost"),
+			Port:     getenv("DB_PORT", defaultPort),
+			Name:     getenv("DB_NAME", "cms"),
+			Username: getenv("DB_USERNAME", ""),
+			Password: getenv("DB_PASSWORD", ""),
+			SSLMode:  getenv("DB_SSL_MODE", "disable"),
+			EntityDB: EntityDBConfig{
+				User:        getenv("DB_ENTITY_USER", driver),
+				ContentType: getenv("DB_ENTITY_CONTENT_TYPE", driver),
+				Document:    getenv("DB_ENTITY_DOCUMENT", driver),
+				Media:       getenv("DB_ENTITY_MEDIA", driver),
+			},
+		},
 		Media: MediaConfig{
 			Driver:            getenv("STORAGE_PROVIDER", "cloudinary"),
 			GenerateThumbnail: generateThumbnail,

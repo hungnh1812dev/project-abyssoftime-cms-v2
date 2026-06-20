@@ -10,14 +10,16 @@ import (
 )
 
 type RouterConfig struct {
-	AuthHandler    *handler.AuthHandler
-	CTHandler      *handler.ContentTypeHandler
-	DocHandler     *handler.DocumentHandler
-	MediaHandler   *handler.MediaHandler
-	LocaleHandler  *handler.LocaleHandler
+	AuthHandler        *handler.AuthHandler
+	CTHandler          *handler.ContentTypeHandler
+	DocHandler         *handler.DocumentHandler
+	MediaHandler       *handler.MediaHandler
+	LocaleHandler      *handler.LocaleHandler
 	UserHandler        *handler.UserHandler
 	InviteHandler      *handler.InviteHandler
 	AccessTokenHandler *handler.AccessTokenHandler
+	RoleHandler        *handler.RoleHandler
+	RoleCache          *middleware.RoleCache
 	GraphQLHandler     http.Handler
 	GraphQLPath        string
 }
@@ -40,8 +42,10 @@ func SetupRouter(cfg RouterConfig) *gin.Engine {
 		authGroup.POST("/logout", cfg.AuthHandler.Logout)
 	}
 
-	// Content type routes (admin+)
-	ctGroup := r.Group("/api/content-types", middleware.GinAuth(), middleware.GinRequireMinRole("admin"))
+	cache := cfg.RoleCache
+
+	// Content type routes
+	ctGroup := r.Group("/api/content-types", middleware.GinAuth(), middleware.GinRequirePermission(cache, "content_types:read"))
 	{
 		ctGroup.GET("", cfg.CTHandler.ListSummary)
 		ctGroup.GET("/:identifier", cfg.CTHandler.Get)
@@ -50,37 +54,37 @@ func SetupRouter(cfg RouterConfig) *gin.Engine {
 	// Document routes — single-type
 	stGroup := r.Group("/api/document-manager/single-type", middleware.GinAuth())
 	{
-		stGroup.GET("/:slug", cfg.DocHandler.GetSingleType)
-		stGroup.PUT("/:slug", middleware.GinRequireMinRole("editor"), cfg.DocHandler.SaveSingleType)
-		stGroup.POST("/:slug/publish", middleware.GinRequireMinRole("editor"), cfg.DocHandler.PublishSingleType)
-		stGroup.POST("/:slug/unpublish", middleware.GinRequireMinRole("editor"), cfg.DocHandler.UnpublishSingleType)
+		stGroup.GET("/:slug", middleware.GinRequirePermission(cache, "content:read"), cfg.DocHandler.GetSingleType)
+		stGroup.PUT("/:slug", middleware.GinRequirePermission(cache, "content:update"), cfg.DocHandler.SaveSingleType)
+		stGroup.POST("/:slug/publish", middleware.GinRequirePermission(cache, "content:publish"), cfg.DocHandler.PublishSingleType)
+		stGroup.POST("/:slug/unpublish", middleware.GinRequirePermission(cache, "content:unpublish"), cfg.DocHandler.UnpublishSingleType)
 	}
 
 	// Document routes — collection-type
 	colGroup := r.Group("/api/document-manager/collection-type", middleware.GinAuth())
 	{
-		colGroup.GET("/:slug", cfg.DocHandler.ListCollection)
-		colGroup.GET("/:slug/:documentId", cfg.DocHandler.GetCollection)
-		colGroup.POST("/:slug", middleware.GinRequireMinRole("editor"), cfg.DocHandler.CreateCollection)
-		colGroup.PUT("/:slug/:documentId", middleware.GinRequireMinRole("editor"), cfg.DocHandler.UpdateCollection)
-		colGroup.DELETE("/:slug/:documentId", middleware.GinRequireMinRole("editor"), cfg.DocHandler.DeleteCollection)
-		colGroup.POST("/:slug/:documentId/publish", middleware.GinRequireMinRole("editor"), cfg.DocHandler.PublishCollection)
-		colGroup.POST("/:slug/:documentId/unpublish", middleware.GinRequireMinRole("editor"), cfg.DocHandler.UnpublishCollection)
+		colGroup.GET("/:slug", middleware.GinRequirePermission(cache, "content:read"), cfg.DocHandler.ListCollection)
+		colGroup.GET("/:slug/:documentId", middleware.GinRequirePermission(cache, "content:read"), cfg.DocHandler.GetCollection)
+		colGroup.POST("/:slug", middleware.GinRequirePermission(cache, "content:create"), cfg.DocHandler.CreateCollection)
+		colGroup.PUT("/:slug/:documentId", middleware.GinRequirePermission(cache, "content:update"), cfg.DocHandler.UpdateCollection)
+		colGroup.DELETE("/:slug/:documentId", middleware.GinRequirePermission(cache, "content:delete"), cfg.DocHandler.DeleteCollection)
+		colGroup.POST("/:slug/:documentId/publish", middleware.GinRequirePermission(cache, "content:publish"), cfg.DocHandler.PublishCollection)
+		colGroup.POST("/:slug/:documentId/unpublish", middleware.GinRequirePermission(cache, "content:unpublish"), cfg.DocHandler.UnpublishCollection)
 	}
 
 	// Public document route (no auth)
 	r.GET("/api/public/document-manager/:slug/:documentId", cfg.DocHandler.GetPublic)
 
-	// Media routes (editor+)
-	mediaGroup := r.Group("/api/media", middleware.GinAuth(), middleware.GinRequireMinRole("editor"))
+	// Media routes
+	mediaGroup := r.Group("/api/media", middleware.GinAuth())
 	{
-		mediaGroup.GET("", cfg.MediaHandler.List)
-		mediaGroup.POST("/upload", cfg.MediaHandler.Upload)
-		mediaGroup.DELETE("/:id", cfg.MediaHandler.Delete)
+		mediaGroup.GET("", middleware.GinRequirePermission(cache, "media:read"), cfg.MediaHandler.List)
+		mediaGroup.POST("/upload", middleware.GinRequirePermission(cache, "media:upload"), cfg.MediaHandler.Upload)
+		mediaGroup.DELETE("/:id", middleware.GinRequirePermission(cache, "media:delete"), cfg.MediaHandler.Delete)
 	}
 
-	// User management routes (admin+)
-	userGroup := r.Group("/api/users", middleware.GinAuth(), middleware.GinRequireMinRole("admin"))
+	// User management routes
+	userGroup := r.Group("/api/users", middleware.GinAuth(), middleware.GinRequirePermission(cache, "users:manage"))
 	{
 		userGroup.GET("", cfg.UserHandler.List)
 		userGroup.GET("/:id", cfg.UserHandler.Get)
@@ -88,8 +92,8 @@ func SetupRouter(cfg RouterConfig) *gin.Engine {
 		userGroup.DELETE("/:id", cfg.UserHandler.Delete)
 	}
 
-	// Invite routes (admin+)
-	inviteGroup := r.Group("/api/invites", middleware.GinAuth(), middleware.GinRequireMinRole("admin"))
+	// Invite routes
+	inviteGroup := r.Group("/api/invites", middleware.GinAuth(), middleware.GinRequirePermission(cache, "users:manage"))
 	{
 		inviteGroup.POST("", cfg.InviteHandler.Create)
 		inviteGroup.GET("", cfg.InviteHandler.List)
@@ -99,8 +103,18 @@ func SetupRouter(cfg RouterConfig) *gin.Engine {
 	// Public invite accept
 	authGroup.POST("/invite/:token", cfg.InviteHandler.Accept)
 
-	// Access token routes (super_admin only)
-	tokenGroup := r.Group("/api/access-tokens", middleware.GinAuth(), middleware.GinRequireMinRole("super_admin"))
+	// Role routes
+	roleGroup := r.Group("/api/roles", middleware.GinAuth())
+	{
+		roleGroup.GET("", cfg.RoleHandler.List)
+		roleGroup.GET("/:id", cfg.RoleHandler.Get)
+		roleGroup.POST("", middleware.GinRequirePermission(cache, "roles:manage"), cfg.RoleHandler.Create)
+		roleGroup.PUT("/:id", middleware.GinRequirePermission(cache, "roles:manage"), cfg.RoleHandler.Update)
+		roleGroup.DELETE("/:id", middleware.GinRequirePermission(cache, "roles:manage"), cfg.RoleHandler.Delete)
+	}
+
+	// Access token routes
+	tokenGroup := r.Group("/api/access-tokens", middleware.GinAuth(), middleware.GinRequirePermission(cache, "access_tokens:manage"))
 	{
 		tokenGroup.POST("", cfg.AccessTokenHandler.Create)
 		tokenGroup.GET("", cfg.AccessTokenHandler.List)

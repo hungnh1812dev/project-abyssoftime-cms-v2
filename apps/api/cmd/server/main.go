@@ -10,6 +10,7 @@ import (
 	grpcdelivery "project-abyssoftime-cms-v2/api/internal/delivery/grpc"
 	deliveryhttp "project-abyssoftime-cms-v2/api/internal/delivery/http"
 	deliveryhandler "project-abyssoftime-cms-v2/api/internal/delivery/http/handler"
+	"project-abyssoftime-cms-v2/api/internal/delivery/http/middleware"
 	"project-abyssoftime-cms-v2/api/internal/domain/repository"
 	cloudinaryadapter "project-abyssoftime-cms-v2/api/internal/infrastructure/cloudinary"
 	"project-abyssoftime-cms-v2/api/internal/infrastructure/gormdb"
@@ -24,6 +25,7 @@ import (
 	accesstokenuc "project-abyssoftime-cms-v2/api/internal/usecase/access_token"
 	inviteuc "project-abyssoftime-cms-v2/api/internal/usecase/invite"
 	mediauc "project-abyssoftime-cms-v2/api/internal/usecase/media"
+	roleuc "project-abyssoftime-cms-v2/api/internal/usecase/role"
 	useruc "project-abyssoftime-cms-v2/api/internal/usecase/user"
 	pkgjwt "project-abyssoftime-cms-v2/api/pkg/jwt"
 )
@@ -52,18 +54,20 @@ func main() {
 	pkgjwt.SetSecret(cfg.JWTSecret)
 
 	// --- database connections ---
+	isPostgres := func(entity string) bool { return entity == "postgres" }
+
 	needsMongo := cfg.DB.EntityDB.User == "mongo" ||
 		cfg.DB.EntityDB.ContentType == "mongo" ||
 		cfg.DB.EntityDB.Document == "mongo" ||
 		cfg.DB.EntityDB.Media == "mongo"
-	needsSQL := cfg.DB.EntityDB.User == "sql" ||
-		cfg.DB.EntityDB.ContentType == "sql" ||
-		cfg.DB.EntityDB.Document == "sql" ||
-		cfg.DB.EntityDB.Media == "sql"
+	needsPostgres := isPostgres(cfg.DB.EntityDB.User) ||
+		isPostgres(cfg.DB.EntityDB.ContentType) ||
+		isPostgres(cfg.DB.EntityDB.Document) ||
+		isPostgres(cfg.DB.EntityDB.Media)
 
 	var mongoDB *mongo.Database
 	if needsMongo {
-		mongoClient, err := mongodb.NewClient(ctx, cfg.DB.Mongo.URI)
+		mongoClient, err := mongodb.NewClient(ctx, cfg.DB.MongoURI())
 		if err != nil {
 			log.Fatalf("mongodb connect: %v", err)
 		}
@@ -74,7 +78,7 @@ func main() {
 		}()
 		log.Println("connected to mongodb")
 
-		mongoDB = mongodb.Database(mongoClient, cfg.DB.Mongo.Name)
+		mongoDB = mongodb.Database(mongoClient, cfg.DB.Name)
 
 		if err := mongodb.EnsureIndexes(ctx, mongoDB); err != nil {
 			log.Fatalf("ensure indexes: %v", err)
@@ -83,42 +87,42 @@ func main() {
 	}
 
 	var sqlDB *gorm.DB
-	if needsSQL {
+	if needsPostgres {
 		var err error
-		sqlDB, err = gormdb.NewClient(cfg.DB.SQL.Driver, cfg.DB.SQL.DSN)
+		sqlDB, err = gormdb.NewClient("postgres", cfg.DB.PostgresDSN())
 		if err != nil {
-			log.Fatalf("gorm connect: %v", err)
+			log.Fatalf("postgres connect: %v", err)
 		}
 		if err := gormdb.AutoMigrate(sqlDB); err != nil {
-			log.Fatalf("gorm auto-migrate: %v", err)
+			log.Fatalf("postgres auto-migrate: %v", err)
 		}
-		log.Printf("connected to sql (%s)", cfg.DB.SQL.Driver)
+		log.Printf("connected to postgres (%s:%s/%s)", cfg.DB.Host, cfg.DB.Port, cfg.DB.Name)
 	}
 
 	// --- repository factory ---
 	var userRepo repository.UserRepository
-	if cfg.DB.EntityDB.User == "sql" {
+	if isPostgres(cfg.DB.EntityDB.User) {
 		userRepo = gormdb.NewUserRepository(sqlDB)
 	} else {
 		userRepo = mongodb.NewUserRepository(mongoDB)
 	}
 
 	var ctRepo repository.ContentTypeRepository
-	if cfg.DB.EntityDB.ContentType == "sql" {
+	if isPostgres(cfg.DB.EntityDB.ContentType) {
 		ctRepo = gormdb.NewContentTypeRepository(sqlDB)
 	} else {
 		ctRepo = mongodb.NewContentTypeRepository(mongoDB)
 	}
 
 	var docRepo repository.DocumentRepository
-	if cfg.DB.EntityDB.Document == "sql" {
+	if isPostgres(cfg.DB.EntityDB.Document) {
 		docRepo = gormdb.NewDocumentRepository(sqlDB)
 	} else {
 		docRepo = mongodb.NewDocumentRepository(mongoDB)
 	}
 
 	var mediaRepo repository.MediaAssetRepository
-	if cfg.DB.EntityDB.Media == "sql" {
+	if isPostgres(cfg.DB.EntityDB.Media) {
 		mediaRepo = gormdb.NewMediaAssetRepository(sqlDB)
 	} else {
 		mediaRepo = mongodb.NewMediaAssetRepository(mongoDB)
@@ -130,17 +134,37 @@ func main() {
 	}
 	log.Printf("storage provider: %s", cfg.Media.Driver)
 
+	// --- role repository ---
+	var roleRepo repository.RoleRepository
+	if isPostgres(cfg.DB.EntityDB.User) {
+		roleRepo = gormdb.NewRoleRepository(sqlDB)
+	} else {
+		roleRepo = mongodb.NewRoleRepository(mongoDB)
+	}
+
 	// --- invite + access token repositories ---
 	inviteRepo := mongodb.NewInviteRepository(mongoDB)
 	accessTokenRepo := mongodb.NewAccessTokenRepository(mongoDB)
 
-	authUC := auth.New(userRepo)
+	authUC := auth.New(userRepo, roleRepo)
 	ctUC := contenttype.New(ctRepo)
 	documentUC := docuc.New(docRepo, mediaRepo, cfg.SupportedLocales)
 	mediaUC := mediauc.New(mediaRepo, storage, cfg.Media.GenerateThumbnail)
-	userUC := useruc.New(userRepo)
-	inviteUC := inviteuc.New(inviteRepo, userRepo)
+	userUC := useruc.New(userRepo, roleRepo)
+	inviteUC := inviteuc.New(inviteRepo, userRepo, roleRepo)
 	accessTokenUC := accesstokenuc.New(accessTokenRepo)
+	roleUC := roleuc.New(roleRepo, userRepo)
+
+	// Seed default roles on first startup
+	if err := roleUC.SeedDefaults(ctx); err != nil {
+		log.Fatalf("seed default roles: %v", err)
+	}
+
+	// Role permission cache
+	roleCache := middleware.NewRoleCache()
+	if allRoles, err := roleUC.FindAll(ctx); err == nil {
+		roleCache.Load(allRoles)
+	}
 
 	defsDir := cfg.ContentTypeDir
 	defs, err := contenttype.LoadDefinitions(defsDir)
@@ -161,14 +185,16 @@ func main() {
 
 	// Gin router (REST + GraphQL)
 	router := deliveryhttp.SetupRouter(deliveryhttp.RouterConfig{
-		AuthHandler:    deliveryhandler.NewAuthHandler(authUC),
-		CTHandler:      deliveryhandler.NewContentTypeHandler(ctUC),
-		DocHandler:     deliveryhandler.NewDocumentHandler(documentUC, ctUC),
-		MediaHandler:   deliveryhandler.NewMediaHandler(mediaUC),
-		LocaleHandler:  deliveryhandler.NewLocaleHandler(cfg.SupportedLocales),
+		AuthHandler:        deliveryhandler.NewAuthHandler(authUC),
+		CTHandler:          deliveryhandler.NewContentTypeHandler(ctUC),
+		DocHandler:         deliveryhandler.NewDocumentHandler(documentUC, ctUC),
+		MediaHandler:       deliveryhandler.NewMediaHandler(mediaUC),
+		LocaleHandler:      deliveryhandler.NewLocaleHandler(cfg.SupportedLocales),
 		UserHandler:        deliveryhandler.NewUserHandler(userUC),
 		InviteHandler:      deliveryhandler.NewInviteHandler(inviteUC),
 		AccessTokenHandler: deliveryhandler.NewAccessTokenHandler(accessTokenUC),
+		RoleHandler:        deliveryhandler.NewRoleHandler(roleUC, roleCache),
+		RoleCache:          roleCache,
 		GraphQLHandler:     gqlHandler,
 		GraphQLPath:        cfg.GraphQL.Path,
 	})

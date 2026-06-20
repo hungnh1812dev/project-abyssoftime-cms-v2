@@ -32,5 +32,6 @@ type User struct {
 	Email        string    `bson:"email"         gorm:"column:email;uniqueIndex"`
 	PasswordHash string    `bson:"passwordHash"  gorm:"column:password_hash"`
 	Role         Role      `bson:"role"          gorm:"column:role;type:varchar(20)"`
+	RoleID       string    `bson:"roleId"        gorm:"column:role_id;index"`
 	CreatedAt    time.Time `bson:"createdAt"     gorm:"column:created_at"`
 }

@@ -13,11 +13,12 @@ import (
 )
 
 type UseCase struct {
-	repo repository.UserRepository
+	repo     repository.UserRepository
+	roleRepo repository.RoleRepository
 }
 
-func New(repo repository.UserRepository) *UseCase {
-	return &UseCase{repo: repo}
+func New(repo repository.UserRepository, roleRepo repository.RoleRepository) *UseCase {
+	return &UseCase{repo: repo, roleRepo: roleRepo}
 }
 
 func (uc *UseCase) Register(ctx context.Context, email, password string) (*entity.User, error) {
@@ -42,10 +43,16 @@ func (uc *UseCase) Register(ctx context.Context, email, password string) (*entit
 		return nil, fmt.Errorf("hash password: %w", err)
 	}
 
+	saRole, err := uc.roleRepo.FindBySlug(ctx, "super_admin")
+	if err != nil {
+		return nil, fmt.Errorf("find super_admin role: %w", err)
+	}
+
 	user := &entity.User{
 		Email:        email,
 		PasswordHash: string(hash),
 		Role:         entity.RoleSuperAdmin,
+		RoleID:       saRole.DocumentID,
 	}
 	if err := uc.repo.Create(ctx, user); err != nil {
 		return nil, err
@@ -70,7 +77,12 @@ func (uc *UseCase) Login(ctx context.Context, email, password string) (accessTok
 		return "", "", pkgerrors.ErrUnauthorized
 	}
 
-	access, err := pkgjwt.GenerateAccessToken(user.ID, string(user.Role))
+	roleSlug, err := uc.resolveRoleSlug(ctx, user)
+	if err != nil {
+		return "", "", err
+	}
+
+	access, err := pkgjwt.GenerateAccessToken(user.ID, roleSlug)
 	if err != nil {
 		return "", "", err
 	}
@@ -92,7 +104,24 @@ func (uc *UseCase) RefreshToken(ctx context.Context, refreshToken string) (strin
 		return "", pkgerrors.ErrUnauthorized
 	}
 
-	return pkgjwt.GenerateAccessToken(user.ID, string(user.Role))
+	roleSlug, err := uc.resolveRoleSlug(ctx, user)
+	if err != nil {
+		return "", pkgerrors.ErrUnauthorized
+	}
+
+	return pkgjwt.GenerateAccessToken(user.ID, roleSlug)
+}
+
+func (uc *UseCase) resolveRoleSlug(ctx context.Context, user *entity.User) (string, error) {
+	if user.RoleID != "" {
+		r, err := uc.roleRepo.FindByID(ctx, user.RoleID)
+		if err != nil {
+			return "", err
+		}
+		return r.Slug, nil
+	}
+	// Fallback for legacy users not yet migrated
+	return string(user.Role), nil
 }
 
 func (uc *UseCase) Logout(_ context.Context, _ string) error {
