@@ -260,7 +260,7 @@ func TestRefreshToken(t *testing.T) {
 		wantNonEmpty bool
 	}{
 		{
-			name:       "success — returns new access token",
+			name:       "success — returns new access and refresh tokens",
 			buildToken: func() string { return validRefreshToken(t, "u1") },
 			setupRepo: func(r *repomock.UserRepository) {
 				r.FindByIDFn = func(_ context.Context, id string) (*entity.User, error) {
@@ -293,7 +293,7 @@ func TestRefreshToken(t *testing.T) {
 			tc.setupRepo(repo)
 
 			uc := auth.New(repo, defaultRoleRepo())
-			token, err := uc.RefreshToken(ctx, tc.buildToken())
+			access, refresh, err := uc.RefreshToken(ctx, tc.buildToken())
 
 			if tc.wantErr != nil {
 				if err == nil {
@@ -304,8 +304,11 @@ func TestRefreshToken(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if tc.wantNonEmpty && token == "" {
+			if tc.wantNonEmpty && access == "" {
 				t.Error("expected non-empty access token")
+			}
+			if tc.wantNonEmpty && refresh == "" {
+				t.Error("expected non-empty refresh token")
 			}
 		})
 	}

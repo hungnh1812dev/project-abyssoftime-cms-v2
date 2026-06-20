@@ -39,8 +39,8 @@ func TestLoad_Defaults(t *testing.T) {
 		JWTSecret:        "test-secret",
 		ContentTypeDir:   "content-types",
 		SupportedLocales: []string{"en", "vi"},
-		CookieSecure:     true,
-		CookieSameSite:   http.SameSiteNoneMode,
+		CookieSecure:     false,
+		CookieSameSite:   http.SameSiteLaxMode,
 		CORSOrigins:      []string{"http://localhost:5173"},
 		DB: config.DBConfig{
 			Driver:  "mongo",
