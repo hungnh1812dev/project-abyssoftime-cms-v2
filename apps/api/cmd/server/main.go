@@ -143,8 +143,19 @@ func main() {
 	}
 
 	// --- invite + access token repositories ---
-	inviteRepo := mongodb.NewInviteRepository(mongoDB)
-	accessTokenRepo := mongodb.NewAccessTokenRepository(mongoDB)
+	var inviteRepo repository.InviteRepository
+	if isPostgres(cfg.DB.Driver) {
+		inviteRepo = gormdb.NewInviteRepository(sqlDB)
+	} else {
+		inviteRepo = mongodb.NewInviteRepository(mongoDB)
+	}
+
+	var accessTokenRepo repository.AccessTokenRepository
+	if isPostgres(cfg.DB.Driver) {
+		accessTokenRepo = gormdb.NewAccessTokenRepository(sqlDB)
+	} else {
+		accessTokenRepo = mongodb.NewAccessTokenRepository(mongoDB)
+	}
 
 	authUC := auth.New(userRepo, roleRepo)
 	ctUC := contenttype.New(ctRepo)
