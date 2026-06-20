@@ -54,18 +54,20 @@ func main() {
 	pkgjwt.SetSecret(cfg.JWTSecret)
 
 	// --- database connections ---
+	isPostgres := func(entity string) bool { return entity == "postgres" }
+
 	needsMongo := cfg.DB.EntityDB.User == "mongo" ||
 		cfg.DB.EntityDB.ContentType == "mongo" ||
 		cfg.DB.EntityDB.Document == "mongo" ||
 		cfg.DB.EntityDB.Media == "mongo"
-	needsSQL := cfg.DB.EntityDB.User == "sql" ||
-		cfg.DB.EntityDB.ContentType == "sql" ||
-		cfg.DB.EntityDB.Document == "sql" ||
-		cfg.DB.EntityDB.Media == "sql"
+	needsPostgres := isPostgres(cfg.DB.EntityDB.User) ||
+		isPostgres(cfg.DB.EntityDB.ContentType) ||
+		isPostgres(cfg.DB.EntityDB.Document) ||
+		isPostgres(cfg.DB.EntityDB.Media)
 
 	var mongoDB *mongo.Database
 	if needsMongo {
-		mongoClient, err := mongodb.NewClient(ctx, cfg.DB.Mongo.URI)
+		mongoClient, err := mongodb.NewClient(ctx, cfg.DB.MongoURI())
 		if err != nil {
 			log.Fatalf("mongodb connect: %v", err)
 		}
@@ -76,7 +78,7 @@ func main() {
 		}()
 		log.Println("connected to mongodb")
 
-		mongoDB = mongodb.Database(mongoClient, cfg.DB.Mongo.Name)
+		mongoDB = mongodb.Database(mongoClient, cfg.DB.Name)
 
 		if err := mongodb.EnsureIndexes(ctx, mongoDB); err != nil {
 			log.Fatalf("ensure indexes: %v", err)
@@ -85,42 +87,42 @@ func main() {
 	}
 
 	var sqlDB *gorm.DB
-	if needsSQL {
+	if needsPostgres {
 		var err error
-		sqlDB, err = gormdb.NewClient(cfg.DB.SQL.Driver, cfg.DB.SQL.DSN)
+		sqlDB, err = gormdb.NewClient("postgres", cfg.DB.PostgresDSN())
 		if err != nil {
-			log.Fatalf("gorm connect: %v", err)
+			log.Fatalf("postgres connect: %v", err)
 		}
 		if err := gormdb.AutoMigrate(sqlDB); err != nil {
-			log.Fatalf("gorm auto-migrate: %v", err)
+			log.Fatalf("postgres auto-migrate: %v", err)
 		}
-		log.Printf("connected to sql (%s)", cfg.DB.SQL.Driver)
+		log.Printf("connected to postgres (%s:%s/%s)", cfg.DB.Host, cfg.DB.Port, cfg.DB.Name)
 	}
 
 	// --- repository factory ---
 	var userRepo repository.UserRepository
-	if cfg.DB.EntityDB.User == "sql" {
+	if isPostgres(cfg.DB.EntityDB.User) {
 		userRepo = gormdb.NewUserRepository(sqlDB)
 	} else {
 		userRepo = mongodb.NewUserRepository(mongoDB)
 	}
 
 	var ctRepo repository.ContentTypeRepository
-	if cfg.DB.EntityDB.ContentType == "sql" {
+	if isPostgres(cfg.DB.EntityDB.ContentType) {
 		ctRepo = gormdb.NewContentTypeRepository(sqlDB)
 	} else {
 		ctRepo = mongodb.NewContentTypeRepository(mongoDB)
 	}
 
 	var docRepo repository.DocumentRepository
-	if cfg.DB.EntityDB.Document == "sql" {
+	if isPostgres(cfg.DB.EntityDB.Document) {
 		docRepo = gormdb.NewDocumentRepository(sqlDB)
 	} else {
 		docRepo = mongodb.NewDocumentRepository(mongoDB)
 	}
 
 	var mediaRepo repository.MediaAssetRepository
-	if cfg.DB.EntityDB.Media == "sql" {
+	if isPostgres(cfg.DB.EntityDB.Media) {
 		mediaRepo = gormdb.NewMediaAssetRepository(sqlDB)
 	} else {
 		mediaRepo = mongodb.NewMediaAssetRepository(mongoDB)
@@ -134,7 +136,7 @@ func main() {
 
 	// --- role repository ---
 	var roleRepo repository.RoleRepository
-	if cfg.DB.EntityDB.User == "sql" {
+	if isPostgres(cfg.DB.EntityDB.User) {
 		roleRepo = gormdb.NewRoleRepository(sqlDB)
 	} else {
 		roleRepo = mongodb.NewRoleRepository(mongoDB)

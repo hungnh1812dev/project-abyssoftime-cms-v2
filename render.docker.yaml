@@ -1,5 +1,7 @@
 services:
   # ── Go API (Web Service, Docker, free tier) ────────────────────────────────
+  # Docker build — use this if you need CGO or custom system dependencies.
+  # For faster builds, see render.yaml (native Go runtime).
   - type: web
     name: cms-api
     runtime: docker
@@ -10,30 +12,21 @@ services:
       - key: PORT
         value: "8080"
 
-      # ── Database: Supabase PostgreSQL ──────────────────────────────────────
+      # ── Database (Supabase PostgreSQL) ─────────────────────────────────────
       - key: DB_DRIVER
-        value: "sql"
-      - key: SQL_DRIVER
         value: "postgres"
-      - key: SQL_DSN
-        sync: false # Set manually — use Supabase connection string:
-        # postgres://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres
-
-      # ── MongoDB (kept for backward compat — set to empty to skip) ─────────
-      - key: MONGODB_URI
+      - key: DB_HOST
+        sync: false # e.g. aws-0-ap-southeast-1.pooler.supabase.com
+      - key: DB_PORT
+        value: "6543"
+      - key: DB_NAME
+        value: "postgres"
+      - key: DB_USERNAME
+        sync: false # e.g. postgres.xxxxxxxxxxxxxxxxxxxx
+      - key: DB_PASSWORD
         sync: false
-      - key: MONGODB_DB
-        value: "abyssoftime-cms"
-
-      # ── Per-entity DB routing (all on SQL via Supabase) ───────────────────
-      - key: DB_USER
-        value: "sql"
-      - key: DB_CONTENT_TYPE
-        value: "sql"
-      - key: DB_DOCUMENT
-        value: "sql"
-      - key: DB_MEDIA
-        value: "sql"
+      - key: DB_SSL_MODE
+        value: "require"
 
       # ── Auth ──────────────────────────────────────────────────────────────
       - key: JWT_SECRET

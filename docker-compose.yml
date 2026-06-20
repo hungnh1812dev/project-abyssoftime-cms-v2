@@ -38,18 +38,18 @@ services:
         condition: service_healthy
     environment:
       PORT: "8080"
-      MONGODB_URI: "mongodb://mongodb:27017/cms"
       JWT_SECRET: "${JWT_SECRET:-changeme-in-production}"
       CLOUDINARY_CLOUD_NAME: "${CLOUDINARY_CLOUD_NAME}"
       CLOUDINARY_API_KEY: "${CLOUDINARY_API_KEY}"
       CLOUDINARY_API_SECRET: "${CLOUDINARY_API_SECRET}"
+      # DB_DRIVER=mongo → MongoDB (default) | DB_DRIVER=postgres → PostgreSQL
       DB_DRIVER: "${DB_DRIVER:-mongo}"
-      SQL_DRIVER: "postgres"
-      SQL_DSN: "postgres://cms:cms@postgres:5432/cms?sslmode=disable"
-      DB_USER: "${DB_USER:-mongo}"
-      DB_CONTENT_TYPE: "${DB_CONTENT_TYPE:-mongo}"
-      DB_DOCUMENT: "${DB_DOCUMENT:-mongo}"
-      DB_MEDIA: "${DB_MEDIA:-mongo}"
+      DB_HOST: "${DB_HOST:-mongodb}"
+      DB_PORT: "${DB_PORT:-27017}"
+      DB_NAME: "${DB_NAME:-cms}"
+      DB_USERNAME: "${DB_USERNAME:-}"
+      DB_PASSWORD: "${DB_PASSWORD:-}"
+      DB_SSL_MODE: "${DB_SSL_MODE:-disable}"
     ports:
       - "8080:8080"
 
