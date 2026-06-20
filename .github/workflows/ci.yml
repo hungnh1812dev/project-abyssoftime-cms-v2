@@ -56,9 +56,10 @@ jobs:
       - name: Build
         run: bun run build
 
-  # ── Render deploy hooks (main only) ─────────────────────────────────────────
-  # API: Render Web Service (Native Go) — needs manual deploy hook trigger.
+  # ── Render deploy hook (main only) ──────────────────────────────────────────
+  # API: Render Web Service (Docker) — needs deploy hook trigger.
   # Web: Render Static Site — auto-deploys from repo, no hook needed.
+  # Docker build runs on Render, not in CI, to save GitHub Actions minutes.
   render-deploy:
     name: Deploy to Render
     runs-on: ubuntu-latest
