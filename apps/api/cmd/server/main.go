@@ -173,19 +173,19 @@ func main() {
 		GraphQLPath:        cfg.GraphQL.Path,
 	})
 
-	// gRPC server
+	// gRPC server (optional — skipped if port unavailable)
 	grpcSrv := grpcdelivery.NewServer(authUC, ctUC, documentUC, mediaUC)
 
-	// Start gRPC in a goroutine
 	go func() {
 		grpcAddr := ":" + cfg.GRPCPort
 		lis, err := net.Listen("tcp", grpcAddr)
 		if err != nil {
-			log.Fatalf("grpc listen: %v", err)
+			log.Printf("gRPC disabled: %v", err)
+			return
 		}
 		log.Printf("gRPC server listening on %s", grpcAddr)
 		if err := grpcSrv.Serve(lis); err != nil {
-			log.Fatalf("grpc serve: %v", err)
+			log.Printf("gRPC stopped: %v", err)
 		}
 	}()
 
