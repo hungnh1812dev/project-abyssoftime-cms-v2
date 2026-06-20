@@ -8,6 +8,7 @@ on:
 
 jobs:
   ping:
+    environment: production
     if: vars.ENABLE_KEEP_ALIVE == 'true'
     runs-on: ubuntu-latest
     steps:
