@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { useMutation } from '@tanstack/react-query'
-import { useNavigate, Link } from 'react-router-dom'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import { useNavigate, Navigate, Link } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/button'
@@ -21,6 +21,25 @@ export function LoginPage() {
   const navigate = useNavigate()
   const { login } = useAuth()
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+
+  const { data: setupData, isLoading: setupLoading } = useQuery({
+    queryKey: ['auth-setup'],
+    queryFn: () =>
+      api.get<{ adminExists: boolean }>('/auth/setup').then((r) => r.data),
+    staleTime: 30_000,
+  })
+
+  if (setupLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-muted-foreground text-sm">Loading…</p>
+      </div>
+    )
+  }
+
+  if (setupData && !setupData.adminExists) {
+    return <Navigate to="/register" replace />
+  }
 
   const {
     register,
