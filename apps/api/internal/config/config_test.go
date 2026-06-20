@@ -83,6 +83,28 @@ func TestLoad_PostgresDefaults(t *testing.T) {
 	}
 }
 
+func TestPostgresDSN_SpecialCharsInPassword(t *testing.T) {
+	clearEnv(t)
+	t.Setenv("JWT_SECRET", "s")
+	t.Setenv("DB_DRIVER", "postgres")
+	t.Setenv("DB_HOST", "pooler.supabase.com")
+	t.Setenv("DB_PORT", "6543")
+	t.Setenv("DB_NAME", "postgres")
+	t.Setenv("DB_USERNAME", "postgres.abc123")
+	t.Setenv("DB_PASSWORD", "p@ss?word#1!")
+	t.Setenv("DB_SSL_MODE", "require")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	wantDSN := "postgres://postgres.abc123:p%40ss%3Fword%231%21@pooler.supabase.com:6543/postgres?sslmode=require"
+	if cfg.DB.PostgresDSN() != wantDSN {
+		t.Errorf("PostgresDSN() = %q, want %q", cfg.DB.PostgresDSN(), wantDSN)
+	}
+}
+
 func TestLoad_MongoURI(t *testing.T) {
 	clearEnv(t)
 	t.Setenv("JWT_SECRET", "s")
