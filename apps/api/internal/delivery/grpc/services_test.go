@@ -17,7 +17,7 @@ import (
 type mockAuthUC struct {
 	registerFn    func(ctx context.Context, email, password string) (*entity.User, error)
 	loginFn       func(ctx context.Context, email, password string) (string, string, error)
-	refreshFn     func(ctx context.Context, rt string) (string, error)
+	refreshFn     func(ctx context.Context, rt string) (string, string, error)
 	setupStatusFn func(ctx context.Context) (bool, error)
 }
 
@@ -27,7 +27,7 @@ func (m *mockAuthUC) Register(ctx context.Context, email, password string) (*ent
 func (m *mockAuthUC) Login(ctx context.Context, email, password string) (string, string, error) {
 	return m.loginFn(ctx, email, password)
 }
-func (m *mockAuthUC) RefreshToken(ctx context.Context, rt string) (string, error) {
+func (m *mockAuthUC) RefreshToken(ctx context.Context, rt string) (string, string, error) {
 	return m.refreshFn(ctx, rt)
 }
 func (m *mockAuthUC) SetupStatus(ctx context.Context) (bool, error) {

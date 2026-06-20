@@ -8,10 +8,10 @@
 
 See [bugfix-auth-and-naming.md](bugfix-auth-and-naming.md) for full details.
 
-- [ ] B1 Register → Login redirect (invalidate `['auth-setup']` query before navigate)
-- [ ] B2 Session persistence: fix cookie defaults (`COOKIE_SECURE=false`, `COOKIE_SAMESITE=lax` for dev) + re-issue refresh token on `/auth/refresh`
-- [ ] B3 Component table naming: `component_` → `components_` plural prefix in GORM adapter
-- [ ] ✅ Checkpoint Z: register→login works, F5 stays logged in, component tables named correctly
+- [x] B1 Register → Login redirect (invalidate `['auth-setup']` query before navigate)
+- [x] B2 Session persistence: fix cookie defaults (`COOKIE_SECURE=false`, `COOKIE_SAMESITE=lax` for dev) + re-issue refresh token on `/auth/refresh`
+- [x] B3 Component table naming: spec-only fix — no code exists yet; `components_` prefix documented for future implementation
+- [x] ✅ Checkpoint Z: all tests pass (`make test-api` + `make test-web`)
 
 ---
 

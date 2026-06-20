@@ -10,7 +10,7 @@ import (
 type authUseCase interface {
 	Register(ctx context.Context, email, password string) (*entity.User, error)
 	Login(ctx context.Context, email, password string) (accessToken, refreshToken string, err error)
-	RefreshToken(ctx context.Context, refreshToken string) (string, error)
+	RefreshToken(ctx context.Context, refreshToken string) (string, string, error)
 	SetupStatus(ctx context.Context) (bool, error)
 }
 
@@ -40,7 +40,7 @@ func (s *AuthServiceServer) Register(ctx context.Context, req *pb.RegisterReques
 }
 
 func (s *AuthServiceServer) Refresh(ctx context.Context, req *pb.RefreshRequest) (*pb.RefreshResponse, error) {
-	access, err := s.uc.RefreshToken(ctx, req.RefreshToken)
+	access, _, err := s.uc.RefreshToken(ctx, req.RefreshToken)
 	if err != nil {
 		return nil, toGRPCError(err)
 	}
