@@ -25,11 +25,13 @@ type authUseCase interface {
 }
 
 type AuthHandler struct {
-	uc authUseCase
+	uc             authUseCase
+	cookieSecure   bool
+	cookieSameSite http.SameSite
 }
 
-func NewAuthHandler(uc authUseCase) *AuthHandler {
-	return &AuthHandler{uc: uc}
+func NewAuthHandler(uc authUseCase, cookieSecure bool, cookieSameSite http.SameSite) *AuthHandler {
+	return &AuthHandler{uc: uc, cookieSecure: cookieSecure, cookieSameSite: cookieSameSite}
 }
 
 func (h *AuthHandler) Register(c *gin.Context) {
@@ -76,7 +78,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	if req.RememberMe {
 		maxAge = refreshCookieMaxAgeRemember
 	}
-	c.SetCookie(RefreshCookieName, refresh, maxAge, "/", "", false, true)
+	c.SetSameSite(h.cookieSameSite)
+	c.SetCookie(RefreshCookieName, refresh, maxAge, "/", "", h.cookieSecure, true)
 
 	c.JSON(http.StatusOK, gin.H{
 		"accessToken": access,
@@ -113,6 +116,7 @@ func (h *AuthHandler) SetupStatus(c *gin.Context) {
 }
 
 func (h *AuthHandler) Logout(c *gin.Context) {
-	c.SetCookie(RefreshCookieName, "", -1, "/", "", false, true)
+	c.SetSameSite(h.cookieSameSite)
+	c.SetCookie(RefreshCookieName, "", -1, "/", "", h.cookieSecure, true)
 	c.Status(http.StatusOK)
 }

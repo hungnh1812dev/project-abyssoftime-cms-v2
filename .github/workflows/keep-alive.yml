@@ -11,4 +11,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Ping API Health Endpoint
-        run: curl -fsSL "https://project-abyssoftime-cms-v2.onrender.com/health" > /dev/null
+        run: curl -fsSL "https://abyssoftime-cms-api.onrender.com/health" > /dev/null

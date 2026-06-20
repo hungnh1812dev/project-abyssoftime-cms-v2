@@ -22,11 +22,13 @@ type RouterConfig struct {
 	RoleCache          *middleware.RoleCache
 	GraphQLHandler     http.Handler
 	GraphQLPath        string
+	CORSOrigins        []string
 }
 
 func SetupRouter(cfg RouterConfig) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery())
+	r.Use(middleware.CORS(cfg.CORSOrigins))
 
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})

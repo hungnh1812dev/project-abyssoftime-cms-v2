@@ -328,7 +328,7 @@ jobs:
 
 1. **Media storage**: Support both AWS S3 and Cloudinary from day one, behind the storage interface (`internal/infrastructure/storage/`), selectable via config/env.
 2. **Go module path**: `project-abyssoftime-cms-v2/api`.
-3. **Render deployment**: Single Render service running `docker-compose up` (the full stack as one service, not split per Docker service).
+3. **Render deployment**: ~~Single Render service running `docker-compose up`.~~ **Updated (§13):** Two separate Render services — web-api as Web Service (native Go), web-ui as Static Site. Deploy hooks from CI with path-based change detection. Database on Supabase PostgreSQL.
 
 ---
 
@@ -3803,3 +3803,446 @@ Same test cases for both implementations:
 | **Ask first** | Adding new permission actions to the allowed set |
 | **Ask first** | Adding per-content-type permission scoping |
 | **Ask first** | Changing default role level values or the level range (1–99) |
+
+---
+
+## 13. Deployment — Render.com (Separate Services)
+
+### 13.1 Objective
+
+Deploy web-api and web-ui as two independent Render.com services on the free tier (no Blueprint). Each service redeploys only when its own code changes, triggered by deploy hooks from GitHub Actions CI.
+
+**Supersedes** Resolved Decision #3 (single docker-compose service).
+
+**Target users:** Project maintainers deploying and operating the CMS.
+
+---
+
+### 13.2 Architecture
+
+```
+┌──────────────────────────────────────────────────────────┐
+│                    Render.com (Free Tier)                 │
+│                                                          │
+│  ┌─────────────────────────┐  ┌────────────────────────┐ │
+│  │ Web Service (Go)        │  │ Static Site             │ │
+│  │ abyssoftime-cms-api     │  │ abyssoftime-cms-web     │ │
+│  │ Native Go runtime       │  │ React/Vite SPA          │ │
+│  │ Port 8080               │  │ Served from Render CDN  │ │
+│  └───────────┬─────────────┘  └──────────┬─────────────┘ │
+│              │                           │               │
+└──────────────┼───────────────────────────┼───────────────┘
+               │                           │
+               │  HTTPS API calls          │  Browser loads
+               │  (CORS-enabled)           │  static assets
+               │                           │
+       ┌───────┴───────┐           ┌───────┴───────┐
+       │ Supabase      │           │ Cloudinary    │
+       │ PostgreSQL    │           │ Media storage │
+       └───────────────┘           └───────────────┘
+```
+
+| Component | Service Type | Name | Source |
+|---|---|---|---|
+| web-api | Render Web Service (Go) | `abyssoftime-cms-api` | `apps/api` |
+| web-ui | Render Static Site | `abyssoftime-cms-web` | `apps/web` |
+| Database | Supabase PostgreSQL (external) | — | — |
+| Media | Cloudinary (external) | — | — |
+
+**Free tier constraints:**
+- Web Services spin down after 15 minutes of inactivity (cold start ~30s for Go). The existing `keep-alive.yml` GitHub Actions workflow pings `/health` every 14 minutes to prevent this.
+- Static Sites are served from Render CDN — always available, no cold starts.
+- 750 free Web Service hours/month. One service running 24/7 uses ~730 hours — fits within the limit.
+
+---
+
+### 13.3 Prerequisites
+
+Before Render setup, ensure the following external services are ready:
+
+1. **Supabase PostgreSQL** — project created at supabase.com. Note down:
+   - Host: `db.<project-ref>.supabase.co`
+   - Port: `5432` (default, use `6543` for connection pooling via Supavisor)
+   - Database name: `postgres`
+   - Username: `postgres` (or a dedicated user)
+   - Password: the database password set during project creation
+
+2. **Cloudinary** — account created. Note down:
+   - Cloud name, API key, API secret (from Cloudinary dashboard → Settings → API Keys)
+
+3. **GitHub repository** — the monorepo is pushed to GitHub and GitHub Actions CI is passing.
+
+---
+
+### 13.4 Code Changes Required
+
+Three code changes are required before deployment. These ensure the frontend can call the API cross-origin and the backend accepts cross-origin requests.
+
+#### 13.4.1 Frontend — API Base URL (`apps/web/src/lib/api.ts`)
+
+The frontend uses relative URLs (`/api/*`, `/auth/*`) that rely on Vite's dev proxy. Render Static Site has no server-side proxy — the frontend must call the API directly via absolute URL.
+
+**Change:**
+```ts
+export const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || '',
+  withCredentials: true,
+})
+```
+
+- **Dev:** `VITE_API_URL` is unset → `baseURL` is `''` → relative paths → Vite proxy handles routing to `localhost:8080`.
+- **Production:** `VITE_API_URL=https://abyssoftime-cms-api.onrender.com` → all requests go directly to the API service.
+
+`VITE_API_URL` is a build-time env var (Vite embeds it during `vite build`). Set it in Render's Static Site environment.
+
+#### 13.4.2 Backend — Cross-Origin Cookie Configuration (`apps/api/internal/delivery/http/handler/auth_handler.go`)
+
+With web-ui and web-api on different origins (`*.onrender.com` subdomains), the refresh token cookie requires `SameSite=None` + `Secure=true` for the browser to include it in cross-origin requests.
+
+**Current:**
+```go
+c.SetCookie(RefreshCookieName, refresh, maxAge, "/", "", false, true)
+```
+
+**After:**
+```go
+c.SetSameSite(h.cookieSameSite)
+c.SetCookie(RefreshCookieName, refresh, maxAge, "/", "", h.cookieSecure, true)
+```
+
+Apply this change in all three locations where the refresh cookie is set: `Login`, `Refresh`, and `Logout`.
+
+**AuthHandler struct changes:**
+```go
+type AuthHandler struct {
+    uc             authUseCase
+    cookieSecure   bool
+    cookieSameSite http.SameSite
+}
+
+func NewAuthHandler(uc authUseCase, cookieSecure bool, cookieSameSite http.SameSite) *AuthHandler {
+    return &AuthHandler{uc: uc, cookieSecure: cookieSecure, cookieSameSite: cookieSameSite}
+}
+```
+
+#### 13.4.3 Backend — Config Additions (`apps/api/internal/config/config.go`)
+
+Add to `Config` struct and `Load()`:
+
+```go
+type Config struct {
+    // ... existing fields
+    CookieSecure   bool          // COOKIE_SECURE, default true
+    CookieSameSite http.SameSite // COOKIE_SAMESITE: "none"|"lax"|"strict", default "none"
+    CORSOrigins    []string      // CORS_ORIGINS, comma-separated, default "http://localhost:5173"
+}
+```
+
+Parsing `COOKIE_SAMESITE`:
+```go
+func parseSameSite(raw string) http.SameSite {
+    switch strings.ToLower(raw) {
+    case "lax":
+        return http.SameSiteLaxMode
+    case "strict":
+        return http.SameSiteStrictMode
+    case "none":
+        return http.SameSiteNoneMode
+    default:
+        return http.SameSiteNoneMode
+    }
+}
+```
+
+#### 13.4.4 Backend — CORS Middleware (Prerequisite from §9.5)
+
+Cross-origin deployment requires the CORS middleware defined in §9.5. If not yet implemented, it must be completed before deployment. The middleware must:
+
+- Accept `CORS_ORIGINS` (comma-separated allowed origins)
+- Set `Access-Control-Allow-Credentials: true` (required for cookie-based auth)
+- Handle `OPTIONS` preflight requests with `204`
+- Never use `Access-Control-Allow-Origin: *` — always explicit origin whitelist
+
+#### 13.4.5 CI — Path-Based Deploy Triggers (`.github/workflows/ci.yml`)
+
+Update deploy jobs to only trigger when the relevant service's files change:
+
+```yaml
+  # Detect which directories changed
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    outputs:
+      api: ${{ steps.filter.outputs.api }}
+      web: ${{ steps.filter.outputs.web }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            api:
+              - 'apps/api/**'
+            web:
+              - 'apps/web/**'
+
+  deploy-api:
+    name: Deploy API to Render
+    runs-on: ubuntu-latest
+    needs: [api-test, web-lint, changes]
+    environment: Production
+    if: needs.changes.outputs.api == 'true'
+    steps:
+      - name: Trigger Render deploy — API
+        run: curl -fsSL "${{ vars.RENDER_DEPLOY_HOOK_API }}"
+
+  deploy-web:
+    name: Deploy Web to Render
+    runs-on: ubuntu-latest
+    needs: [api-test, web-lint, changes]
+    environment: Production
+    if: needs.changes.outputs.web == 'true'
+    steps:
+      - name: Trigger Render deploy — Web
+        run: curl -fsSL "${{ vars.RENDER_DEPLOY_HOOK_WEB }}"
+```
+
+#### 13.4.6 Keep-Alive Workflow Update (`.github/workflows/keep-alive.yml`)
+
+Update the health endpoint URL to the new API service name:
+
+```yaml
+- name: Ping API Health Endpoint
+  run: curl -fsSL "https://abyssoftime-cms-api.onrender.com/health" > /dev/null
+```
+
+---
+
+### 13.5 Render Dashboard Setup — Step by Step
+
+#### Step 1: Create the API Web Service
+
+1. Go to [dashboard.render.com](https://dashboard.render.com) → **New** → **Web Service**
+2. Connect your GitHub repository (`project-abyssoftime-cms-v2`)
+3. Configure:
+
+| Setting | Value |
+|---|---|
+| **Name** | `abyssoftime-cms-api` |
+| **Region** | Oregon (US West) or closest to your users |
+| **Branch** | `main` |
+| **Root Directory** | `apps/api` |
+| **Runtime** | Go |
+| **Build Command** | `go build -trimpath -ldflags="-s -w" -o bin/server ./cmd/server` |
+| **Start Command** | `bin/server` |
+| **Instance Type** | Free |
+| **Auto-Deploy** | No (we use deploy hooks from CI) |
+
+Native Go builds directly on Render's Ubuntu environment — no Docker layer overhead, smaller footprint, faster builds (~1-2 minutes vs ~3-5 minutes with Docker).
+
+4. Add environment variables (see §13.6 below)
+5. Click **Create Web Service**
+6. Wait for first build to complete (~1-2 minutes)
+7. Copy the service URL: `https://abyssoftime-cms-api.onrender.com`
+
+#### Step 2: Create the Web Static Site
+
+1. Go to Render dashboard → **New** → **Static Site**
+2. Connect the same GitHub repository
+3. Configure:
+
+| Setting | Value |
+|---|---|
+| **Name** | `abyssoftime-cms-web` |
+| **Branch** | `main` |
+| **Root Directory** | `apps/web` |
+| **Build Command** | `bun install --frozen-lockfile && bun run build` |
+| **Publish Directory** | `dist` |
+| **Auto-Deploy** | No (we use deploy hooks from CI) |
+
+4. Add environment variables:
+
+| Variable | Value |
+|---|---|
+| `VITE_API_URL` | `https://abyssoftime-cms-api.onrender.com` |
+
+5. Under **Redirects/Rewrites**, add an SPA rewrite rule:
+
+| Source | Destination | Action |
+|---|---|---|
+| `/*` | `/index.html` | Rewrite |
+
+This ensures React Router works for all client-side routes (e.g., `/admin/content-type/single-type/homepage` serves `index.html` instead of a 404).
+
+6. Click **Create Static Site**
+7. Wait for first build to complete (~1-2 minutes)
+8. Copy the site URL: `https://abyssoftime-cms-web.onrender.com`
+
+#### Step 3: Copy Deploy Hook URLs
+
+For each service:
+
+1. Go to the service's **Settings** page on Render
+2. Scroll to **Build & Deploy** → **Deploy Hook**
+3. Copy the deploy hook URL (format: `https://api.render.com/deploy/srv-...?key=...`)
+
+#### Step 4: Configure GitHub Repository Secrets
+
+1. Go to your GitHub repo → **Settings** → **Environments** → **Production**
+2. Add these **environment variables** (not secrets — the CI uses `vars.*`):
+
+| Variable | Value |
+|---|---|
+| `RENDER_DEPLOY_HOOK_API` | The API service deploy hook URL from Step 3 |
+| `RENDER_DEPLOY_HOOK_WEB` | The Static Site deploy hook URL from Step 3 |
+
+#### Step 5: Update CORS Origin on API
+
+After the Static Site is created and you have the URL:
+
+1. Go to the API Web Service → **Environment**
+2. Set `CORS_ORIGINS` to the Static Site URL:
+   ```
+   CORS_ORIGINS=https://abyssoftime-cms-web.onrender.com
+   ```
+3. Save and manually deploy the API to pick up the new env var
+
+#### Step 6: Verify
+
+1. Open `https://abyssoftime-cms-web.onrender.com` in a browser
+2. Verify the login page loads
+3. Open browser DevTools → Network tab
+4. Attempt login — verify the request goes to `https://abyssoftime-cms-api.onrender.com/auth/login`
+5. Verify the response includes:
+   - `Access-Control-Allow-Origin: https://abyssoftime-cms-web.onrender.com`
+   - `Access-Control-Allow-Credentials: true`
+   - `Set-Cookie: refresh_token=...; SameSite=None; Secure; HttpOnly`
+6. Verify navigation works (React Router routes should not 404)
+7. Verify content operations: create, save, publish a content entry
+
+---
+
+### 13.6 Environment Variables
+
+#### API Web Service (`abyssoftime-cms-api`)
+
+| Variable | Value | Notes |
+|---|---|---|
+| `PORT` | `8080` | Render also sets `PORT` automatically; explicit value ensures consistency |
+| `DB_DRIVER` | `postgres` | Use PostgreSQL via Supabase |
+| `DB_HOST` | `db.<project-ref>.supabase.co` | From Supabase dashboard → Settings → Database → Host |
+| `DB_PORT` | `5432` | Default PostgreSQL port (use `6543` for Supavisor pooling) |
+| `DB_NAME` | `postgres` | Supabase default database name |
+| `DB_USERNAME` | `postgres` | Or a dedicated DB user |
+| `DB_PASSWORD` | `<supabase-db-password>` | From Supabase dashboard → Settings → Database → Password |
+| `DB_SSL_MODE` | `require` | Supabase requires SSL |
+| `JWT_SECRET` | `<random-64-char-string>` | Generate: `openssl rand -hex 32` |
+| `CLOUDINARY_CLOUD_NAME` | `<your-cloud-name>` | From Cloudinary dashboard |
+| `CLOUDINARY_API_KEY` | `<your-api-key>` | From Cloudinary dashboard |
+| `CLOUDINARY_API_SECRET` | `<your-api-secret>` | From Cloudinary dashboard |
+| `STORAGE_PROVIDER` | `cloudinary` | Active media storage adapter |
+| `CONTENT_TYPES_DIR` | `content-types` | Relative to root directory (`apps/api/content-types/`) — native Go runs from the root directory |
+| `CORS_ORIGINS` | `https://abyssoftime-cms-web.onrender.com` | The Static Site URL (set after Step 2) |
+| `COOKIE_SECURE` | `true` | Required for `SameSite=None` |
+| `COOKIE_SAMESITE` | `none` | Required for cross-origin cookie delivery |
+| `SUPPORTED_LOCALES` | `en,vi` | Comma-separated locale codes |
+
+#### Static Site (`abyssoftime-cms-web`)
+
+| Variable | Value | Notes |
+|---|---|---|
+| `VITE_API_URL` | `https://abyssoftime-cms-api.onrender.com` | Build-time env var; Vite embeds it during `vite build` |
+
+---
+
+### 13.7 Files Changed
+
+**Modified files:**
+```
+apps/web/src/lib/api.ts                                    ← add baseURL from VITE_API_URL
+apps/api/internal/delivery/http/handler/auth_handler.go    ← configurable Secure + SameSite on cookies
+apps/api/internal/config/config.go                         ← add CookieSecure, CookieSameSite, CORSOrigins
+apps/api/cmd/server/main.go                                ← pass cookie config to auth handler
+.github/workflows/ci.yml                                   ← path-based change detection for deploy jobs
+.github/workflows/keep-alive.yml                           ← update health endpoint URL
+```
+
+**New files (if CORS middleware from §9.5 not yet implemented):**
+```
+apps/api/internal/delivery/http/middleware/cors.go          ← CORS middleware
+apps/api/internal/delivery/http/middleware/cors_test.go     ← CORS tests
+```
+
+---
+
+### 13.8 Testing
+
+**Local cross-origin simulation:**
+1. Start API on `localhost:8080`
+2. Build frontend with `VITE_API_URL=http://localhost:8080 bun run build`
+3. Serve `dist/` on a different port: `npx serve dist -l 3000`
+4. Open `http://localhost:3000` — verify login, CORS headers, cookie behavior
+
+**Post-deploy verification:**
+- Health check: `curl https://abyssoftime-cms-api.onrender.com/health` → `{"status":"ok"}`
+- CORS preflight: `curl -X OPTIONS -H "Origin: https://abyssoftime-cms-web.onrender.com" -H "Access-Control-Request-Method: POST" https://abyssoftime-cms-api.onrender.com/auth/login -v` → verify CORS headers in response
+- Static site: `curl -I https://abyssoftime-cms-web.onrender.com` → 200 with HTML content
+- Deep link: `curl -I https://abyssoftime-cms-web.onrender.com/admin/content-type/single-type/test` → 200 (SPA rewrite working)
+
+---
+
+### 13.9 Acceptance Criteria
+
+**Infrastructure:**
+- [ ] API Web Service (`abyssoftime-cms-api`) is running on Render and responds to `/health`
+- [ ] Static Site (`abyssoftime-cms-web`) is deployed and serves the React SPA
+- [ ] SPA client-side routes work (no 404 on direct navigation to `/admin/...`)
+- [ ] API connects to Supabase PostgreSQL successfully
+- [ ] Media upload to Cloudinary works from the deployed API
+
+**Cross-origin:**
+- [ ] Frontend at `abyssoftime-cms-web.onrender.com` successfully calls API at `abyssoftime-cms-api.onrender.com`
+- [ ] CORS headers are present on API responses (`Access-Control-Allow-Origin`, `Access-Control-Allow-Credentials`)
+- [ ] Refresh token cookie is set with `SameSite=None; Secure; HttpOnly`
+- [ ] Login, token refresh, and authenticated API calls work cross-origin
+
+**CI/CD:**
+- [ ] Push to `main` with changes only in `apps/api/` triggers API deploy only
+- [ ] Push to `main` with changes only in `apps/web/` triggers web deploy only
+- [ ] Push to `main` with changes in both triggers both deploys
+- [ ] Push to `main` with no changes in `apps/` skips both deploy jobs
+- [ ] Deploy hooks are configured in GitHub environment `Production`
+
+**Keep-alive:**
+- [ ] `keep-alive.yml` pings the correct API URL every 14 minutes
+- [ ] API does not spin down due to inactivity
+
+---
+
+### 13.10 Boundaries
+
+| Rule | Detail |
+|---|---|
+| **Always** | Set `COOKIE_SAMESITE=none` and `COOKIE_SECURE=true` for cross-origin deployment |
+| **Always** | Set `DB_SSL_MODE=require` when connecting to Supabase |
+| **Always** | Use explicit origin whitelist in `CORS_ORIGINS` — never `*` |
+| **Always** | Set `VITE_API_URL` at build time on the Static Site — it's embedded by Vite, not read at runtime |
+| **Always** | Add SPA rewrite rule (`/* → /index.html`) on the Static Site |
+| **Always** | Use deploy hooks (not auto-deploy) so deployments only happen after CI passes |
+| **Never** | Store deploy hook URLs in public GitHub repository settings — use the `Production` environment |
+| **Never** | Set `COOKIE_SAMESITE=lax` for cross-origin deployment — cookies won't be sent cross-origin |
+| **Never** | Use `Access-Control-Allow-Origin: *` with `Access-Control-Allow-Credentials: true` — browsers reject this |
+| **Ask first** | Adding custom domains (requires DNS configuration + Render TLS provisioning) |
+
+---
+
+### 13.11 Out of Scope
+
+- Custom domain setup (both services use `*.onrender.com` subdomains)
+- Render Blueprint / Infrastructure-as-Code (`render.yaml`)
+- Render paid tier features (persistent disk, private networking, preview environments)
+- Database migration tooling (Supabase handles schema via GORM auto-migrate on API startup)
+- CDN caching configuration for the Static Site
+- Monitoring and alerting beyond the health check ping
+- Multi-environment deployment (staging/production) — single production environment only
