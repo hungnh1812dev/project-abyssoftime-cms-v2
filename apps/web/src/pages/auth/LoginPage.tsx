@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { useMutation } from '@tanstack/react-query'
-import { useNavigate, Link } from 'react-router-dom'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import { useNavigate, Navigate, Link } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/button'
@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 interface LoginFields {
   email: string
   password: string
+  rememberMe: boolean
 }
 
 interface LoginResponse {
@@ -21,6 +22,13 @@ export function LoginPage() {
   const navigate = useNavigate()
   const { login } = useAuth()
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+
+  const { data: setupData, isLoading: setupLoading } = useQuery({
+    queryKey: ['auth-setup'],
+    queryFn: () =>
+      api.get<{ adminExists: boolean }>('/auth/setup').then((r) => r.data),
+    staleTime: 30_000,
+  })
 
   const {
     register,
@@ -39,6 +47,18 @@ export function LoginPage() {
       setErrorMsg('Invalid email or password.')
     },
   })
+
+  if (setupLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-muted-foreground text-sm">Loading…</p>
+      </div>
+    )
+  }
+
+  if (setupData && !setupData.adminExists) {
+    return <Navigate to="/register" replace />
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center">
@@ -83,6 +103,18 @@ export function LoginPage() {
               })}
             />
             {errors.password && <p className="text-destructive text-xs">{errors.password.message}</p>}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              id="rememberMe"
+              type="checkbox"
+              className="h-4 w-4 rounded border-border"
+              {...register('rememberMe')}
+            />
+            <Label htmlFor="rememberMe" className="text-sm font-normal cursor-pointer">
+              Stay logged in
+            </Label>
           </div>
 
           <Button type="submit" className="w-full" disabled={mutation.isPending}>

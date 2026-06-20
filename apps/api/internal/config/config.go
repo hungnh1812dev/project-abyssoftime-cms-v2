@@ -4,6 +4,9 @@
 package config
 
 import (
+	"fmt"
+	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -15,33 +18,82 @@ type Config struct {
 	JWTSecret        string
 	ContentTypeDir   string
 	SupportedLocales []string
+	CookieSecure     bool
+	CookieSameSite   http.SameSite
+	CORSOrigins      []string
 	DB               DBConfig
 	Media            MediaConfig
 	GraphQL          GraphQLConfig
 }
 
 type DBConfig struct {
-	Driver   string // DB_DRIVER, default "mongo"
-	Mongo    MongoConfig
-	SQL      SQLConfig
+	Driver   string // DB_DRIVER: "mongo" | "postgres", default "mongo"
+	Host     string // DB_HOST
+	Port     string // DB_PORT (default: 27017 for mongo, 5432 for postgres)
+	Name     string // DB_NAME, default "cms"
+	Username string // DB_USERNAME
+	Password string // DB_PASSWORD
+	SSLMode  string // DB_SSL_MODE: "disable" | "require", default "disable"
 	EntityDB EntityDBConfig
 }
 
-type MongoConfig struct {
-	URI  string // MONGODB_URI, default "mongodb://localhost:27017"
-	Name string // MONGODB_DB,  default "cms"
+// MongoURI builds the MongoDB connection string from generic DB_* vars.
+// Username and password are URL-encoded to handle special characters.
+func (d DBConfig) MongoURI() string {
+	host := d.Host
+	if host == "" {
+		host = "localhost"
+	}
+	port := d.Port
+	if port == "" {
+		port = "27017"
+	}
+	u := &url.URL{
+		Scheme: "mongodb",
+		Host:   fmt.Sprintf("%s:%s", host, port),
+	}
+	if d.Username != "" && d.Password != "" {
+		u.User = url.UserPassword(d.Username, d.Password)
+	}
+	return u.String()
 }
 
-type SQLConfig struct {
-	Driver string // SQL_DRIVER: "postgres" (default when any entity uses sql)
-	DSN    string // SQL_DSN: full connection string
+// PostgresDSN builds the PostgreSQL connection string from generic DB_* vars.
+// Username and password are URL-encoded to handle special characters (@, ?, etc.).
+func (d DBConfig) PostgresDSN() string {
+	host := d.Host
+	if host == "" {
+		host = "localhost"
+	}
+	port := d.Port
+	if port == "" {
+		port = "5432"
+	}
+	name := d.Name
+	if name == "" {
+		name = "cms"
+	}
+	sslMode := d.SSLMode
+	if sslMode == "" {
+		sslMode = "disable"
+	}
+	u := &url.URL{
+		Scheme:   "postgres",
+		Host:     fmt.Sprintf("%s:%s", host, port),
+		Path:     name,
+		RawQuery: fmt.Sprintf("sslmode=%s", sslMode),
+	}
+	if d.Username != "" {
+		u.User = url.UserPassword(d.Username, d.Password)
+	}
+	return u.String()
 }
 
 type EntityDBConfig struct {
-	User        string // DB_USER, default: DB_DRIVER
-	ContentType string // DB_CONTENT_TYPE, default: DB_DRIVER
-	Document    string // DB_DOCUMENT, default: DB_DRIVER
-	Media       string // DB_MEDIA, default: DB_DRIVER
+	User        string // DB_ENTITY_USER, default: DB_DRIVER
+	ContentType string // DB_ENTITY_CONTENT_TYPE, default: DB_DRIVER
+	Document    string // DB_ENTITY_DOCUMENT, default: DB_DRIVER
+	Media       string // DB_ENTITY_MEDIA, default: DB_DRIVER
 }
 
 type MediaConfig struct {
@@ -73,29 +125,51 @@ func getenv(key, fallback string) string {
 	return fallback
 }
 
-func splitLocales(raw string) []string {
+func splitCSV(raw string) []string {
 	parts := strings.Split(raw, ",")
-	locales := make([]string, 0, len(parts))
+	out := make([]string, 0, len(parts))
 	for _, p := range parts {
 		p = strings.TrimSpace(p)
 		if p != "" {
-			locales = append(locales, p)
+			out = append(out, p)
 		}
 	}
-	return locales
+	return out
+}
+
+func parseSameSite(raw string) http.SameSite {
+	switch strings.ToLower(raw) {
+	case "lax":
+		return http.SameSiteLaxMode
+	case "strict":
+		return http.SameSiteStrictMode
+	case "none":
+		return http.SameSiteNoneMode
+	default:
+		return http.SameSiteNoneMode
+	}
+}
+
+func parseBoolDefault(raw string, fallback bool) bool {
+	if raw == "" {
+		return fallback
+	}
+	v, err := strconv.ParseBool(raw)
+	if err != nil {
+		return fallback
+	}
+	return v
 }
 
 // Load reads, defaults, and validates every environment variable the
 // application needs, returning a single typed Config or the first
 // validation error encountered.
 func Load() (*Config, error) {
-	generateThumbnail := true
-	if raw := os.Getenv("MEDIA_AUTO_THUMBNAIL"); raw != "" {
-		v, err := strconv.ParseBool(raw)
-		if err != nil {
-			generateThumbnail = false
-		} else{
-		generateThumbnail = v}
+	driver := getenv("DB_DRIVER", "mongo")
+
+	defaultPort := "27017"
+	if driver == "postgres" {
+		defaultPort = "5432"
 	}
 
 	return &Config{
@@ -103,30 +177,28 @@ func Load() (*Config, error) {
 		GRPCPort:         getenv("GRPC_PORT", "9090"),
 		JWTSecret:        getenv("JWT_SECRET", ""),
 		ContentTypeDir:   getenv("CONTENT_TYPES_DIR", "content-types"),
-		SupportedLocales: splitLocales(getenv("SUPPORTED_LOCALES", "en,vi")),
-		DB: func() DBConfig {
-			driver := getenv("DB_DRIVER", "mongo")
-			return DBConfig{
-				Driver: driver,
-				Mongo: MongoConfig{
-					URI:  getenv("MONGODB_URI", "mongodb://localhost:27017"),
-					Name: getenv("MONGODB_DB", "cms"),
-				},
-				SQL: SQLConfig{
-					Driver: getenv("SQL_DRIVER", "postgres"),
-					DSN:    getenv("SQL_DSN", ""),
-				},
-				EntityDB: EntityDBConfig{
-					User:        getenv("DB_USER", driver),
-					ContentType: getenv("DB_CONTENT_TYPE", driver),
-					Document:    getenv("DB_DOCUMENT", driver),
-					Media:       getenv("DB_MEDIA", driver),
-				},
-			}
-		}(),
+		SupportedLocales: splitCSV(getenv("SUPPORTED_LOCALES", "en,vi")),
+		CookieSecure:     parseBoolDefault(os.Getenv("COOKIE_SECURE"), true),
+		CookieSameSite:   parseSameSite(getenv("COOKIE_SAMESITE", "none")),
+		CORSOrigins:      splitCSV(getenv("CORS_ORIGINS", "http://localhost:5173")),
+		DB: DBConfig{
+			Driver:   driver,
+			Host:     getenv("DB_HOST", "localhost"),
+			Port:     getenv("DB_PORT", defaultPort),
+			Name:     getenv("DB_NAME", "cms"),
+			Username: getenv("DB_USERNAME", ""),
+			Password: getenv("DB_PASSWORD", ""),
+			SSLMode:  getenv("DB_SSL_MODE", "disable"),
+			EntityDB: EntityDBConfig{
+				User:        getenv("DB_ENTITY_USER", driver),
+				ContentType: getenv("DB_ENTITY_CONTENT_TYPE", driver),
+				Document:    getenv("DB_ENTITY_DOCUMENT", driver),
+				Media:       getenv("DB_ENTITY_MEDIA", driver),
+			},
+		},
 		Media: MediaConfig{
 			Driver:            getenv("STORAGE_PROVIDER", "cloudinary"),
-			GenerateThumbnail: generateThumbnail,
+			GenerateThumbnail: parseBoolDefault(os.Getenv("MEDIA_AUTO_THUMBNAIL"), true),
 			Cloudinary: CloudinaryConfig{
 				CloudName: getenv("CLOUDINARY_CLOUD_NAME", ""),
 				APIKey:    getenv("CLOUDINARY_API_KEY", ""),

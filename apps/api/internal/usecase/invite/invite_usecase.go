@@ -20,10 +20,11 @@ const inviteExpiry = 7 * 24 * time.Hour
 type UseCase struct {
 	inviteRepo repository.InviteRepository
 	userRepo   repository.UserRepository
+	roleRepo   repository.RoleRepository
 }
 
-func New(inviteRepo repository.InviteRepository, userRepo repository.UserRepository) *UseCase {
-	return &UseCase{inviteRepo: inviteRepo, userRepo: userRepo}
+func New(inviteRepo repository.InviteRepository, userRepo repository.UserRepository, roleRepo repository.RoleRepository) *UseCase {
+	return &UseCase{inviteRepo: inviteRepo, userRepo: userRepo, roleRepo: roleRepo}
 }
 
 func (uc *UseCase) Create(ctx context.Context, actorID, email string, role entity.Role) (*entity.Invite, string, error) {
@@ -31,7 +32,16 @@ func (uc *UseCase) Create(ctx context.Context, actorID, email string, role entit
 	if err != nil {
 		return nil, "", err
 	}
-	if entity.RoleLevel(actor.Role) <= entity.RoleLevel(role) {
+	actorLevel, err := uc.resolveLevel(ctx, actor)
+	if err != nil {
+		return nil, "", err
+	}
+
+	targetRole, err := uc.roleRepo.FindBySlug(ctx, string(role))
+	if err != nil {
+		return nil, "", err
+	}
+	if actorLevel <= targetRole.Level {
 		return nil, "", pkgerrors.ErrForbidden
 	}
 
@@ -102,10 +112,16 @@ func (uc *UseCase) Accept(ctx context.Context, token, password string) (*entity.
 		return nil, fmt.Errorf("hash password: %w", err)
 	}
 
+	invRole, err := uc.roleRepo.FindBySlug(ctx, string(inv.Role))
+	if err != nil {
+		return nil, fmt.Errorf("resolve invite role: %w", err)
+	}
+
 	user := &entity.User{
 		Email:        inv.Email,
 		PasswordHash: string(passHash),
 		Role:         inv.Role,
+		RoleID:       invRole.DocumentID,
 	}
 	if err := uc.userRepo.Create(ctx, user); err != nil {
 		return nil, err
@@ -113,4 +129,15 @@ func (uc *UseCase) Accept(ctx context.Context, token, password string) (*entity.
 
 	_ = uc.inviteRepo.Delete(ctx, inv.ID)
 	return user, nil
+}
+
+func (uc *UseCase) resolveLevel(ctx context.Context, u *entity.User) (int, error) {
+	if u.RoleID != "" {
+		r, err := uc.roleRepo.FindByID(ctx, u.RoleID)
+		if err != nil {
+			return 0, err
+		}
+		return r.Level, nil
+	}
+	return entity.RoleLevel(u.Role), nil
 }

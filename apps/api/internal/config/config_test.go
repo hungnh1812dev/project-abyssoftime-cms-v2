@@ -1,6 +1,7 @@
 package config_test
 
 import (
+	"net/http"
 	"reflect"
 	"testing"
 
@@ -10,12 +11,14 @@ import (
 func clearEnv(t *testing.T) {
 	t.Helper()
 	for _, k := range []string{
-		"PORT", "MONGODB_URI", "MONGODB_DB", "JWT_SECRET",
+		"PORT", "JWT_SECRET",
 		"CLOUDINARY_CLOUD_NAME", "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET",
 		"CONTENT_TYPES_DIR", "STORAGE_PROVIDER", "S3_BUCKET", "S3_REGION",
-		"SUPPORTED_LOCALES", "MEDIA_AUTO_THUMBNAIL", "GRAPHQL_PATH", "DB_DRIVER",
-		"SQL_DRIVER", "SQL_DSN", "DB_USER", "DB_CONTENT_TYPE", "DB_DOCUMENT", "DB_MEDIA",
+		"SUPPORTED_LOCALES", "MEDIA_AUTO_THUMBNAIL", "GRAPHQL_PATH",
+		"DB_DRIVER", "DB_HOST", "DB_PORT", "DB_NAME", "DB_USERNAME", "DB_PASSWORD", "DB_SSL_MODE",
+		"DB_ENTITY_USER", "DB_ENTITY_CONTENT_TYPE", "DB_ENTITY_DOCUMENT", "DB_ENTITY_MEDIA",
 		"GRPC_PORT",
+		"COOKIE_SECURE", "COOKIE_SAMESITE", "CORS_ORIGINS",
 	} {
 		t.Setenv(k, "")
 	}
@@ -36,10 +39,15 @@ func TestLoad_Defaults(t *testing.T) {
 		JWTSecret:        "test-secret",
 		ContentTypeDir:   "content-types",
 		SupportedLocales: []string{"en", "vi"},
+		CookieSecure:     true,
+		CookieSameSite:   http.SameSiteNoneMode,
+		CORSOrigins:      []string{"http://localhost:5173"},
 		DB: config.DBConfig{
-			Driver: "mongo",
-			Mongo:  config.MongoConfig{URI: "mongodb://localhost:27017", Name: "cms"},
-			SQL:    config.SQLConfig{Driver: "postgres"},
+			Driver:  "mongo",
+			Host:    "localhost",
+			Port:    "27017",
+			Name:    "cms",
+			SSLMode: "disable",
 			EntityDB: config.EntityDBConfig{
 				User: "mongo", ContentType: "mongo", Document: "mongo", Media: "mongo",
 			},
@@ -52,6 +60,87 @@ func TestLoad_Defaults(t *testing.T) {
 	}
 	if !reflect.DeepEqual(cfg, want) {
 		t.Errorf("Load() = %+v, want %+v", cfg, want)
+	}
+}
+
+func TestLoad_PostgresDefaults(t *testing.T) {
+	clearEnv(t)
+	t.Setenv("JWT_SECRET", "s")
+	t.Setenv("DB_DRIVER", "postgres")
+	t.Setenv("DB_USERNAME", "cms_user")
+	t.Setenv("DB_PASSWORD", "secret")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if cfg.DB.Port != "5432" {
+		t.Errorf("DB.Port = %q, want %q (postgres default)", cfg.DB.Port, "5432")
+	}
+	if cfg.DB.EntityDB.User != "postgres" {
+		t.Errorf("EntityDB.User = %q, want %q", cfg.DB.EntityDB.User, "postgres")
+	}
+
+	wantDSN := "postgres://cms_user:secret@localhost:5432/cms?sslmode=disable"
+	if cfg.DB.PostgresDSN() != wantDSN {
+		t.Errorf("PostgresDSN() = %q, want %q", cfg.DB.PostgresDSN(), wantDSN)
+	}
+}
+
+func TestPostgresDSN_SpecialCharsInPassword(t *testing.T) {
+	clearEnv(t)
+	t.Setenv("JWT_SECRET", "s")
+	t.Setenv("DB_DRIVER", "postgres")
+	t.Setenv("DB_HOST", "pooler.supabase.com")
+	t.Setenv("DB_PORT", "6543")
+	t.Setenv("DB_NAME", "postgres")
+	t.Setenv("DB_USERNAME", "postgres.abc123")
+	t.Setenv("DB_PASSWORD", "p@ss?word#1!")
+	t.Setenv("DB_SSL_MODE", "require")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	wantDSN := "postgres://postgres.abc123:p%40ss%3Fword%231%21@pooler.supabase.com:6543/postgres?sslmode=require"
+	if cfg.DB.PostgresDSN() != wantDSN {
+		t.Errorf("PostgresDSN() = %q, want %q", cfg.DB.PostgresDSN(), wantDSN)
+	}
+}
+
+func TestLoad_MongoURI(t *testing.T) {
+	clearEnv(t)
+	t.Setenv("JWT_SECRET", "s")
+	t.Setenv("DB_HOST", "mongo.example.com")
+	t.Setenv("DB_PORT", "27018")
+	t.Setenv("DB_USERNAME", "admin")
+	t.Setenv("DB_PASSWORD", "pass")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	wantURI := "mongodb://admin:pass@mongo.example.com:27018"
+	if cfg.DB.MongoURI() != wantURI {
+		t.Errorf("MongoURI() = %q, want %q", cfg.DB.MongoURI(), wantURI)
+	}
+}
+
+func TestLoad_MongoURI_NoAuth(t *testing.T) {
+	clearEnv(t)
+	t.Setenv("JWT_SECRET", "s")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	wantURI := "mongodb://localhost:27017"
+	if cfg.DB.MongoURI() != wantURI {
+		t.Errorf("MongoURI() = %q, want %q", cfg.DB.MongoURI(), wantURI)
 	}
 }
 
@@ -91,5 +180,3 @@ func TestLoad_OverridesAndLocaleSplit(t *testing.T) {
 		t.Errorf("GraphQL.Path = %q, want %q", cfg.GraphQL.Path, "/api/graphql")
 	}
 }
-
-

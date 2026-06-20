@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"gorm.io/driver/postgres"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
@@ -12,14 +11,9 @@ import (
 )
 
 func NewClient(driver, dsn string) (*gorm.DB, error) {
-	var dialector gorm.Dialector
-	switch driver {
-	case "postgres":
-		dialector = postgres.Open(dsn)
-	case "sqlite":
-		dialector = sqlite.Open(dsn)
-	default:
-		return nil, fmt.Errorf("unsupported GORM driver: %s", driver)
+	dialector, err := resolveDialector(driver, dsn)
+	if err != nil {
+		return nil, err
 	}
 
 	db, err := gorm.Open(dialector, &gorm.Config{
@@ -42,11 +36,18 @@ func NewClient(driver, dsn string) (*gorm.DB, error) {
 	return db, nil
 }
 
+func postgresDialector(dsn string) gorm.Dialector {
+	return postgres.Open(dsn)
+}
+
 func AutoMigrate(db *gorm.DB) error {
 	return db.AutoMigrate(
 		&entity.User{},
 		&entity.ContentType{},
 		&entity.Document{},
 		&entity.MediaAsset{},
+		&entity.RoleEntity{},
+		&entity.Invite{},
+		&entity.AccessToken{},
 	)
 }

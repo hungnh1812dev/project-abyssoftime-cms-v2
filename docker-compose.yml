@@ -10,6 +10,21 @@ services:
       timeout: 5s
       retries: 5
 
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cms
+      POSTGRES_PASSWORD: cms
+      POSTGRES_DB: cms
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cms"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   api:
     build:
       context: ./apps/api
@@ -19,13 +34,22 @@ services:
     depends_on:
       mongodb:
         condition: service_healthy
+      postgres:
+        condition: service_healthy
     environment:
       PORT: "8080"
-      MONGODB_URI: "mongodb://mongodb:27017/cms"
       JWT_SECRET: "${JWT_SECRET:-changeme-in-production}"
       CLOUDINARY_CLOUD_NAME: "${CLOUDINARY_CLOUD_NAME}"
       CLOUDINARY_API_KEY: "${CLOUDINARY_API_KEY}"
       CLOUDINARY_API_SECRET: "${CLOUDINARY_API_SECRET}"
+      # DB_DRIVER=mongo → MongoDB (default) | DB_DRIVER=postgres → PostgreSQL
+      DB_DRIVER: "${DB_DRIVER:-mongo}"
+      DB_HOST: "${DB_HOST:-mongodb}"
+      DB_PORT: "${DB_PORT:-27017}"
+      DB_NAME: "${DB_NAME:-cms}"
+      DB_USERNAME: "${DB_USERNAME:-}"
+      DB_PASSWORD: "${DB_PASSWORD:-}"
+      DB_SSL_MODE: "${DB_SSL_MODE:-disable}"
     ports:
       - "8080:8080"
 
@@ -41,3 +65,4 @@ services:
 
 volumes:
   mongo_data:
+  pg_data:

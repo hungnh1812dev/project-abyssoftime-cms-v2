@@ -328,7 +328,7 @@ jobs:
 
 1. **Media storage**: Support both AWS S3 and Cloudinary from day one, behind the storage interface (`internal/infrastructure/storage/`), selectable via config/env.
 2. **Go module path**: `project-abyssoftime-cms-v2/api`.
-3. **Render deployment**: Single Render service running `docker-compose up` (the full stack as one service, not split per Docker service).
+3. **Render deployment**: ~~Single Render service running `docker-compose up`.~~ **Updated (§13):** Two separate Render services — web-api as Web Service (native Go), web-ui as Static Site. Deploy hooks from CI with path-based change detection. Database on Supabase PostgreSQL.
 
 ---
 
@@ -3127,3 +3127,1122 @@ apps/api/graphql/model/models_gen.go                               ← regenerat
 | **Ask first** | Choosing between PostgreSQL and MySQL for production deployment |
 | **Ask first** | Adding new gRPC client service connections beyond the initial configured set |
 | **Ask first** | Changing the gRPC port default from 9090 |
+
+---
+
+## 12. Role-Based Permission System & PostgreSQL Sub-Component Tables
+
+### 12.1 Objective
+
+Replace the hardcoded role system (string constants on the User entity) with a database-backed Role table. Each role defines a set of per-action permissions applied globally to all content types. Roles are fully managed via the API and admin UI (CRUD). Default roles are seeded on first startup; admins can create additional custom roles at runtime.
+
+Additionally, define the PostgreSQL table strategy for content-type sub-components: when a content-type field has `type: "component"`, the GORM adapter creates a dedicated relational table for the component's sub-fields instead of storing them in the parent document's JSONB `data` column. MongoDB behavior is unchanged — components remain nested objects in the document's BSON `data` field.
+
+**Target users:** CMS administrators managing team access and content permissions.
+
+---
+
+### 12.2 Permission Model
+
+Permissions are flat action strings applied globally (not scoped to specific content types).
+
+**Permission actions:**
+
+| Permission | Description |
+|---|---|
+| `content:read` | View content entries (draft + published) |
+| `content:create` | Create new content entries |
+| `content:update` | Edit existing content entries (save draft) |
+| `content:delete` | Delete content entries |
+| `content:publish` | Publish content entries |
+| `content:unpublish` | Unpublish content entries |
+| `media:read` | View media library |
+| `media:upload` | Upload media assets |
+| `media:delete` | Delete media assets |
+| `users:manage` | View, invite, update role, delete users |
+| `roles:manage` | Create, edit, delete roles |
+| `access_tokens:manage` | Create, view, delete API access tokens |
+| `content_types:read` | View content-type schemas |
+
+**Default roles (seeded on first startup if no roles exist):**
+
+| Role | Slug | Level | Permissions |
+|---|---|---|---|
+| Super Admin | `super_admin` | 100 | All permissions |
+| Admin | `admin` | 80 | All except `roles:manage`, `access_tokens:manage` |
+| Editor | `editor` | 60 | `content:*`, `media:*`, `content_types:read` |
+| Guest | `guest` | 20 | `content:read`, `media:read`, `content_types:read` |
+
+**Level** is an integer used for hierarchy comparison — a user can only manage users/roles with a lower level than their own. Custom roles can use any level value between 1–99.
+
+---
+
+### 12.3 Role Entity
+
+**File:** `apps/api/internal/domain/entity/role.go` (new)
+
+```go
+type Permission string
+
+const (
+    PermContentRead       Permission = "content:read"
+    PermContentCreate     Permission = "content:create"
+    PermContentUpdate     Permission = "content:update"
+    PermContentDelete     Permission = "content:delete"
+    PermContentPublish    Permission = "content:publish"
+    PermContentUnpublish  Permission = "content:unpublish"
+    PermMediaRead         Permission = "media:read"
+    PermMediaUpload       Permission = "media:upload"
+    PermMediaDelete       Permission = "media:delete"
+    PermUsersManage       Permission = "users:manage"
+    PermRolesManage       Permission = "roles:manage"
+    PermAccessTokenManage Permission = "access_tokens:manage"
+    PermContentTypesRead  Permission = "content_types:read"
+)
+
+type Role struct {
+    ID          string    `bson:"_id,omitempty"   gorm:"column:id;primaryKey"              json:"-"`
+    DocumentID  string    `bson:"documentId"      gorm:"column:document_id;uniqueIndex"    json:"documentId"`
+    Name        string    `bson:"name"            gorm:"column:name"                       json:"name"`
+    Slug        string    `bson:"slug"            gorm:"column:slug;uniqueIndex"           json:"slug"`
+    Permissions []string  `bson:"permissions"     gorm:"column:permissions;serializer:json" json:"permissions"`
+    Level       int       `bson:"level"           gorm:"column:level"                      json:"level"`
+    IsDefault   bool      `bson:"isDefault"       gorm:"column:is_default"                 json:"isDefault"`
+    CreatedAt   time.Time `bson:"createdAt"       gorm:"column:created_at"                 json:"createdAt"`
+    UpdatedAt   time.Time `bson:"updatedAt"       gorm:"column:updated_at"                 json:"updatedAt"`
+}
+```
+
+**PostgreSQL table: `roles`**
+```sql
+CREATE TABLE roles (
+    id            VARCHAR(255) PRIMARY KEY,
+    document_id   VARCHAR(255) UNIQUE NOT NULL,
+    name          VARCHAR(255) NOT NULL,
+    slug          VARCHAR(63)  UNIQUE NOT NULL,
+    permissions   JSONB        NOT NULL,
+    level         INTEGER      NOT NULL,
+    is_default    BOOLEAN      NOT NULL DEFAULT false,
+    created_at    TIMESTAMP    NOT NULL,
+    updated_at    TIMESTAMP    NOT NULL
+);
+```
+
+**MongoDB collection: `roles`** — same fields as entity struct.
+
+`IsDefault` marks the four seeded roles. Default roles cannot be deleted via the API.
+
+---
+
+### 12.4 User ↔ Role Relationship
+
+Replace the `Role Role` string field on User with `RoleID string` referencing the Role's `DocumentID`:
+
+**Before:**
+```go
+type User struct {
+    ID           string    `bson:"_id,omitempty" gorm:"column:id;primaryKey"`
+    DocumentID   string    `bson:"documentId"    gorm:"column:document_id;uniqueIndex"`
+    Email        string    `bson:"email"         gorm:"column:email;uniqueIndex"`
+    PasswordHash string    `bson:"passwordHash"  gorm:"column:password_hash"`
+    Role         Role      `bson:"role"          gorm:"column:role;type:varchar(20)"`
+    CreatedAt    time.Time `bson:"createdAt"     gorm:"column:created_at"`
+}
+```
+
+**After:**
+```go
+type User struct {
+    ID           string    `bson:"_id,omitempty" gorm:"column:id;primaryKey"`
+    DocumentID   string    `bson:"documentId"    gorm:"column:document_id;uniqueIndex"`
+    Email        string    `bson:"email"         gorm:"column:email;uniqueIndex"`
+    PasswordHash string    `bson:"passwordHash"  gorm:"column:password_hash"`
+    RoleID       string    `bson:"roleId"        gorm:"column:role_id;index"`
+    CreatedAt    time.Time `bson:"createdAt"     gorm:"column:created_at"`
+}
+```
+
+**PostgreSQL:** `users.role_id` references `roles.document_id` (application-level FK — not DB-level constraint, to stay consistent with MongoDB which has no FK enforcement).
+
+**MongoDB:** `users.roleId` is a string reference to the role's `documentId`.
+
+**Startup migration (one-time):**
+On startup, if the `roles` collection/table has no records:
+1. Seed the four default roles
+2. For each existing user with the legacy `role` string field, look up the matching default role by slug and set `roleId` to its `documentId`
+
+The old `Role` type (`type Role string` with constants `RoleSuperAdmin`, `RoleAdmin`, etc.) and `RoleLevel()` function are **removed** from `entity/user.go`. The `Role` entity in `entity/role.go` replaces them entirely.
+
+---
+
+### 12.5 JWT & Auth Changes
+
+JWT access token claims are unchanged structurally:
+
+```go
+type Claims struct {
+    UserID string `json:"userId"`
+    Role   string `json:"role"`   // role slug
+    jwt.RegisteredClaims
+}
+```
+
+The `Role` claim stores the role **slug** (e.g., `"editor"`). The change is that the slug now references a database record rather than a hardcoded constant.
+
+**Permission resolution flow:**
+1. On startup, load all roles into an in-memory cache (`slug → Role` with permissions set)
+2. When a role is created/updated/deleted via the API, invalidate and reload the cache
+3. Auth middleware reads the role slug from JWT → looks up permissions from the cache
+4. Route-level middleware checks if the user's role has the required permission(s)
+
+**New middleware:**
+
+```go
+// GinRequirePermission aborts with 403 if the authenticated user's role
+// lacks the specified permission.
+func GinRequirePermission(cache *RoleCache, permission string) gin.HandlerFunc
+```
+
+This replaces `GinRequireMinRole` for content, media, and admin routes. `GinRequireMinRole` is retained for level-based hierarchy checks (e.g., "can only manage users with a lower role level").
+
+**RoleCache** (`internal/delivery/http/middleware/role_cache.go` — new):
+
+```go
+type RoleCache struct {
+    mu    sync.RWMutex
+    roles map[string]*entity.Role // slug → Role
+}
+
+func NewRoleCache() *RoleCache
+func (c *RoleCache) Load(roles []*entity.Role)
+func (c *RoleCache) HasPermission(roleSlug, permission string) bool
+func (c *RoleCache) GetLevel(roleSlug string) int
+func (c *RoleCache) Get(roleSlug string) *entity.Role
+```
+
+---
+
+### 12.6 API Routes — Role CRUD
+
+Base path: `/api/roles`
+
+| Method | Route | Required Permission | Response | Description |
+|---|---|---|---|---|
+| `GET` | `/api/roles` | Any authenticated user | `Role[]` | List all roles |
+| `GET` | `/api/roles/:id` | Any authenticated user | `Role` | Get role by documentId |
+| `POST` | `/api/roles` | `roles:manage` | `Role` (201) | Create custom role |
+| `PUT` | `/api/roles/:id` | `roles:manage` | `Role` | Update role |
+| `DELETE` | `/api/roles/:id` | `roles:manage` | `204` | Delete custom role |
+
+**Create request body:**
+```json
+{
+  "name": "Content Manager",
+  "slug": "content-manager",
+  "permissions": ["content:read", "content:create", "content:update", "content:publish"],
+  "level": 50
+}
+```
+
+**Validation rules:**
+- `slug`: same pattern as content-type slugs (`^[a-z0-9]+(?:-[a-z0-9]+)*$`, 1–63 chars)
+- `name`: non-empty, max 100 chars
+- `permissions`: each entry must be a valid permission string from the defined set
+- `level`: 1–99 (level 100 reserved for super_admin; 0 is invalid)
+- Cannot create a role with `level >= caller's role level`
+- Cannot delete a default role (`isDefault: true`)
+- Cannot delete a role that is currently assigned to any user
+- Updating a default role: only `permissions` can be changed (`slug`, `name`, `level` are immutable for defaults)
+
+---
+
+### 12.7 Repository Interface
+
+**New file: `internal/domain/repository/role_repository.go`**
+
+```go
+type RoleRepository interface {
+    Create(ctx context.Context, role *entity.Role) error
+    FindByID(ctx context.Context, documentID string) (*entity.Role, error)
+    FindBySlug(ctx context.Context, slug string) (*entity.Role, error)
+    FindAll(ctx context.Context) ([]*entity.Role, error)
+    Update(ctx context.Context, role *entity.Role) error
+    Delete(ctx context.Context, documentID string) error
+    HasAny(ctx context.Context) (bool, error)
+}
+```
+
+Implemented by both `infrastructure/mongodb/role_repository.go` and `infrastructure/gormdb/role_repository.go`.
+
+---
+
+### 12.8 PostgreSQL Sub-Component Tables
+
+When a content-type field has `type: "component"`, the GORM adapter creates a separate relational table for the component's sub-fields instead of storing them in the parent document's JSONB `data` column.
+
+#### 12.8.1 Naming Convention
+
+Table name pattern: `component_{content_type_slug}_{component_field_name}`
+
+- Slug hyphens → underscores (SQL-safe)
+- CamelCase field names → snake_case
+
+| Content-type slug | Component field name | Table name |
+|---|---|---|
+| `blog-posts` | `seo` | `component_blog_posts_seo` |
+| `about-page` | `heroSection` | `component_about_page_hero_section` |
+| `en-vocab-pack` | `wordList` | `component_en_vocab_pack_word_list` |
+
+#### 12.8.2 Component Table Structure
+
+```sql
+-- Example: blog-posts has a component field "seo" with sub-fields metaTitle, metaDescription
+CREATE TABLE component_blog_posts_seo (
+    id          SERIAL PRIMARY KEY,
+    parent_id   INTEGER NOT NULL REFERENCES documents(gorm_id) ON DELETE CASCADE,
+    -- sub-field columns derived from the component's field definitions:
+    meta_title       TEXT,
+    meta_description TEXT
+);
+```
+
+- `id`: auto-increment PK — no `documentId` (sub-components can't be directly queried)
+- `parent_id`: FK to the parent document's `gorm_id`, with `ON DELETE CASCADE`
+- Sub-field columns: one column per sub-field, using the field-type → SQL-type mapping below
+
+#### 12.8.3 Field Type → SQL Column Mapping
+
+| Content-type field type | PostgreSQL column type |
+|---|---|
+| `text` | `TEXT` |
+| `richtext` | `TEXT` |
+| `number` | `DOUBLE PRECISION` |
+| `boolean` | `BOOLEAN` |
+| `media` | `TEXT` (stores URL string) |
+| `json` | `JSONB` |
+
+#### 12.8.4 Nested Components
+
+Not supported in v1. If a component field contains another component sub-field, the inner component is stored as `JSONB` in the parent component table's column — not extracted into yet another table.
+
+#### 12.8.5 MongoDB Behavior
+
+Unchanged. Components remain as nested objects inside the document's BSON `data` field. No additional collections are created for component fields.
+
+---
+
+### 12.9 GORM Document Repository Changes
+
+The GORM document repository transparently handles component fields for the usecase layer — the `map[string]any` data interface is unchanged.
+
+#### On Write (UpsertDraft / UpsertPublished)
+
+1. Look up the content-type schema (via `ContentTypeProvider`)
+2. Separate `doc.Data` into scalar fields and component fields
+3. Write scalar fields to the `documents` table's `data` JSONB column
+4. For each component field, upsert rows in the corresponding component table (keyed by `parent_id`)
+
+#### On Read (FindDraftByDocumentID, etc.)
+
+1. Read the document row from the `documents` table
+2. For each component field in the content-type schema, query the component table by `parent_id`
+3. Merge component data back into `doc.Data` before returning to the caller
+
+The repository constructor accepts a `ContentTypeProvider` interface so it can look up schemas:
+
+```go
+type ContentTypeProvider interface {
+    FindBySlug(ctx context.Context, slug string) (*entity.ContentType, error)
+}
+```
+
+#### EnsureCollection (GORM — no longer a no-op for component types)
+
+```go
+func (r *documentRepository) EnsureCollection(ctx context.Context, contentTypeSlug string) error {
+    ct, err := r.ctProvider.FindBySlug(ctx, contentTypeSlug)
+    if err != nil { return err }
+
+    for _, field := range ct.Fields {
+        if field.Type == "component" {
+            if err := r.ensureComponentTable(contentTypeSlug, field); err != nil {
+                return err
+            }
+        }
+    }
+    return nil
+}
+```
+
+`ensureComponentTable` uses GORM's `Migrator` to create or update the component table with the correct columns.
+
+#### DropCollection (GORM — drops component tables)
+
+When a content-type is deleted, `DropCollection` drops all `component_{slug}_*` tables associated with it, plus deletes all document rows for that slug.
+
+---
+
+### 12.10 Backend Changes — Files
+
+**New files:**
+```
+apps/api/internal/domain/entity/role.go                          ← Role entity + Permission constants
+apps/api/internal/domain/repository/role_repository.go           ← RoleRepository interface
+apps/api/internal/infrastructure/mongodb/role_repository.go      ← MongoDB implementation
+apps/api/internal/infrastructure/mongodb/role_repository_test.go
+apps/api/internal/infrastructure/gormdb/role_repository.go       ← GORM implementation
+apps/api/internal/infrastructure/gormdb/role_repository_test.go
+apps/api/internal/usecase/role/role_usecase.go                   ← Role CRUD + seed + permission validation
+apps/api/internal/usecase/role/role_usecase_test.go
+apps/api/internal/delivery/http/handler/role_handler.go          ← Gin handlers for role CRUD
+apps/api/internal/delivery/http/handler/role_handler_test.go
+apps/api/internal/delivery/http/middleware/role_cache.go          ← In-memory role permission cache
+apps/api/internal/delivery/http/middleware/role_cache_test.go
+```
+
+**Modified files:**
+```
+apps/api/internal/domain/entity/user.go                          ← Role string → RoleID string; remove Role type + RoleLevel()
+apps/api/internal/domain/entity/user_test.go                     ← Update tests for RoleID
+apps/api/internal/infrastructure/gormdb/client.go                ← AutoMigrate includes Role entity
+apps/api/internal/infrastructure/gormdb/document_repository.go   ← Component table read/write + ContentTypeProvider dependency
+apps/api/internal/infrastructure/gormdb/document_repository_test.go
+apps/api/internal/infrastructure/gormdb/user_repository.go       ← Update for RoleID field
+apps/api/internal/infrastructure/gormdb/user_repository_test.go
+apps/api/internal/infrastructure/mongodb/user_repository.go      ← Update for roleId field
+apps/api/internal/infrastructure/mongodb/user_repository_test.go
+apps/api/internal/delivery/http/router.go                        ← Add role routes, migrate to GinRequirePermission
+apps/api/internal/delivery/http/middleware/gin_auth.go           ← Add GinRequirePermission; keep GinRequireMinRole for hierarchy
+apps/api/internal/delivery/http/middleware/gin_auth_test.go
+apps/api/internal/usecase/auth/auth_usecase.go                   ← Use RoleID instead of Role string; look up role slug for JWT
+apps/api/internal/usecase/auth/auth_usecase_test.go
+apps/api/cmd/server/main.go                                      ← Role repo/usecase init, seed on startup, role cache init
+```
+
+---
+
+### 12.11 Router Changes
+
+**New route group:**
+```go
+// Role routes
+roleGroup := r.Group("/api/roles", middleware.GinAuth())
+{
+    roleGroup.GET("", cfg.RoleHandler.List)
+    roleGroup.GET("/:id", cfg.RoleHandler.Get)
+    roleGroup.POST("", middleware.GinRequirePermission(cache, "roles:manage"), cfg.RoleHandler.Create)
+    roleGroup.PUT("/:id", middleware.GinRequirePermission(cache, "roles:manage"), cfg.RoleHandler.Update)
+    roleGroup.DELETE("/:id", middleware.GinRequirePermission(cache, "roles:manage"), cfg.RoleHandler.Delete)
+}
+```
+
+**Existing routes migrated to permission-based middleware:**
+
+| Route Group | Current Middleware | New Middleware |
+|---|---|---|
+| Content-type routes | `GinRequireMinRole("admin")` | `GinRequirePermission(cache, "content_types:read")` |
+| Single-type PUT/POST | `GinRequireMinRole("editor")` | `GinRequirePermission(cache, "content:update")` |
+| Collection POST (create) | `GinRequireMinRole("editor")` | `GinRequirePermission(cache, "content:create")` |
+| Collection PUT (update) | `GinRequireMinRole("editor")` | `GinRequirePermission(cache, "content:update")` |
+| Collection DELETE | `GinRequireMinRole("editor")` | `GinRequirePermission(cache, "content:delete")` |
+| Publish routes | `GinRequireMinRole("editor")` | `GinRequirePermission(cache, "content:publish")` |
+| Unpublish routes | `GinRequireMinRole("editor")` | `GinRequirePermission(cache, "content:unpublish")` |
+| Media GET | `GinRequireMinRole("editor")` | `GinRequirePermission(cache, "media:read")` |
+| Media upload | `GinRequireMinRole("editor")` | `GinRequirePermission(cache, "media:upload")` |
+| Media DELETE | `GinRequireMinRole("editor")` | `GinRequirePermission(cache, "media:delete")` |
+| User routes | `GinRequireMinRole("admin")` | `GinRequirePermission(cache, "users:manage")` |
+| Access token routes | `GinRequireMinRole("super_admin")` | `GinRequirePermission(cache, "access_tokens:manage")` |
+
+---
+
+### 12.12 Frontend Changes
+
+#### Types (`src/types/cms.ts`)
+
+```ts
+export interface RoleResponse {
+  documentId: string
+  name: string
+  slug: string
+  permissions: string[]
+  level: number
+  isDefault: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export const ALL_PERMISSIONS = [
+  { value: 'content:read',          label: 'View Content',       group: 'Content' },
+  { value: 'content:create',        label: 'Create Content',     group: 'Content' },
+  { value: 'content:update',        label: 'Edit Content',       group: 'Content' },
+  { value: 'content:delete',        label: 'Delete Content',     group: 'Content' },
+  { value: 'content:publish',       label: 'Publish Content',    group: 'Content' },
+  { value: 'content:unpublish',     label: 'Unpublish Content',  group: 'Content' },
+  { value: 'media:read',            label: 'View Media',         group: 'Media' },
+  { value: 'media:upload',          label: 'Upload Media',       group: 'Media' },
+  { value: 'media:delete',          label: 'Delete Media',       group: 'Media' },
+  { value: 'users:manage',          label: 'Manage Users',       group: 'Admin' },
+  { value: 'roles:manage',          label: 'Manage Roles',       group: 'Admin' },
+  { value: 'access_tokens:manage',  label: 'Manage Tokens',      group: 'Admin' },
+  { value: 'content_types:read',    label: 'View Content Types', group: 'Admin' },
+] as const
+```
+
+#### Hooks (`src/hooks/useRoles.ts` — new)
+
+```ts
+// useRoles()
+//   → GET /api/roles → returns RoleResponse[]
+//   → query key: ['roles']
+
+// useRole(id: string)
+//   → GET /api/roles/:id → returns RoleResponse
+//   → query key: ['roles', id]
+
+// useCreateRole()
+//   → POST /api/roles
+//   → invalidates ['roles']
+
+// useUpdateRole()
+//   → PUT /api/roles/:id
+//   → invalidates ['roles']
+
+// useDeleteRole()
+//   → DELETE /api/roles/:id
+//   → invalidates ['roles']
+```
+
+#### Auth Context Changes (`src/context/AuthContext.tsx`)
+
+- On login/token refresh, fetch the user's role permissions via `GET /api/roles` (or embed in login response)
+- Store `permissions: string[]` alongside `role: string` in auth context
+- Expose `hasPermission(action: string): boolean` from `useAuth()`
+- Replace all `isSuperAdmin` / `isAdminOrAbove` checks with `hasPermission(...)` calls
+
+#### RolesPage.tsx — Full Rewrite
+
+Replace the static hardcoded permission matrix with a dynamic CRUD page:
+
+**List view:**
+- Table columns: Name, Slug, Level, Permissions (grouped badges), Actions
+- "Create Role" button (visible when user has `roles:manage`)
+- Each row: Edit button, Delete button (hidden for default roles)
+- Default roles show a locked badge — cannot be deleted, slug/name/level read-only on edit
+
+**Create/Edit form (Dialog):**
+- Name: text input
+- Slug: text input, auto-derived from name on create; read-only for default roles on edit
+- Level: number input (1–99)
+- Permissions: checkbox grid grouped by category (Content, Media, Admin)
+- Save button → `useCreateRole()` or `useUpdateRole()`
+
+**Delete:**
+- Confirm dialog: "Delete role {name}?"
+- API returns error if role is assigned to any user → show toast
+- Cannot delete default roles (button not rendered)
+
+#### UsersPage.tsx — Changes
+
+- Replace hardcoded `ALL_ROLES` array with data from `useRoles()`
+- Role `<Select>` dropdown shows role names fetched from the API
+- `rolesBelow()` uses the role's `level` field from the API instead of the hardcoded `roleLevel()` function
+- Remove import of `roleLevel` from `@/lib/roles`
+- Role assignment sends `roleId` (documentId) instead of role slug string
+
+#### Sidebar.tsx — Changes
+
+- Replace `isSuperAdmin` / `isAdminOrAbove` boolean checks with `hasPermission()`:
+  - Users nav item → `hasPermission('users:manage')`
+  - Access Tokens nav item → `hasPermission('access_tokens:manage')`
+  - Roles nav item → `hasPermission('roles:manage')`
+- Remove import of `roleLevel` from `@/lib/roles`
+
+#### `@/lib/roles.ts` — Removed
+
+This file contains the hardcoded `roleLevel()` function. It is replaced by the `useAuth().hasPermission()` hook and role data from the API. Delete the file; remove all imports.
+
+---
+
+### 12.13 Testing
+
+#### Backend — Role Usecase (`role_usecase_test.go`)
+
+- `TestSeedDefaultRoles` — seeds 4 default roles when `HasAny()` returns false; skips when roles already exist
+- `TestCreate_Valid` — creates role with valid permissions and level < caller's level
+- `TestCreate_DuplicateSlug` — returns conflict error
+- `TestCreate_LevelTooHigh` — rejects when `level >= caller's level`
+- `TestCreate_InvalidPermission` — rejects unknown permission strings
+- `TestUpdate_DefaultRole_OnlyPermissions` — permits permission changes; rejects slug/name/level changes
+- `TestUpdate_CustomRole_AllFields` — all fields changeable
+- `TestDelete_DefaultRole` — returns validation error
+- `TestDelete_AssignedRole` — returns conflict error (role in use by user(s))
+- `TestDelete_CustomRole` — succeeds
+- `TestFindAll` — returns all roles sorted by level descending
+
+#### Backend — Role Repository (GORM + MongoDB)
+
+Same test cases for both implementations:
+- CRUD operations (create, read, update, delete)
+- `HasAny` returns false when empty, true after seeding
+- `FindBySlug` returns correct role
+- Unique constraint violation on duplicate slug → returns conflict error
+
+#### Backend — Role Handler (`role_handler_test.go`)
+
+- `GET /api/roles` → 200 with role list
+- `GET /api/roles/:id` → 200 with role; 404 for unknown ID
+- `POST /api/roles` → 201 with created role; 400 for invalid data; 403 without `roles:manage`
+- `PUT /api/roles/:id` → 200 with updated role; 400 for invalid changes to default role
+- `DELETE /api/roles/:id` → 204 for custom role; 400 for default role; 409 for assigned role; 403 without `roles:manage`
+
+#### Backend — Permission Middleware (`role_cache_test.go`, `gin_auth_test.go`)
+
+- `GinRequirePermission("content:create")` — user with permission → next handler called; without → 403
+- `RoleCache.Load` — populates cache; `HasPermission` returns correct results
+- Cache reload after role update — stale permissions not served
+
+#### Backend — Component Tables (GORM) (`document_repository_test.go`)
+
+- `EnsureCollection` with component fields → creates component table with correct columns and FK
+- Write document with component data → scalar data in `documents.data`, component data in component table
+- Read document → component data assembled back into `doc.Data`
+- Delete document → component table rows cascade-deleted
+- `DropCollection` → drops associated component tables
+- Content-type without components → `EnsureCollection` behaves as current no-op
+
+#### Frontend — RolesPage
+
+- Renders role list from `useRoles()` hook
+- Create form validates: name required, slug format, level range, at least one permission
+- Edit form loads existing role data; default role slug/name/level fields disabled
+- Delete button hidden for default roles
+- Delete shows confirm dialog; toast on API error
+
+#### Frontend — UsersPage
+
+- Role `<Select>` populated from `useRoles()` data (not hardcoded array)
+- Only roles with level < current user's role level are shown in dropdown
+
+#### Frontend — Sidebar
+
+- Nav items shown/hidden based on `hasPermission()` not hardcoded role checks
+
+---
+
+### 12.14 Acceptance Criteria
+
+**Role CRUD:**
+- [ ] `GET /api/roles` returns all roles including default ones
+- [ ] `POST /api/roles` creates a custom role with valid permissions and level
+- [ ] `PUT /api/roles/:id` updates role; default roles only allow permission changes
+- [ ] `DELETE /api/roles/:id` deletes custom roles only; rejects if role is assigned to a user
+- [ ] Default roles (super_admin, admin, editor, guest) seeded automatically on first startup
+- [ ] Seeding is idempotent — skipped if any roles already exist
+
+**Permission enforcement:**
+- [ ] All content/media/admin routes use `GinRequirePermission` instead of `GinRequireMinRole`
+- [ ] Users with custom roles get exactly the permissions defined on their role
+- [ ] Permission cache reloads when a role is created, updated, or deleted
+- [ ] JWT continues to embed role slug for backward compatibility
+
+**User ↔ Role relationship:**
+- [ ] User entity stores `roleId` referencing Role's `documentId`
+- [ ] Existing users auto-migrated to role references on startup (one-time)
+- [ ] Auth usecase resolves role slug from roleId for JWT generation
+- [ ] UsersPage shows dynamic role list from API
+
+**PostgreSQL sub-component tables:**
+- [ ] Content-type with `component` field → GORM creates `component_{slug}_{field_name}` table
+- [ ] Component table has auto-increment PK + FK to `documents.gorm_id` (cascade delete)
+- [ ] No `documentId` column in component tables
+- [ ] Write: component data extracted from `doc.Data`, written to component table
+- [ ] Read: component data assembled from component table back into `doc.Data`
+- [ ] Drop content-type → drops associated component tables
+- [ ] MongoDB: no change — components remain nested in BSON `data`
+
+**Frontend:**
+- [ ] RolesPage: dynamic role CRUD with permission checkbox grid
+- [ ] UsersPage: role assignment uses database roles (not hardcoded list)
+- [ ] Sidebar: nav item visibility driven by `hasPermission()`, not role name checks
+- [ ] `@/lib/roles.ts` removed; all imports replaced with `useAuth().hasPermission()`
+
+---
+
+### 12.15 Out of Scope
+
+- Per-content-type permission scoping (e.g., "can only edit blog-posts but not about-page")
+- Nested component tables (component within component → stored as JSONB in parent component table)
+- Role versioning or audit trail
+- GraphQL schema changes for roles (REST-only in this phase)
+- gRPC service for roles
+- Bulk role assignment
+- Role-based field-level visibility (hiding specific fields from the form based on role)
+- Frontend permission-gated form fields (Save/Publish buttons already controlled; field-level is out of scope)
+
+---
+
+### 12.16 Boundaries
+
+| Rule | Detail |
+|---|---|
+| **Always** | Seed default roles on first startup; skip seeding if `HasAny()` returns true |
+| **Always** | Validate permissions against the allowed set — reject unknown permission strings |
+| **Always** | Use `GinRequirePermission(cache, perm)` for content/media/admin routes |
+| **Always** | Keep `GinRequireMinRole` only for hierarchy-based checks (managing users/roles with lower level) |
+| **Always** | Cache role permissions in memory; invalidate and reload on any role CRUD operation |
+| **Always** | Convert content-type slug hyphens to underscores in PostgreSQL component table names |
+| **Always** | Convert camelCase component field names to snake_case for PostgreSQL column names |
+| **Always** | Cascade-delete component table rows when parent document is deleted (FK constraint) |
+| **Always** | Component read/write is transparent to the usecase layer — `map[string]any` data interface unchanged |
+| **Never** | Allow deletion of default roles (`isDefault: true`) |
+| **Never** | Allow a user to create/edit a role with `level >= their own role's level` |
+| **Never** | Store component data in both JSONB `data` and the component table — mutually exclusive per field |
+| **Never** | Add `documentId` to component tables — they are not directly queryable |
+| **Never** | Change MongoDB document storage behavior for components (always nested in `data`) |
+| **Never** | Create nested component tables (component-in-component → JSONB fallback) |
+| **Ask first** | Adding new permission actions to the allowed set |
+| **Ask first** | Adding per-content-type permission scoping |
+| **Ask first** | Changing default role level values or the level range (1–99) |
+
+---
+
+## 13. Deployment — Render.com (Separate Services)
+
+### 13.1 Objective
+
+Deploy web-api and web-ui as two independent Render.com services on the free tier (no Blueprint). Each service redeploys only when its own code changes, triggered by deploy hooks from GitHub Actions CI.
+
+**Supersedes** Resolved Decision #3 (single docker-compose service).
+
+**Target users:** Project maintainers deploying and operating the CMS.
+
+---
+
+### 13.2 Architecture
+
+```
+┌──────────────────────────────────────────────────────────┐
+│                    Render.com (Free Tier)                 │
+│                                                          │
+│  ┌─────────────────────────┐  ┌────────────────────────┐ │
+│  │ Web Service (Go)        │  │ Static Site             │ │
+│  │ abyssoftime-cms-api     │  │ abyssoftime-cms-web     │ │
+│  │ Native Go runtime       │  │ React/Vite SPA          │ │
+│  │ Port 8080               │  │ Served from Render CDN  │ │
+│  └───────────┬─────────────┘  └──────────┬─────────────┘ │
+│              │                           │               │
+└──────────────┼───────────────────────────┼───────────────┘
+               │                           │
+               │  HTTPS API calls          │  Browser loads
+               │  (CORS-enabled)           │  static assets
+               │                           │
+       ┌───────┴───────┐           ┌───────┴───────┐
+       │ Supabase      │           │ Cloudinary    │
+       │ PostgreSQL    │           │ Media storage │
+       └───────────────┘           └───────────────┘
+```
+
+| Component | Service Type | Name | Source |
+|---|---|---|---|
+| web-api | Render Web Service (Go) | `abyssoftime-cms-api` | `apps/api` |
+| web-ui | Render Static Site | `abyssoftime-cms-web` | `apps/web` |
+| Database | Supabase PostgreSQL (external) | — | — |
+| Media | Cloudinary (external) | — | — |
+
+**Free tier constraints:**
+- Web Services spin down after 15 minutes of inactivity (cold start ~30s for Go). The existing `keep-alive.yml` GitHub Actions workflow pings `/health` every 14 minutes to prevent this.
+- Static Sites are served from Render CDN — always available, no cold starts.
+- 750 free Web Service hours/month. One service running 24/7 uses ~730 hours — fits within the limit.
+
+---
+
+### 13.3 Prerequisites
+
+Before Render setup, ensure the following external services are ready:
+
+1. **Supabase PostgreSQL** — project created at supabase.com. Note down:
+   - Host: `db.<project-ref>.supabase.co`
+   - Port: `5432` (default, use `6543` for connection pooling via Supavisor)
+   - Database name: `postgres`
+   - Username: `postgres` (or a dedicated user)
+   - Password: the database password set during project creation
+
+2. **Cloudinary** — account created. Note down:
+   - Cloud name, API key, API secret (from Cloudinary dashboard → Settings → API Keys)
+
+3. **GitHub repository** — the monorepo is pushed to GitHub and GitHub Actions CI is passing.
+
+---
+
+### 13.4 Code Changes Required
+
+Three code changes are required before deployment. These ensure the frontend can call the API cross-origin and the backend accepts cross-origin requests.
+
+#### 13.4.1 Frontend — API Base URL (`apps/web/src/lib/api.ts`)
+
+The frontend uses relative URLs (`/api/*`, `/auth/*`) that rely on Vite's dev proxy. Render Static Site has no server-side proxy — the frontend must call the API directly via absolute URL.
+
+**Change:**
+```ts
+export const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || '',
+  withCredentials: true,
+})
+```
+
+- **Dev:** `VITE_API_URL` is unset → `baseURL` is `''` → relative paths → Vite proxy handles routing to `localhost:8080`.
+- **Production:** `VITE_API_URL=https://abyssoftime-cms-api.onrender.com` → all requests go directly to the API service.
+
+`VITE_API_URL` is a build-time env var (Vite embeds it during `vite build`). Set it in Render's Static Site environment.
+
+#### 13.4.2 Backend — Cross-Origin Cookie Configuration (`apps/api/internal/delivery/http/handler/auth_handler.go`)
+
+With web-ui and web-api on different origins (`*.onrender.com` subdomains), the refresh token cookie requires `SameSite=None` + `Secure=true` for the browser to include it in cross-origin requests.
+
+**Current:**
+```go
+c.SetCookie(RefreshCookieName, refresh, maxAge, "/", "", false, true)
+```
+
+**After:**
+```go
+c.SetSameSite(h.cookieSameSite)
+c.SetCookie(RefreshCookieName, refresh, maxAge, "/", "", h.cookieSecure, true)
+```
+
+Apply this change in all three locations where the refresh cookie is set: `Login`, `Refresh`, and `Logout`.
+
+**AuthHandler struct changes:**
+```go
+type AuthHandler struct {
+    uc             authUseCase
+    cookieSecure   bool
+    cookieSameSite http.SameSite
+}
+
+func NewAuthHandler(uc authUseCase, cookieSecure bool, cookieSameSite http.SameSite) *AuthHandler {
+    return &AuthHandler{uc: uc, cookieSecure: cookieSecure, cookieSameSite: cookieSameSite}
+}
+```
+
+#### 13.4.3 Backend — Config Additions (`apps/api/internal/config/config.go`)
+
+Add to `Config` struct and `Load()`:
+
+```go
+type Config struct {
+    // ... existing fields
+    CookieSecure   bool          // COOKIE_SECURE, default true
+    CookieSameSite http.SameSite // COOKIE_SAMESITE: "none"|"lax"|"strict", default "none"
+    CORSOrigins    []string      // CORS_ORIGINS, comma-separated, default "http://localhost:5173"
+}
+```
+
+Parsing `COOKIE_SAMESITE`:
+```go
+func parseSameSite(raw string) http.SameSite {
+    switch strings.ToLower(raw) {
+    case "lax":
+        return http.SameSiteLaxMode
+    case "strict":
+        return http.SameSiteStrictMode
+    case "none":
+        return http.SameSiteNoneMode
+    default:
+        return http.SameSiteNoneMode
+    }
+}
+```
+
+#### 13.4.4 Backend — CORS Middleware (Prerequisite from §9.5)
+
+Cross-origin deployment requires the CORS middleware defined in §9.5. If not yet implemented, it must be completed before deployment. The middleware must:
+
+- Accept `CORS_ORIGINS` (comma-separated allowed origins)
+- Set `Access-Control-Allow-Credentials: true` (required for cookie-based auth)
+- Handle `OPTIONS` preflight requests with `204`
+- Never use `Access-Control-Allow-Origin: *` — always explicit origin whitelist
+
+#### 13.4.5 CI — Path-Based Deploy Triggers (`.github/workflows/ci.yml`)
+
+Update deploy jobs to only trigger when the relevant service's files change:
+
+```yaml
+  # Detect which directories changed
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    outputs:
+      api: ${{ steps.filter.outputs.api }}
+      web: ${{ steps.filter.outputs.web }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            api:
+              - 'apps/api/**'
+            web:
+              - 'apps/web/**'
+
+  deploy-api:
+    name: Deploy API to Render
+    runs-on: ubuntu-latest
+    needs: [api-test, web-lint, changes]
+    environment: Production
+    if: needs.changes.outputs.api == 'true'
+    steps:
+      - name: Trigger Render deploy — API
+        run: curl -fsSL "${{ vars.RENDER_DEPLOY_HOOK_API }}"
+
+  deploy-web:
+    name: Deploy Web to Render
+    runs-on: ubuntu-latest
+    needs: [api-test, web-lint, changes]
+    environment: Production
+    if: needs.changes.outputs.web == 'true'
+    steps:
+      - name: Trigger Render deploy — Web
+        run: curl -fsSL "${{ vars.RENDER_DEPLOY_HOOK_WEB }}"
+```
+
+#### 13.4.6 Keep-Alive Workflow Update (`.github/workflows/keep-alive.yml`)
+
+Update the health endpoint URL to the new API service name:
+
+```yaml
+- name: Ping API Health Endpoint
+  run: curl -fsSL "https://abyssoftime-cms-api.onrender.com/health" > /dev/null
+```
+
+---
+
+### 13.5 Render Dashboard Setup — Step by Step
+
+#### Step 1: Create the API Web Service
+
+1. Go to [dashboard.render.com](https://dashboard.render.com) → **New** → **Web Service**
+2. Connect your GitHub repository (`project-abyssoftime-cms-v2`)
+3. Configure:
+
+| Setting | Value |
+|---|---|
+| **Name** | `abyssoftime-cms-api` |
+| **Region** | Oregon (US West) or closest to your users |
+| **Branch** | `main` |
+| **Root Directory** | `apps/api` |
+| **Runtime** | Go |
+| **Build Command** | `go build -trimpath -ldflags="-s -w" -o bin/server ./cmd/server` |
+| **Start Command** | `bin/server` |
+| **Instance Type** | Free |
+| **Auto-Deploy** | No (we use deploy hooks from CI) |
+
+Native Go builds directly on Render's Ubuntu environment — no Docker layer overhead, smaller footprint, faster builds (~1-2 minutes vs ~3-5 minutes with Docker).
+
+4. Add environment variables (see §13.6 below)
+5. Click **Create Web Service**
+6. Wait for first build to complete (~1-2 minutes)
+7. Copy the service URL: `https://abyssoftime-cms-api.onrender.com`
+
+#### Step 2: Create the Web Static Site
+
+1. Go to Render dashboard → **New** → **Static Site**
+2. Connect the same GitHub repository
+3. Configure:
+
+| Setting | Value |
+|---|---|
+| **Name** | `abyssoftime-cms-web` |
+| **Branch** | `main` |
+| **Root Directory** | `apps/web` |
+| **Build Command** | `bun install --frozen-lockfile && bun run build` |
+| **Publish Directory** | `dist` |
+| **Auto-Deploy** | No (we use deploy hooks from CI) |
+
+4. Add environment variables:
+
+| Variable | Value |
+|---|---|
+| `VITE_API_URL` | `https://abyssoftime-cms-api.onrender.com` |
+
+5. Under **Redirects/Rewrites**, add an SPA rewrite rule:
+
+| Source | Destination | Action |
+|---|---|---|
+| `/*` | `/index.html` | Rewrite |
+
+This ensures React Router works for all client-side routes (e.g., `/admin/content-type/single-type/homepage` serves `index.html` instead of a 404).
+
+6. Click **Create Static Site**
+7. Wait for first build to complete (~1-2 minutes)
+8. Copy the site URL: `https://abyssoftime-cms-web.onrender.com`
+
+#### Step 3: Copy Deploy Hook URLs
+
+For each service:
+
+1. Go to the service's **Settings** page on Render
+2. Scroll to **Build & Deploy** → **Deploy Hook**
+3. Copy the deploy hook URL (format: `https://api.render.com/deploy/srv-...?key=...`)
+
+#### Step 4: Configure GitHub Repository Secrets
+
+1. Go to your GitHub repo → **Settings** → **Environments** → **Production**
+2. Add these **environment variables** (not secrets — the CI uses `vars.*`):
+
+| Variable | Value |
+|---|---|
+| `RENDER_DEPLOY_HOOK_API` | The API service deploy hook URL from Step 3 |
+| `RENDER_DEPLOY_HOOK_WEB` | The Static Site deploy hook URL from Step 3 |
+
+#### Step 5: Update CORS Origin on API
+
+After the Static Site is created and you have the URL:
+
+1. Go to the API Web Service → **Environment**
+2. Set `CORS_ORIGINS` to the Static Site URL:
+   ```
+   CORS_ORIGINS=https://abyssoftime-cms-web.onrender.com
+   ```
+3. Save and manually deploy the API to pick up the new env var
+
+#### Step 6: Verify
+
+1. Open `https://abyssoftime-cms-web.onrender.com` in a browser
+2. Verify the login page loads
+3. Open browser DevTools → Network tab
+4. Attempt login — verify the request goes to `https://abyssoftime-cms-api.onrender.com/auth/login`
+5. Verify the response includes:
+   - `Access-Control-Allow-Origin: https://abyssoftime-cms-web.onrender.com`
+   - `Access-Control-Allow-Credentials: true`
+   - `Set-Cookie: refresh_token=...; SameSite=None; Secure; HttpOnly`
+6. Verify navigation works (React Router routes should not 404)
+7. Verify content operations: create, save, publish a content entry
+
+---
+
+### 13.6 Environment Variables
+
+#### API Web Service (`abyssoftime-cms-api`)
+
+| Variable | Value | Notes |
+|---|---|---|
+| `PORT` | `8080` | Render also sets `PORT` automatically; explicit value ensures consistency |
+| `DB_DRIVER` | `postgres` | Use PostgreSQL via Supabase |
+| `DB_HOST` | `db.<project-ref>.supabase.co` | From Supabase dashboard → Settings → Database → Host |
+| `DB_PORT` | `5432` | Default PostgreSQL port (use `6543` for Supavisor pooling) |
+| `DB_NAME` | `postgres` | Supabase default database name |
+| `DB_USERNAME` | `postgres` | Or a dedicated DB user |
+| `DB_PASSWORD` | `<supabase-db-password>` | From Supabase dashboard → Settings → Database → Password |
+| `DB_SSL_MODE` | `require` | Supabase requires SSL |
+| `JWT_SECRET` | `<random-64-char-string>` | Generate: `openssl rand -hex 32` |
+| `CLOUDINARY_CLOUD_NAME` | `<your-cloud-name>` | From Cloudinary dashboard |
+| `CLOUDINARY_API_KEY` | `<your-api-key>` | From Cloudinary dashboard |
+| `CLOUDINARY_API_SECRET` | `<your-api-secret>` | From Cloudinary dashboard |
+| `STORAGE_PROVIDER` | `cloudinary` | Active media storage adapter |
+| `CONTENT_TYPES_DIR` | `content-types` | Relative to root directory (`apps/api/content-types/`) — native Go runs from the root directory |
+| `CORS_ORIGINS` | `https://abyssoftime-cms-web.onrender.com` | The Static Site URL (set after Step 2) |
+| `COOKIE_SECURE` | `true` | Required for `SameSite=None` |
+| `COOKIE_SAMESITE` | `none` | Required for cross-origin cookie delivery |
+| `SUPPORTED_LOCALES` | `en,vi` | Comma-separated locale codes |
+
+#### Static Site (`abyssoftime-cms-web`)
+
+| Variable | Value | Notes |
+|---|---|---|
+| `VITE_API_URL` | `https://abyssoftime-cms-api.onrender.com` | Build-time env var; Vite embeds it during `vite build` |
+
+---
+
+### 13.7 Files Changed
+
+**Modified files:**
+```
+apps/web/src/lib/api.ts                                    ← add baseURL from VITE_API_URL
+apps/api/internal/delivery/http/handler/auth_handler.go    ← configurable Secure + SameSite on cookies
+apps/api/internal/config/config.go                         ← add CookieSecure, CookieSameSite, CORSOrigins
+apps/api/cmd/server/main.go                                ← pass cookie config to auth handler
+.github/workflows/ci.yml                                   ← path-based change detection for deploy jobs
+.github/workflows/keep-alive.yml                           ← update health endpoint URL
+```
+
+**New files (if CORS middleware from §9.5 not yet implemented):**
+```
+apps/api/internal/delivery/http/middleware/cors.go          ← CORS middleware
+apps/api/internal/delivery/http/middleware/cors_test.go     ← CORS tests
+```
+
+---
+
+### 13.8 Testing
+
+**Local cross-origin simulation:**
+1. Start API on `localhost:8080`
+2. Build frontend with `VITE_API_URL=http://localhost:8080 bun run build`
+3. Serve `dist/` on a different port: `npx serve dist -l 3000`
+4. Open `http://localhost:3000` — verify login, CORS headers, cookie behavior
+
+**Post-deploy verification:**
+- Health check: `curl https://abyssoftime-cms-api.onrender.com/health` → `{"status":"ok"}`
+- CORS preflight: `curl -X OPTIONS -H "Origin: https://abyssoftime-cms-web.onrender.com" -H "Access-Control-Request-Method: POST" https://abyssoftime-cms-api.onrender.com/auth/login -v` → verify CORS headers in response
+- Static site: `curl -I https://abyssoftime-cms-web.onrender.com` → 200 with HTML content
+- Deep link: `curl -I https://abyssoftime-cms-web.onrender.com/admin/content-type/single-type/test` → 200 (SPA rewrite working)
+
+---
+
+### 13.9 Acceptance Criteria
+
+**Infrastructure:**
+- [ ] API Web Service (`abyssoftime-cms-api`) is running on Render and responds to `/health`
+- [ ] Static Site (`abyssoftime-cms-web`) is deployed and serves the React SPA
+- [ ] SPA client-side routes work (no 404 on direct navigation to `/admin/...`)
+- [ ] API connects to Supabase PostgreSQL successfully
+- [ ] Media upload to Cloudinary works from the deployed API
+
+**Cross-origin:**
+- [ ] Frontend at `abyssoftime-cms-web.onrender.com` successfully calls API at `abyssoftime-cms-api.onrender.com`
+- [ ] CORS headers are present on API responses (`Access-Control-Allow-Origin`, `Access-Control-Allow-Credentials`)
+- [ ] Refresh token cookie is set with `SameSite=None; Secure; HttpOnly`
+- [ ] Login, token refresh, and authenticated API calls work cross-origin
+
+**CI/CD:**
+- [ ] Push to `main` with changes only in `apps/api/` triggers API deploy only
+- [ ] Push to `main` with changes only in `apps/web/` triggers web deploy only
+- [ ] Push to `main` with changes in both triggers both deploys
+- [ ] Push to `main` with no changes in `apps/` skips both deploy jobs
+- [ ] Deploy hooks are configured in GitHub environment `Production`
+
+**Keep-alive:**
+- [ ] `keep-alive.yml` pings the correct API URL every 14 minutes
+- [ ] API does not spin down due to inactivity
+
+---
+
+### 13.10 Boundaries
+
+| Rule | Detail |
+|---|---|
+| **Always** | Set `COOKIE_SAMESITE=none` and `COOKIE_SECURE=true` for cross-origin deployment |
+| **Always** | Set `DB_SSL_MODE=require` when connecting to Supabase |
+| **Always** | Use explicit origin whitelist in `CORS_ORIGINS` — never `*` |
+| **Always** | Set `VITE_API_URL` at build time on the Static Site — it's embedded by Vite, not read at runtime |
+| **Always** | Add SPA rewrite rule (`/* → /index.html`) on the Static Site |
+| **Always** | Use deploy hooks (not auto-deploy) so deployments only happen after CI passes |
+| **Never** | Store deploy hook URLs in public GitHub repository settings — use the `Production` environment |
+| **Never** | Set `COOKIE_SAMESITE=lax` for cross-origin deployment — cookies won't be sent cross-origin |
+| **Never** | Use `Access-Control-Allow-Origin: *` with `Access-Control-Allow-Credentials: true` — browsers reject this |
+| **Ask first** | Adding custom domains (requires DNS configuration + Render TLS provisioning) |
+
+---
+
+### 13.11 Out of Scope
+
+- Custom domain setup (both services use `*.onrender.com` subdomains)
+- Render Blueprint / Infrastructure-as-Code (`render.yaml`)
+- Render paid tier features (persistent disk, private networking, preview environments)
+- Database migration tooling (Supabase handles schema via GORM auto-migrate on API startup)
+- CDN caching configuration for the Static Site
+- Monitoring and alerting beyond the health check ping
+- Multi-environment deployment (staging/production) — single production environment only

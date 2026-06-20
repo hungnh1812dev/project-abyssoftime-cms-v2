@@ -14,6 +14,18 @@ import (
 	pkgjwt "project-abyssoftime-cms-v2/api/pkg/jwt"
 )
 
+func defaultRoleRepo() *repomock.RoleRepository {
+	return &repomock.RoleRepository{
+		FindBySlugFn: func(_ context.Context, slug string) (*entity.RoleEntity, error) {
+			return &entity.RoleEntity{DocumentID: "role-" + slug, Slug: slug}, nil
+		},
+		FindByIDFn: func(_ context.Context, id string) (*entity.RoleEntity, error) {
+			return &entity.RoleEntity{DocumentID: id, Slug: "admin"}, nil
+		},
+		HasAnyFn: func(_ context.Context) (bool, error) { return true, nil },
+	}
+}
+
 func mustHash(password string) string {
 	h, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.MinCost)
 	if err != nil {
@@ -126,7 +138,7 @@ func TestRegister(t *testing.T) {
 			repo := &repomock.UserRepository{}
 			tc.setupRepo(repo)
 
-			uc := auth.New(repo)
+			uc := auth.New(repo, defaultRoleRepo())
 			user, err := uc.Register(ctx, tc.email, tc.password)
 
 			if tc.wantErr != nil {
@@ -215,7 +227,7 @@ func TestLogin(t *testing.T) {
 			repo := &repomock.UserRepository{}
 			tc.setupRepo(repo)
 
-			uc := auth.New(repo)
+			uc := auth.New(repo, defaultRoleRepo())
 			access, refresh, err := uc.Login(ctx, "user@example.com", tc.password)
 
 			if tc.wantErr != nil {
@@ -280,7 +292,7 @@ func TestRefreshToken(t *testing.T) {
 			repo := &repomock.UserRepository{}
 			tc.setupRepo(repo)
 
-			uc := auth.New(repo)
+			uc := auth.New(repo, defaultRoleRepo())
 			token, err := uc.RefreshToken(ctx, tc.buildToken())
 
 			if tc.wantErr != nil {
@@ -302,7 +314,7 @@ func TestRefreshToken(t *testing.T) {
 func TestLogout(t *testing.T) {
 	ctx := context.Background()
 	repo := &repomock.UserRepository{}
-	uc := auth.New(repo)
+	uc := auth.New(repo, defaultRoleRepo())
 
 	if err := uc.Logout(ctx, "any-user-id"); err != nil {
 		t.Fatalf("Logout returned unexpected error: %v", err)
@@ -348,7 +360,7 @@ func TestSetupStatus(t *testing.T) {
 			repo := &repomock.UserRepository{}
 			tc.setupRepo(repo)
 
-			uc := auth.New(repo)
+			uc := auth.New(repo, defaultRoleRepo())
 			exists, err := uc.SetupStatus(ctx)
 
 			if tc.wantErr {

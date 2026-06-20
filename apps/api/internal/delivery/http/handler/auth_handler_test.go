@@ -108,7 +108,7 @@ func TestRegisterHandler(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			h := handler.NewAuthHandler(tc.uc)
+			h := handler.NewAuthHandler(tc.uc, false, http.SameSiteLaxMode)
 			w := httptest.NewRecorder()
 			_, r := gin.CreateTestContext(w)
 			r.POST("/auth/register", h.Register)
@@ -171,7 +171,7 @@ func TestLoginHandler(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			h := handler.NewAuthHandler(tc.uc)
+			h := handler.NewAuthHandler(tc.uc, false, http.SameSiteLaxMode)
 			w := httptest.NewRecorder()
 			_, r := gin.CreateTestContext(w)
 			r.POST("/auth/login", h.Login)
@@ -242,7 +242,7 @@ func TestRefreshHandler(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			h := handler.NewAuthHandler(tc.uc)
+			h := handler.NewAuthHandler(tc.uc, false, http.SameSiteLaxMode)
 			w := httptest.NewRecorder()
 			_, r := gin.CreateTestContext(w)
 			r.POST("/auth/refresh", h.Refresh)
@@ -295,7 +295,7 @@ func TestSetupStatusHandler(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			h := handler.NewAuthHandler(tc.uc)
+			h := handler.NewAuthHandler(tc.uc, false, http.SameSiteLaxMode)
 			w := httptest.NewRecorder()
 			_, r := gin.CreateTestContext(w)
 			r.GET("/auth/setup", h.SetupStatus)
@@ -320,7 +320,7 @@ func TestLogoutHandler(t *testing.T) {
 
 	h := handler.NewAuthHandler(&mockAuthUC{
 		logoutFn: func(_ context.Context, _ string) error { return nil },
-	})
+	}, false, http.SameSiteLaxMode)
 
 	w := httptest.NewRecorder()
 	_, r := gin.CreateTestContext(w)
