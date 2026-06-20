@@ -5,6 +5,7 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -33,6 +34,7 @@ type DBConfig struct {
 }
 
 // MongoURI builds the MongoDB connection string from generic DB_* vars.
+// Username and password are URL-encoded to handle special characters.
 func (d DBConfig) MongoURI() string {
 	host := d.Host
 	if host == "" {
@@ -42,13 +44,18 @@ func (d DBConfig) MongoURI() string {
 	if port == "" {
 		port = "27017"
 	}
-	if d.Username != "" && d.Password != "" {
-		return fmt.Sprintf("mongodb://%s:%s@%s:%s", d.Username, d.Password, host, port)
+	u := &url.URL{
+		Scheme: "mongodb",
+		Host:   fmt.Sprintf("%s:%s", host, port),
 	}
-	return fmt.Sprintf("mongodb://%s:%s", host, port)
+	if d.Username != "" && d.Password != "" {
+		u.User = url.UserPassword(d.Username, d.Password)
+	}
+	return u.String()
 }
 
 // PostgresDSN builds the PostgreSQL connection string from generic DB_* vars.
+// Username and password are URL-encoded to handle special characters (@, ?, etc.).
 func (d DBConfig) PostgresDSN() string {
 	host := d.Host
 	if host == "" {
@@ -66,11 +73,16 @@ func (d DBConfig) PostgresDSN() string {
 	if sslMode == "" {
 		sslMode = "disable"
 	}
-	if d.Username != "" {
-		return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s",
-			d.Username, d.Password, host, port, name, sslMode)
+	u := &url.URL{
+		Scheme:   "postgres",
+		Host:     fmt.Sprintf("%s:%s", host, port),
+		Path:     name,
+		RawQuery: fmt.Sprintf("sslmode=%s", sslMode),
 	}
-	return fmt.Sprintf("postgres://%s:%s/%s?sslmode=%s", host, port, name, sslMode)
+	if d.Username != "" {
+		u.User = url.UserPassword(d.Username, d.Password)
+	}
+	return u.String()
 }
 
 type EntityDBConfig struct {
