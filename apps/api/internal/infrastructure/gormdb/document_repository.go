@@ -59,6 +59,10 @@ func fieldColumnType(fieldType string) string {
 	}
 }
 
+func (r *documentRepository) isPostgres() bool {
+	return r.db.Dialector.Name() == "postgres"
+}
+
 func (r *documentRepository) EnsureCollection(ctx context.Context, contentTypeSlug string, fields []entity.FieldDefinition) error {
 	table := documentTableName(contentTypeSlug)
 	if r.db.Migrator().HasTable(table) {
@@ -68,7 +72,11 @@ func (r *documentRepository) EnsureCollection(ctx context.Context, contentTypeSl
 	}
 
 	var cols []string
-	cols = append(cols, "gorm_id INTEGER PRIMARY KEY AUTOINCREMENT")
+	if r.isPostgres() {
+		cols = append(cols, "gorm_id SERIAL PRIMARY KEY")
+	} else {
+		cols = append(cols, "gorm_id INTEGER PRIMARY KEY AUTOINCREMENT")
+	}
 	cols = append(cols, "document_id TEXT")
 	cols = append(cols, "version TEXT")
 	cols = append(cols, "locale TEXT")
@@ -78,9 +86,9 @@ func (r *documentRepository) EnsureCollection(ctx context.Context, contentTypeSl
 		}
 		cols = append(cols, fmt.Sprintf("%s %s", toSnakeCase(f.Name), fieldColumnType(f.Type)))
 	}
-	cols = append(cols, "created_at DATETIME")
-	cols = append(cols, "updated_at DATETIME")
-	cols = append(cols, "published_at DATETIME")
+	cols = append(cols, "created_at TIMESTAMP")
+	cols = append(cols, "updated_at TIMESTAMP")
+	cols = append(cols, "published_at TIMESTAMP")
 	cols = append(cols, "created_by TEXT")
 	cols = append(cols, "updated_by TEXT")
 	cols = append(cols, "published_by TEXT")

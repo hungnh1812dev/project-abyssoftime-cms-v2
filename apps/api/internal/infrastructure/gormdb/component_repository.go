@@ -25,6 +25,10 @@ func (r *componentRepository) table(slug, component string) *gorm.DB {
 	return r.db.Table(componentTableName(slug, component))
 }
 
+func (r *componentRepository) isPostgres() bool {
+	return r.db.Dialector.Name() == "postgres"
+}
+
 func (r *componentRepository) EnsureCollection(ctx context.Context, contentTypeSlug, componentName string, fields []entity.FieldDefinition) error {
 	table := componentTableName(contentTypeSlug, componentName)
 	if r.db.Migrator().HasTable(table) {
@@ -34,7 +38,11 @@ func (r *componentRepository) EnsureCollection(ctx context.Context, contentTypeS
 	}
 
 	var cols []string
-	cols = append(cols, "gorm_id INTEGER PRIMARY KEY AUTOINCREMENT")
+	if r.isPostgres() {
+		cols = append(cols, "gorm_id SERIAL PRIMARY KEY")
+	} else {
+		cols = append(cols, "gorm_id INTEGER PRIMARY KEY AUTOINCREMENT")
+	}
 	cols = append(cols, "component_id TEXT")
 	cols = append(cols, "document_id TEXT")
 	cols = append(cols, "version TEXT")
@@ -42,8 +50,8 @@ func (r *componentRepository) EnsureCollection(ctx context.Context, contentTypeS
 	for _, f := range fields {
 		cols = append(cols, fmt.Sprintf("%s %s", toSnakeCase(f.Name), fieldColumnType(f.Type)))
 	}
-	cols = append(cols, "created_at DATETIME")
-	cols = append(cols, "updated_at DATETIME")
+	cols = append(cols, "created_at TIMESTAMP")
+	cols = append(cols, "updated_at TIMESTAMP")
 
 	sql := fmt.Sprintf("CREATE TABLE %s (%s)", table, strings.Join(cols, ", "))
 	return r.db.WithContext(ctx).Exec(sql).Error
