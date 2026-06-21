@@ -39,7 +39,7 @@ See [ui-design-system.md](ui-design-system.md) for full plan. Spec: [specs/ui-de
 - [x] T2 Button: add `success` variant, `loading` prop, update hover/active states
 - [x] T3 Badge: add `draft`/`published`/`modified` semantic variants
 - [x] T4 SidebarContext: collapsed state + localStorage + mobile detection
-- [ ] T5 Sidebar components: Brand, Group, SubGroup, Item, CollapseToggle, rail popover
+- [x] T5 Sidebar components: Brand, Group, SubGroup, Item, CollapseToggle, rail popover
 - [ ] T6 Sidebar responsive: mobile overlay with backdrop
 - [ ] T7 AdminLayout: wire new sidebar, remove old Sidebar.tsx
 - [ ] ✅ Checkpoint 1: foundation + sidebar complete
