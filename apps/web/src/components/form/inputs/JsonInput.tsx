@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Controller, type Control } from 'react-hook-form';
 import CodeMirror from '@uiw/react-codemirror';
 import { json } from '@codemirror/lang-json';
@@ -16,13 +16,17 @@ function serialize(value: unknown): string {
 function InnerJsonInput({ field }: { field: { value: unknown; onChange: (v: unknown) => void } }) {
   const [rawValue, setRawValue] = useState(serialize(field.value));
   const [syntaxError, setSyntaxError] = useState<string | null>(null);
-  const fieldValue = field.value;
+  const typing = useRef(false);
 
-  const [prevFieldValue, setPrevFieldValue] = useState(field.value);
+  const [prevSerialized, setPrevSerialized] = useState(() => serialize(field.value));
+  const currentSerialized = serialize(field.value);
 
-  if (fieldValue !== prevFieldValue) {
-    setPrevFieldValue(fieldValue);
-    setRawValue(serialize(fieldValue));
+  if (currentSerialized !== prevSerialized) {
+    setPrevSerialized(currentSerialized);
+    if (!typing.current) {
+      setRawValue(currentSerialized);
+    }
+    typing.current = false;
   }
 
   return (
@@ -34,6 +38,7 @@ function InnerJsonInput({ field }: { field: { value: unknown; onChange: (v: unkn
           minHeight="15em"
           onChange={(val) => {
             setRawValue(val);
+            typing.current = true;
             if (val.trim() === '') {
               setSyntaxError(null);
               field.onChange(null);

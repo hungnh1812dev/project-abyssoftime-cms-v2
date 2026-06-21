@@ -11,6 +11,16 @@
     { "name": "body", "type": "richtext" },
     { "name": "readingTime", "type": "number" },
     { "name": "featured", "type": "boolean" },
-    { "name": "metadata", "type": "json" }
+    { "name": "metadata", "type": "json" },
+    {
+      "name": "banner",
+      "type": "component",
+      "component": "banner",
+      "fields": [
+        { "name": "title", "type": "text" },
+        { "name": "description", "type": "text" },
+        { "name": "background", "type": "media" }
+      ]
+    }
   ]
 }

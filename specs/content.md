@@ -120,7 +120,7 @@ const (
 ### Draft & Publish Workflow
 
 - Every content entry is stored as **two separate records**: a `draft` and a `published` record (`version: "draft" | "published"`).
-- Each content type's documents live in their own standalone MongoDB collection (`documents_<slug>`), created during sync. GORM uses a single `documents` table with a `slug` column.
+- Each content type's documents live in their own standalone storage: MongoDB collection (`documents_<slug>`) or PostgreSQL table (`documents_<slug_underscored>`), created during sync.
 - `draft` record: holds latest edits, `createdAt`/`updatedAt`/`createdBy`/`updatedBy`, **no** `publishedAt`/`publishedBy`.
 - `published` record: only exists after first publish; carries `publishedAt`/`publishedBy`.
 - Every record carries `locale` (defaults to `"en"`).
@@ -189,8 +189,8 @@ type DocumentRepository interface {
 }
 ```
 
-**MongoDB**: Routes by collection name (`documents_<slug>`).
-**GORM**: Uses single `documents` table with `WHERE slug = ?`. `EnsureCollection`/`DropCollection` are no-ops (except for component tables — see [specs/auth.md](auth.md) §12.8).
+**MongoDB**: Routes by collection name (`documents_<slug>`). Components remain nested in BSON `data`.
+**GORM**: Routes by dynamic table name (`documents_<slug_underscored>`), matching MongoDB's per-content-type pattern. `EnsureCollection` creates the table + unique index; `DropCollection` drops the table. Component fields stored in separate `components_<slug_underscored>_<component_name_underscored>` tables (see §9).
 
 ---
 
@@ -377,8 +377,8 @@ On startup, after content-type sync:
 ### Generated Schema Per Content-Type
 
 **Collection-type** generates:
-- `Query.<slug>(Id: ID!, locale: String): <Type>` — fetch one
-- `Query.<slugPlural>(start: Int, size: Int, locale: String): <Type>Connection` — paginated list
+- `Query.<slug>(Id: ID!, locale: String): <Type>Response` — fetch one document (with component fields resolved as nested objects)
+- `Query.<slugList>(where: <Type>Filter, orderBy: <Type>OrderBy, start: Int, size: Int, locale: String): <Type>ListResponse` — paginated list with filtering, sorting, and component data
 - `Mutation.create<Type>(data: <Type>Input!): <Type>! @auth`
 - `Mutation.update<Type>(Id: ID!, data: <Type>Input!): <Type>! @auth`
 - `Mutation.delete<Type>(Id: ID!): Boolean! @auth`
@@ -386,7 +386,7 @@ On startup, after content-type sync:
 - `Mutation.unpublish<Type>(Id: ID!, locale: String): <Type>! @auth`
 
 **Single-type** generates:
-- `Query.<slug>(locale: String): <Type>` — fetch singleton
+- `Query.<slug>(locale: String): <Type>Response` — fetch singleton (with component fields resolved)
 - `Mutation.save<Type>(data: <Type>Input!, locale: String): <Type>! @auth`
 - `Mutation.publish<Type>(locale: String): <Type>! @auth`
 - `Mutation.unpublish<Type>(locale: String): <Type>! @auth`
@@ -394,40 +394,200 @@ On startup, after content-type sync:
 ### Naming Conventions
 - Type: PascalCase of slug (`blog-posts` → `BlogPost`)
 - Input: `<Type>Input`
-- Connection: `<Type>Connection`
-- Query single: camelCase (`blogPost`)
-- Query list: camelCase plural (`blogPosts`)
+- Response (single): `<Type>Response` — wraps `data: <Type>`
+- Response (list): `<Type>ListResponse` — wraps `data: [<Type>]`
+- Filter: `<Type>Filter` — generated from document + component fields
+- OrderBy: `<Type>OrderBy` — sort by document + component fields
+- Query single: camelCase of slug (`blog-posts` → `blogPost`)
+- Query list: camelCase of slug + `List` (`blog-posts` → `blogPostList`)
+- Component types: PascalCase of `<ContentType><ComponentName>` (e.g., `BlogPostBanner`)
+
+### Query Examples
+
+**Single document (single-type or collection-type by ID):**
+
+```graphql
+query GetBlogPost($locale: String!) {
+  blogPost(Id: "abc123", locale: $locale) {
+    title
+    coverImage { url }
+    banner {
+      background { url }
+    }
+  }
+}
+```
+
+```json
+{
+  "blogPost": {
+    "data": {
+      "title": "...",
+      "coverImage": { "url": "..." },
+      "banner": {
+        "background": { "url": "..." }
+      }
+    }
+  }
+}
+```
+
+**List query with filter, sort, and pagination:**
+
+```graphql
+query GetBlogPostList($locale: String!) {
+  blogPostList(
+    where: { featured: { eq: true } }
+    orderBy: { createdAt: DESC }
+    start: 0
+    size: 10
+    locale: $locale
+  ) {
+    title
+    coverImage { url }
+    banner {
+      background { url }
+    }
+  }
+}
+```
+
+```json
+{
+  "blogPostList": {
+    "data": [
+      {
+        "title": "...",
+        "coverImage": { "url": "..." },
+        "banner": {
+          "background": { "url": "..." }
+        }
+      }
+    ]
+  }
+}
+```
+
+### Filtering & Sorting
+
+Filters are generated per content-type based on field types:
+
+| Field Type | Supported Operators |
+|---|---|
+| `text` | `eq`, `ne`, `contains`, `startsWith`, `endsWith`, `in` |
+| `number` | `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `in` |
+| `boolean` | `eq` |
+| `component` | Nested filter on component sub-fields |
+
+Top-level logical operators: `AND`, `OR`, `NOT`.
+
+OrderBy supports `ASC` / `DESC` on scalar fields (text, number, boolean) and system fields (`createdAt`, `updatedAt`, `publishedAt`).
 
 ---
 
 ## 9. Infrastructure — GORM Specifics
 
-### Single Documents Table
+### Per-Content-Type Document Tables
 
-GORM uses one `documents` table with a `slug` column (vs MongoDB's per-content-type collections):
+GORM creates one table per content type, matching MongoDB's per-collection pattern. Tables are created dynamically during content-type sync, not via `AutoMigrate`.
+
+**Table naming:** `documents_<slug_underscored>` (hyphens replaced with underscores).
+Example: content type `blog-posts` → table `documents_blog_posts`.
+
+**Slug sanitization:** Only `[a-z0-9-]` allowed in slugs (validated at content-type creation). Hyphens converted to underscores for PostgreSQL table names.
 
 ```sql
-CREATE TABLE documents (
-    document_id VARCHAR(24) NOT NULL,
-    version VARCHAR(20) NOT NULL,
+CREATE TABLE IF NOT EXISTS documents_<slug_underscored> (
+    gorm_id         BIGSERIAL PRIMARY KEY,
+    document_id     VARCHAR(255) NOT NULL,
+    version         VARCHAR(20)  NOT NULL,
     content_type_id VARCHAR(255),
-    slug VARCHAR(63) NOT NULL,
-    data JSON NOT NULL,
-    locale VARCHAR(10) NOT NULL,
-    ...
-    PRIMARY KEY (document_id, version, locale, slug),
-    INDEX idx_slug_version_locale (slug, version, locale)
+    data            JSONB,
+    locale          VARCHAR(10)  NOT NULL,
+    created_at      TIMESTAMPTZ,
+    updated_at      TIMESTAMPTZ,
+    published_at    TIMESTAMPTZ,
+    created_by      VARCHAR(255),
+    updated_by      VARCHAR(255),
+    published_by    VARCHAR(255),
+    UNIQUE(document_id, version, locale)
 );
 ```
 
-### Component Tables (PostgreSQL)
+**Implementation changes:**
+- `EnsureCollection(slug)`: Executes `CREATE TABLE IF NOT EXISTS documents_<slug_underscored>` with the schema above + unique index
+- `DropCollection(slug)`: Executes `DROP TABLE IF EXISTS documents_<slug_underscored>`
+- All repository queries use `r.db.Table("documents_" + sanitize(slug))` instead of the default model table
+- `Slug` field removed from the `Document` entity (or marked `gorm:"-"`) — table name replaces the discriminator
+- `&entity.Document{}` removed from `AutoMigrate()` — tables are created dynamically by `EnsureCollection`
 
-When a content-type field has `type: "component"`, GORM creates a dedicated table:
+**Migration from single table:**
+1. For each distinct `slug` in the existing `documents` table, create `documents_<slug_underscored>` and copy rows
+2. Drop the old `documents` table after verification
 
-- Table name: `component_{slug_underscored}_{field_name_snake_case}`
-- Columns: `id SERIAL PK`, `parent_id FK → documents.gorm_id ON DELETE CASCADE`, plus one column per sub-field
-- Nested components (component-in-component) stored as JSONB fallback
-- MongoDB: no change — components remain nested in BSON `data`
+### Component Tables (PostgreSQL Only)
+
+When a content-type field has `type: "component"`, GORM creates a dedicated component table. MongoDB does **not** use component collections — components remain nested in BSON `data`.
+
+**Table naming:** `components_<slug_underscored>_<component_name_snake_case>`
+Example: content type `blog-posts` with component field `banner` → table `components_blog_posts_banner`.
+
+```sql
+CREATE TABLE IF NOT EXISTS components_<slug_underscored>_<component_name_underscored> (
+    gorm_id       BIGSERIAL PRIMARY KEY,
+    component_id  VARCHAR(255) NOT NULL,
+    document_id   VARCHAR(255) NOT NULL,
+    version       VARCHAR(20)  NOT NULL,
+    locale        VARCHAR(10)  NOT NULL,
+    "order"       INT          NOT NULL DEFAULT 0,
+    data          JSONB,
+    created_at    TIMESTAMPTZ,
+    updated_at    TIMESTAMPTZ,
+    UNIQUE(document_id, version, locale, "order")
+);
+```
+
+**New entity — `Component`:**
+
+```go
+type Component struct {
+    GormID      uint            `gorm:"column:gorm_id;primaryKey;autoIncrement"`
+    ComponentID string          `gorm:"column:component_id"`
+    DocumentID  string          `gorm:"column:document_id"`
+    Version     DocumentVersion `gorm:"column:version;type:varchar(20)"`
+    Locale      string          `gorm:"column:locale"`
+    Order       int             `gorm:"column:order"`
+    Data        map[string]any  `gorm:"column:data;serializer:json"`
+    CreatedAt   time.Time       `gorm:"column:created_at"`
+    UpdatedAt   time.Time       `gorm:"column:updated_at"`
+}
+```
+
+**New repository — `ComponentRepository`:**
+
+```go
+type ComponentRepository interface {
+    FindByDocumentID(ctx context.Context, contentTypeSlug, componentName, documentID, locale string, version DocumentVersion) ([]*Component, error)
+    UpsertAll(ctx context.Context, contentTypeSlug, componentName, documentID, locale string, version DocumentVersion, components []*Component) error
+    DeleteByDocumentID(ctx context.Context, contentTypeSlug, componentName, documentID, locale string) error
+    DeleteAllByContentType(ctx context.Context, contentTypeSlug, componentName string) error
+    EnsureCollection(ctx context.Context, contentTypeSlug, componentName string) error
+    DropCollection(ctx context.Context, contentTypeSlug, componentName string) error
+}
+```
+
+**Sync engine changes:**
+- `syncOne()`: After ensuring document table, iterate content-type fields — for each `"type": "component"` field, call `componentRepo.EnsureCollection(slug, field.Name)`
+- `removeContentType()`: Drop all component tables before dropping the document table
+- `Syncer` receives `ComponentRepository` in constructor
+
+**Document save/read flow (PostgreSQL):**
+- **Save:** Extract component fields from `doc.Data` based on content-type field definitions → save scalar data to `documents_<slug_underscored>` → upsert component records to `components_<slug_underscored>_<component_name_underscored>`
+- **Read:** Load document from `documents_<slug_underscored>` → for each component field, load from `components_<slug_underscored>_<component_name_underscored>` → merge into `doc.Data` before returning
+- **Delete:** Delete component records from all component tables → delete document record
+- **Publish:** Copy draft component records to published version → copy draft document to published
+
+**MongoDB (no change):** Components remain nested in the document's BSON `data` field. No component collections are created.
 
 ---
 
@@ -490,7 +650,10 @@ When a content-type field has `type: "component"`, GORM creates a dedicated tabl
 | **Never** | Add API/UI path to create/edit/delete ContentType structure |
 | **Never** | Restrict create/update/delete/save/publish on content data (documents) |
 | **Ask first** | Changing default `size` from 20 or max from 100 |
-| **Ask first** | Adding sort parameters to collection list |
+| **Always** | GraphQL list queries support `where`, `orderBy`, `start`, `size` parameters |
+| **Always** | GraphQL responses wrap document data in a `data` field |
+| **Always** | PostgreSQL component tables created/dropped during content-type sync |
+| **Never** | Create component collections in MongoDB — components stay nested in BSON `data` |
 
 ---
 
@@ -503,4 +666,6 @@ When a content-type field has `type: "component"`, GORM creates a dedicated tabl
 | v1.2 | Slug + documentID input validation | §9.1–§9.3 |
 | v1.3 | API restructure: single-type/collection-type routes, pagination, field projection | §10 |
 | v1.4 | Dynamic GraphQL schema generation | §11.5 |
-| v1.5 | PostgreSQL component tables for GORM adapter | §12.8 |
+| v1.5 | PostgreSQL per-content-type document tables (`documents_<slug_underscored>`) replacing single `documents` table | §9 |
+| v1.6 | PostgreSQL component tables (`components_<slug_underscored>_<component_name_underscored>`) — MongoDB keeps nested BSON | §9 |
+| v1.7 | GraphQL: list query renamed to `<slug>List`, response wrapped in `data`, filter/orderBy/pagination support | §8 |

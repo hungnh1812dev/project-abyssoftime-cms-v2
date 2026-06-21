@@ -86,7 +86,7 @@ export function useUpdateCollectionDocument() {
     onSuccess: (result, { contentTypeSlug }) => {
       qc.invalidateQueries({ queryKey: KEYS.list(contentTypeSlug) })
       qc.invalidateQueries({
-        queryKey: KEYS.detail(contentTypeSlug, result.documentId, result.locale),
+        queryKey: KEYS.detail(contentTypeSlug, result.data.documentId as string, result.data.locale as string),
       })
     },
     onError: onMutationError,

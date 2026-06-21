@@ -64,8 +64,7 @@ func TestRegister(t *testing.T) {
 				r.FindByEmailFn = func(_ context.Context, _ string) (*entity.User, error) {
 					return nil, pkgerrors.ErrNotFound
 				}
-				r.CreateFn = func(_ context.Context, u *entity.User) error {
-					u.ID = "gen-id-1"
+				r.CreateFn = func(_ context.Context, _ *entity.User) error {
 					return nil
 				}
 			},
@@ -152,6 +151,15 @@ func TestRegister(t *testing.T) {
 			}
 			if tc.wantUserID && user == nil {
 				t.Fatal("expected non-nil user")
+			}
+			if user != nil && user.ID == "" {
+				t.Error("expected non-empty ID")
+			}
+			if user != nil && user.DocumentID == "" {
+				t.Error("expected non-empty DocumentID")
+			}
+			if user != nil && user.CreatedAt.IsZero() {
+				t.Error("expected non-zero CreatedAt")
 			}
 			if user != nil && user.PasswordHash == tc.password {
 				t.Error("PasswordHash must not equal plain-text password")

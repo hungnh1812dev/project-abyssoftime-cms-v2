@@ -67,7 +67,7 @@ export function CollectionListPage({ contentType }: Props) {
 
   function handleDelete(doc: Document) {
     if (!window.confirm('Delete this entry?')) return;
-    deleteDoc({ contentTypeSlug: contentType.Slug, id: doc.documentId });
+    deleteDoc({ contentTypeSlug: contentType.Slug, id: doc.data.documentId as string });
   }
 
   if (isLoading) {
@@ -102,7 +102,7 @@ export function CollectionListPage({ contentType }: Props) {
             </thead>
             <tbody>
               {docs.map((doc) => (
-                <tr key={doc.documentId} className="border-b">
+                <tr key={doc.data.documentId as string} className="border-b">
                   {columns.map((col) => (
                     <td key={col.key} className="py-2 pr-4">
                       {cellValue(doc, col)}
@@ -110,7 +110,7 @@ export function CollectionListPage({ contentType }: Props) {
                   ))}
                   <td className="py-2 pr-4 capitalize">{doc.status}</td>
                   <td className="flex gap-2 py-2">
-                    <Link to={`/admin/content-type/collection-type/${contentType.Slug}/${doc.documentId}`} className="text-primary underline-offset-4 hover:underline">
+                    <Link to={`/admin/content-type/collection-type/${contentType.Slug}/${doc.data.documentId}`} className="text-primary underline-offset-4 hover:underline">
                       Edit
                     </Link>
                     <Button variant="destructive" size="sm" onClick={() => handleDelete(doc)}>

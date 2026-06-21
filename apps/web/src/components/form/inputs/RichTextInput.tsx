@@ -26,7 +26,7 @@ export function RichTextInput({ name, control, toolbar }: RichTextInputProps) {
           <style>{minHeightStyle}</style>
           <CKEditor
             editor={Editor}
-            data={field.value as string}
+            data={(field.value as string) ?? ''}
             config={toolbar ? { toolbar } : undefined}
             onChange={(_event, editor) => {
               field.onChange(editor.getData())

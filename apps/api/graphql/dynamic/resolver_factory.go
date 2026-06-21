@@ -19,17 +19,19 @@ import (
 )
 
 type DocumentUseCase interface {
-	Save(ctx context.Context, contentTypeSlug string, doc *entity.Document, userID string) (*entity.Document, error)
-	GetForEdit(ctx context.Context, contentTypeSlug, documentID, locale string) (*entity.Document, string, error)
-	GetPublished(ctx context.Context, contentTypeSlug, documentID, locale string) (*entity.Document, error)
-	Publish(ctx context.Context, contentTypeSlug, documentID, locale, userID string) error
+	Save(ctx context.Context, contentTypeSlug string, doc *entity.Document, fields []entity.FieldDefinition, userID string) (*entity.Document, error)
+	GetForEdit(ctx context.Context, contentTypeSlug, documentID, locale string, fields []entity.FieldDefinition) (*entity.Document, string, error)
+	GetPublished(ctx context.Context, contentTypeSlug, documentID, locale string, fields []entity.FieldDefinition) (*entity.Document, error)
+	Publish(ctx context.Context, contentTypeSlug, documentID, locale string, fields []entity.FieldDefinition, userID string) error
 	Unpublish(ctx context.Context, contentTypeSlug, documentID, locale string) error
-	Delete(ctx context.Context, contentTypeSlug, documentID string) error
-	GetSingleType(ctx context.Context, contentTypeSlug, locale string) (*entity.Document, string, error)
-	SaveSingleType(ctx context.Context, contentTypeSlug string, data map[string]any, locale, userID string) (*entity.Document, error)
-	PublishSingleType(ctx context.Context, contentTypeSlug, locale, userID string) error
+	Delete(ctx context.Context, contentTypeSlug, documentID string, fields []entity.FieldDefinition) error
+	GetSingleType(ctx context.Context, contentTypeSlug, locale string, fields []entity.FieldDefinition) (*entity.Document, string, error)
+	SaveSingleType(ctx context.Context, contentTypeSlug string, data map[string]any, locale string, fields []entity.FieldDefinition, userID string) (*entity.Document, error)
+	PublishSingleType(ctx context.Context, contentTypeSlug, locale string, fields []entity.FieldDefinition, userID string) error
 	UnpublishSingleType(ctx context.Context, contentTypeSlug, locale string) error
-	GetAllPaginated(ctx context.Context, contentTypeSlug string, start, size int, locale string) ([]*entity.Document, []string, int64, error)
+	GetAllPaginated(ctx context.Context, contentTypeSlug string, start, size int, locale string, fields []entity.FieldDefinition) ([]*entity.Document, []string, int64, error)
+	GetPublishedPaginated(ctx context.Context, contentTypeSlug string, start, size int, locale string, fields []entity.FieldDefinition) ([]*entity.Document, int64, error)
+	GetPublishedSingleType(ctx context.Context, contentTypeSlug, locale string, fields []entity.FieldDefinition) (*entity.Document, error)
 }
 
 type ContentTypeUseCase interface {
@@ -141,23 +143,39 @@ func (f *ResolverFactory) BuildHandler(defs []contenttype.ContentTypeDefinition)
 	}), nil
 }
 
+func (f *ResolverFactory) buildComponentType(parentType string, fd entity.FieldDefinition, jsonSc *graphql.Scalar) *graphql.Object {
+	compFields := graphql.Fields{}
+	for _, sub := range fd.Fields {
+		compFields[sub.Name] = &graphql.Field{Type: gqlScalarFor(sub.Type, jsonSc)}
+	}
+	return graphql.NewObject(graphql.ObjectConfig{
+		Name:   parentType + slugToPascalCase(fd.Name),
+		Fields: compFields,
+	})
+}
+
 func (f *ResolverFactory) buildObjectType(def contenttype.ContentTypeDefinition, timeSc, jsonSc *graphql.Scalar) *graphql.Object {
+	typeName := slugToPascalCase(def.Slug)
 	fields := graphql.Fields{
 		"documentId":  &graphql.Field{Type: graphql.NewNonNull(graphql.ID)},
 		"locale":      &graphql.Field{Type: graphql.NewNonNull(graphql.String)},
-		"status":      &graphql.Field{Type: graphql.NewNonNull(graphql.String)},
 		"createdAt":   &graphql.Field{Type: graphql.NewNonNull(timeSc)},
 		"updatedAt":   &graphql.Field{Type: graphql.NewNonNull(timeSc)},
 		"publishedAt": &graphql.Field{Type: timeSc},
 	}
 	for _, fd := range def.Fields {
-		if fd.Type == "layout" || fd.Type == "component" {
+		if fd.Type == "layout" {
+			continue
+		}
+		if fd.Type == "component" {
+			compType := f.buildComponentType(typeName, fd, jsonSc)
+			fields[fd.Name] = &graphql.Field{Type: compType}
 			continue
 		}
 		fields[fd.Name] = &graphql.Field{Type: gqlScalarFor(fd.Type, jsonSc)}
 	}
 	return graphql.NewObject(graphql.ObjectConfig{
-		Name:   slugToPascalCase(def.Slug),
+		Name:   typeName,
 		Fields: fields,
 	})
 }
@@ -186,11 +204,19 @@ func (f *ResolverFactory) addCollectionFields(
 	camel := slugToCamelCase(def.Slug)
 	pascal := slugToPascalCase(def.Slug)
 	slug := def.Slug
+	fields := def.Fields
 
-	connType := graphql.NewObject(graphql.ObjectConfig{
-		Name: pascal + "Connection",
+	responseType := graphql.NewObject(graphql.ObjectConfig{
+		Name: pascal + "Response",
 		Fields: graphql.Fields{
-			"items": &graphql.Field{Type: graphql.NewNonNull(graphql.NewList(graphql.NewNonNull(objType)))},
+			"data": &graphql.Field{Type: objType},
+		},
+	})
+
+	listResponseType := graphql.NewObject(graphql.ObjectConfig{
+		Name: pascal + "ListResponse",
+		Fields: graphql.Fields{
+			"data":  &graphql.Field{Type: graphql.NewNonNull(graphql.NewList(graphql.NewNonNull(objType)))},
 			"total": &graphql.Field{Type: graphql.NewNonNull(graphql.Int)},
 			"start": &graphql.Field{Type: graphql.NewNonNull(graphql.Int)},
 			"size":  &graphql.Field{Type: graphql.NewNonNull(graphql.Int)},
@@ -198,42 +224,64 @@ func (f *ResolverFactory) addCollectionFields(
 	})
 
 	qf[camel] = &graphql.Field{
-		Type: objType,
+		Type: responseType,
 		Args: graphql.FieldConfigArgument{
 			camel + "Id": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.ID)},
 			"locale":     &graphql.ArgumentConfig{Type: graphql.String},
+			"status":     &graphql.ArgumentConfig{Type: graphql.String},
 		},
 		Resolve: func(p graphql.ResolveParams) (any, error) {
 			docID := p.Args[camel+"Id"].(string)
 			locale, _ := p.Args["locale"].(string)
-			doc, status, err := f.docUC.GetForEdit(p.Context, slug, docID, locale)
+			statusFilter, _ := p.Args["status"].(string)
+			if statusFilter == "draft" && middleware.UserID(p.Context) != "" {
+				doc, _, err := f.docUC.GetForEdit(p.Context, slug, docID, locale, fields)
+				if err != nil {
+					return nil, err
+				}
+				return map[string]any{"data": docToMap(doc)}, nil
+			}
+			doc, err := f.docUC.GetPublished(p.Context, slug, docID, locale, fields)
 			if err != nil {
 				return nil, err
 			}
-			return docToMap(doc, status), nil
+			return map[string]any{"data": docToMap(doc)}, nil
 		},
 	}
 
 	qf[camel+"List"] = &graphql.Field{
-		Type: graphql.NewNonNull(connType),
+		Type: graphql.NewNonNull(listResponseType),
 		Args: graphql.FieldConfigArgument{
 			"start":  &graphql.ArgumentConfig{Type: graphql.Int, DefaultValue: 0},
 			"size":   &graphql.ArgumentConfig{Type: graphql.Int, DefaultValue: 20},
 			"locale": &graphql.ArgumentConfig{Type: graphql.String},
+			"status": &graphql.ArgumentConfig{Type: graphql.String},
 		},
 		Resolve: func(p graphql.ResolveParams) (any, error) {
 			start, _ := p.Args["start"].(int)
 			size, _ := p.Args["size"].(int)
 			locale, _ := p.Args["locale"].(string)
-			docs, statuses, total, err := f.docUC.GetAllPaginated(p.Context, slug, start, size, locale)
+			statusFilter, _ := p.Args["status"].(string)
+			if statusFilter == "draft" && middleware.UserID(p.Context) != "" {
+				docs, _, total, err := f.docUC.GetAllPaginated(p.Context, slug, start, size, locale, fields)
+				if err != nil {
+					return nil, err
+				}
+				items := make([]map[string]any, len(docs))
+				for i, d := range docs {
+					items[i] = docToMap(d)
+				}
+				return map[string]any{"data": items, "total": total, "start": start, "size": size}, nil
+			}
+			docs, total, err := f.docUC.GetPublishedPaginated(p.Context, slug, start, size, locale, fields)
 			if err != nil {
 				return nil, err
 			}
 			items := make([]map[string]any, len(docs))
 			for i, d := range docs {
-				items[i] = docToMap(d, statuses[i])
+				items[i] = docToMap(d)
 			}
-			return map[string]any{"items": items, "total": total, "start": start, "size": size}, nil
+			return map[string]any{"data": items, "total": total, "start": start, "size": size}, nil
 		},
 	}
 
@@ -245,11 +293,11 @@ func (f *ResolverFactory) addCollectionFields(
 		Resolve: f.authRequired(func(p graphql.ResolveParams) (any, error) {
 			data := inputToMap(p.Args["data"])
 			doc := &entity.Document{Data: data}
-			saved, err := f.docUC.Save(p.Context, slug, doc, middleware.UserID(p.Context))
+			saved, err := f.docUC.Save(p.Context, slug, doc, fields, middleware.UserID(p.Context))
 			if err != nil {
 				return nil, err
 			}
-			return docToMap(saved, "draft"), nil
+			return docToMap(saved), nil
 		}),
 	}
 
@@ -263,15 +311,11 @@ func (f *ResolverFactory) addCollectionFields(
 			docID := p.Args[camel+"Id"].(string)
 			data := inputToMap(p.Args["data"])
 			doc := &entity.Document{DocumentID: docID, Data: data}
-			saved, err := f.docUC.Save(p.Context, slug, doc, middleware.UserID(p.Context))
+			saved, err := f.docUC.Save(p.Context, slug, doc, fields, middleware.UserID(p.Context))
 			if err != nil {
 				return nil, err
 			}
-			_, status, err := f.docUC.GetForEdit(p.Context, slug, saved.DocumentID, saved.Locale)
-			if err != nil {
-				return nil, err
-			}
-			return docToMap(saved, status), nil
+			return docToMap(saved), nil
 		}),
 	}
 
@@ -282,7 +326,7 @@ func (f *ResolverFactory) addCollectionFields(
 		},
 		Resolve: f.authRequired(func(p graphql.ResolveParams) (any, error) {
 			docID := p.Args[camel+"Id"].(string)
-			return true, f.docUC.Delete(p.Context, slug, docID)
+			return true, f.docUC.Delete(p.Context, slug, docID, fields)
 		}),
 	}
 
@@ -295,14 +339,14 @@ func (f *ResolverFactory) addCollectionFields(
 		Resolve: f.authRequired(func(p graphql.ResolveParams) (any, error) {
 			docID := p.Args[camel+"Id"].(string)
 			locale, _ := p.Args["locale"].(string)
-			if err := f.docUC.Publish(p.Context, slug, docID, locale, middleware.UserID(p.Context)); err != nil {
+			if err := f.docUC.Publish(p.Context, slug, docID, locale, fields, middleware.UserID(p.Context)); err != nil {
 				return nil, err
 			}
-			doc, err := f.docUC.GetPublished(p.Context, slug, docID, locale)
+			doc, err := f.docUC.GetPublished(p.Context, slug, docID, locale, fields)
 			if err != nil {
 				return nil, err
 			}
-			return docToMap(doc, "published"), nil
+			return docToMap(doc), nil
 		}),
 	}
 
@@ -318,11 +362,11 @@ func (f *ResolverFactory) addCollectionFields(
 			if err := f.docUC.Unpublish(p.Context, slug, docID, locale); err != nil {
 				return nil, err
 			}
-			doc, status, err := f.docUC.GetForEdit(p.Context, slug, docID, locale)
+			doc, _, err := f.docUC.GetForEdit(p.Context, slug, docID, locale, fields)
 			if err != nil {
 				return nil, err
 			}
-			return docToMap(doc, status), nil
+			return docToMap(doc), nil
 		}),
 	}
 }
@@ -336,19 +380,36 @@ func (f *ResolverFactory) addSingleFields(
 	camel := slugToCamelCase(def.Slug)
 	pascal := slugToPascalCase(def.Slug)
 	slug := def.Slug
+	fields := def.Fields
+
+	responseType := graphql.NewObject(graphql.ObjectConfig{
+		Name: pascal + "Response",
+		Fields: graphql.Fields{
+			"data": &graphql.Field{Type: objType},
+		},
+	})
 
 	qf[camel] = &graphql.Field{
-		Type: objType,
+		Type: responseType,
 		Args: graphql.FieldConfigArgument{
 			"locale": &graphql.ArgumentConfig{Type: graphql.String},
+			"status": &graphql.ArgumentConfig{Type: graphql.String},
 		},
 		Resolve: func(p graphql.ResolveParams) (any, error) {
 			locale, _ := p.Args["locale"].(string)
-			doc, status, err := f.docUC.GetSingleType(p.Context, slug, locale)
+			statusFilter, _ := p.Args["status"].(string)
+			if statusFilter == "draft" && middleware.UserID(p.Context) != "" {
+				doc, _, err := f.docUC.GetSingleType(p.Context, slug, locale, fields)
+				if err != nil {
+					return nil, nil
+				}
+				return map[string]any{"data": docToMap(doc)}, nil
+			}
+			doc, err := f.docUC.GetPublishedSingleType(p.Context, slug, locale, fields)
 			if err != nil {
 				return nil, nil
 			}
-			return docToMap(doc, status), nil
+			return map[string]any{"data": docToMap(doc)}, nil
 		},
 	}
 
@@ -361,15 +422,15 @@ func (f *ResolverFactory) addSingleFields(
 		Resolve: f.authRequired(func(p graphql.ResolveParams) (any, error) {
 			data := inputToMap(p.Args["data"])
 			locale, _ := p.Args["locale"].(string)
-			saved, err := f.docUC.SaveSingleType(p.Context, slug, data, locale, middleware.UserID(p.Context))
+			saved, err := f.docUC.SaveSingleType(p.Context, slug, data, locale, fields, middleware.UserID(p.Context))
 			if err != nil {
 				return nil, err
 			}
-			doc, status, err := f.docUC.GetSingleType(p.Context, slug, saved.Locale)
+			doc, _, err := f.docUC.GetSingleType(p.Context, slug, saved.Locale, fields)
 			if err != nil {
 				return nil, err
 			}
-			return docToMap(doc, status), nil
+			return docToMap(doc), nil
 		}),
 	}
 
@@ -380,14 +441,14 @@ func (f *ResolverFactory) addSingleFields(
 		},
 		Resolve: f.authRequired(func(p graphql.ResolveParams) (any, error) {
 			locale, _ := p.Args["locale"].(string)
-			if err := f.docUC.PublishSingleType(p.Context, slug, locale, middleware.UserID(p.Context)); err != nil {
+			if err := f.docUC.PublishSingleType(p.Context, slug, locale, fields, middleware.UserID(p.Context)); err != nil {
 				return nil, err
 			}
-			doc, status, err := f.docUC.GetSingleType(p.Context, slug, locale)
+			doc, _, err := f.docUC.GetSingleType(p.Context, slug, locale, fields)
 			if err != nil {
 				return nil, err
 			}
-			return docToMap(doc, status), nil
+			return docToMap(doc), nil
 		}),
 	}
 
@@ -401,11 +462,11 @@ func (f *ResolverFactory) addSingleFields(
 			if err := f.docUC.UnpublishSingleType(p.Context, slug, locale); err != nil {
 				return nil, err
 			}
-			doc, status, err := f.docUC.GetSingleType(p.Context, slug, locale)
+			doc, _, err := f.docUC.GetSingleType(p.Context, slug, locale, fields)
 			if err != nil {
 				return nil, err
 			}
-			return docToMap(doc, status), nil
+			return docToMap(doc), nil
 		}),
 	}
 }
@@ -419,11 +480,10 @@ func (f *ResolverFactory) authRequired(resolve graphql.FieldResolveFn) graphql.F
 	}
 }
 
-func docToMap(d *entity.Document, status string) map[string]any {
+func docToMap(d *entity.Document) map[string]any {
 	m := map[string]any{
 		"documentId":  d.DocumentID,
 		"locale":      d.Locale,
-		"status":      status,
 		"createdAt":   d.CreatedAt,
 		"updatedAt":   d.UpdatedAt,
 		"publishedAt": nil,
