@@ -17,6 +17,7 @@ export function MediaInput({
   "aria-label": ariaLabel,
 }: MediaInputProps) {
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   return (
     <Controller
@@ -24,10 +25,18 @@ export function MediaInput({
       control={control}
       defaultValue={null}
       render={({ field }) => {
-        const displayUrl = (field.value as string | null) || null;
+        const hasValue = !!field.value;
+        const displayUrl = previewUrl || (hasValue ? (field.value as string) : null);
 
         function handleSelect(asset: MediaAsset) {
-          field.onChange(asset.thumbnailUrl || asset.url);
+          field.onChange(asset.documentId);
+          setPreviewUrl(asset.thumbnailUrl || asset.url);
+        }
+
+        function handleRemove(e: React.MouseEvent) {
+          e.stopPropagation();
+          field.onChange(null);
+          setPreviewUrl(null);
         }
 
         return (
@@ -37,7 +46,7 @@ export function MediaInput({
               aria-label={ariaLabel ?? name}
               role="button"
               tabIndex={0}
-              className="cursor-pointer border border-input rounded-md transition-colors hover:border-ring relative min-h-28 max-h-28 overflow-hidden"
+              className="cursor-pointer border border-input rounded-md transition-colors hover:border-ring relative overflow-hidden"
               onClick={() => setIsLibraryOpen(true)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") setIsLibraryOpen(true);
@@ -48,22 +57,19 @@ export function MediaInput({
                   <img
                     src={displayUrl}
                     alt="media preview"
-                    className="w-full max-h-28 object-contain inline-block"
+                    className="w-full h-auto max-h-40 object-contain"
                   />
                   <button
                     type="button"
                     aria-label="Remove image"
                     className="absolute top-1 right-1 rounded-full bg-background/80 p-1 text-muted-foreground hover:text-destructive transition-colors"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      field.onChange(null);
-                    }}
+                    onClick={handleRemove}
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
                   </button>
                 </>
               ) : (
-                <div className="flex flex-col items-center justify-center min-h-28 gap-2 text-muted-foreground">
+                <div className="flex flex-col items-center justify-center h-28 gap-2 text-muted-foreground">
                   <span className="text-2xl">↑</span>
                   <span className="text-sm">Click to select media</span>
                 </div>

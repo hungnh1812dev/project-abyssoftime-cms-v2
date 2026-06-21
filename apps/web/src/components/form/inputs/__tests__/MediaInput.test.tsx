@@ -14,14 +14,15 @@ const mediaResponse = {
   items: [
     {
       ID: 'a1',
+      documentId: 'doc-uuid-1',
       url: 'https://cdn/a1.jpg',
       thumbnailUrl: 'https://cdn/a1.jpg',
       publicId: 'p1',
       fileName: 'a1_abc.jpg',
       fileExt: 'jpg',
       hash: 'abc',
-      documentRef: '',
-      contentTypeId: '',
+      width: 800,
+      height: 600,
       createdAt: '',
     },
   ],
@@ -80,7 +81,7 @@ describe('MediaInput', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument()
   })
 
-  it('sets field value to asset url when an asset is selected from library', async () => {
+  it('stores documentId and shows preview URL when an asset is selected', async () => {
     render(
       <Wrapper>
         <FormProvider mutationFn={vi.fn().mockResolvedValue(undefined)}>

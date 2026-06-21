@@ -61,8 +61,8 @@ See [sync-table-fields.md](sync-table-fields.md) for full plan. Spec: [specs/syn
 - [x] ✅ Checkpoint A: backend compiles + tests pass
 - [x] T4 Per-field dynamic columns (repository rewrite)
 - [x] T5 GraphQL: media as object + remove response wrappers
-- [ ] T6 Frontend: MediaInput stores `documentId` + aspect ratio fix
-- [ ] ✅ Checkpoint B (Final): full system verification
+- [x] T6 Frontend: MediaInput stores `documentId` + aspect ratio fix
+- [x] ✅ Checkpoint B (Final): full system verification
 
 ---
 
