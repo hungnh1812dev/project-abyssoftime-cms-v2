@@ -29,15 +29,20 @@ export interface PaginatedResponse<T> {
 export type EntryStatus = 'draft' | 'modified' | 'published'
 
 export interface Document {
-  documentId: string
-  contentTypeId: string
   data: Record<string, unknown>
   status: EntryStatus
-  locale: string
-  createdAt: string
-  updatedAt: string
-  createdBy: string
-  updatedBy: string
+}
+
+export const SYSTEM_FIELDS = ['documentId', 'locale', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy'] as const
+
+export function stripSystemFields(data: Record<string, unknown>): Record<string, unknown> {
+  const content: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(data)) {
+    if (!(SYSTEM_FIELDS as readonly string[]).includes(k)) {
+      content[k] = v
+    }
+  }
+  return content
 }
 
 export interface MediaAsset {

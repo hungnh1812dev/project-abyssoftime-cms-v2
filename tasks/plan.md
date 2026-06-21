@@ -61,6 +61,26 @@ All three are independent — can be done in any order.
 
 ---
 
+## Current: Phase ZZ — Bug Fixes v1.8 (Response Shape, Auth, Inputs, GraphQL)
+
+See [bugfix-v1.8.md](bugfix-v1.8.md) for full plan. Spec: [specs/BUGFIX-SPEC.md](../specs/BUGFIX-SPEC.md).
+
+### Summary
+
+Six bugs across auth, content API, frontend inputs, and response formatting:
+
+| Bug | Scope | Description |
+|-----|-------|-------------|
+| B1 | BE | User entity missing `id`/`documentId` on registration |
+| B2 | FE | Register page re-shown after admin creation |
+| B4+B5 | BE+FE | Response shape: merge system+content into `data`, remove `contentTypeId`/`status` from public |
+| B3 | FE | JsonInput/RichTextInput data loss on save |
+| B6 | BE | GraphQL defaults to draft instead of published |
+
+### Order: B1 → B2 → B4+B5 → B3 → B6
+
+---
+
 ## Upcoming
 
 *(Add new plans here as they are defined.)*

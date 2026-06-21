@@ -4,14 +4,30 @@
 
 ---
 
-## Phase Z — Bug Fixes: Auth Flow & Naming
+## Phase Z — Bug Fixes: Auth Flow & Naming (Complete)
 
-See [bugfix-auth-and-naming.md](bugfix-auth-and-naming.md) for full details.
+- [x] B1 Register → Login redirect
+- [x] B2 Session persistence
+- [x] B3 Component table naming
+- [x] ✅ Checkpoint Z
 
-- [x] B1 Register → Login redirect (invalidate `['auth-setup']` query before navigate)
-- [x] B2 Session persistence: fix cookie defaults (`COOKIE_SECURE=false`, `COOKIE_SAMESITE=lax` for dev) + re-issue refresh token on `/auth/refresh`
-- [x] B3 Component table naming: spec-only fix — no code exists yet; `components_` prefix documented for future implementation
-- [x] ✅ Checkpoint Z: all tests pass (`make test-api` + `make test-web`)
+---
+
+## Phase ZZ — Bug Fixes v1.8 (Response Shape, Auth, Inputs, GraphQL)
+
+See [bugfix-v1.8.md](bugfix-v1.8.md) for full plan. Spec: [specs/BUGFIX-SPEC.md](../specs/BUGFIX-SPEC.md).
+
+- [x] B1 User entity: add UUID generation for `id` + `documentId` in `Register()`
+- [x] B2 Register page: add `adminExists` guard → redirect to `/login`
+- [x] ✅ Checkpoint 1: B1+B2 verified
+- [x] B4+B5a Backend: restructure response shape (merge system+content into `data`, remove `contentTypeId`/`status` from public)
+- [x] B4+B5b Frontend: adapt hooks + panels to new response shape
+- [x] ✅ Checkpoint 2: response shape verified end-to-end
+- [x] B3 JsonInput/RichTextInput: fix data loss on save (deep comparison in JsonInput, fallback in RichTextInput)
+- [x] ✅ Checkpoint 3: input persistence verified
+- [x] B6a Backend: new repo+usecase methods for published document queries
+- [x] B6b GraphQL: default queries to published, add `status` filter with auth
+- [x] ✅ Checkpoint 4 (Final): all tests green (`go test ./...` + `vitest run`)
 
 ---
 

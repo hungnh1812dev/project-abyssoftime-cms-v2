@@ -18,11 +18,12 @@ function InnerJsonInput({ field }: { field: { value: unknown; onChange: (v: unkn
   const [syntaxError, setSyntaxError] = useState<string | null>(null);
   const fieldValue = field.value;
 
-  const [prevFieldValue, setPrevFieldValue] = useState(field.value);
+  const [prevSerialized, setPrevSerialized] = useState(() => serialize(field.value));
+  const currentSerialized = serialize(fieldValue);
 
-  if (fieldValue !== prevFieldValue) {
-    setPrevFieldValue(fieldValue);
-    setRawValue(serialize(fieldValue));
+  if (currentSerialized !== prevSerialized) {
+    setPrevSerialized(currentSerialized);
+    setRawValue(currentSerialized);
   }
 
   return (

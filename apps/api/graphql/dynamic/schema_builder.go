@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"project-abyssoftime-cms-v2/api/internal/domain/entity"
 	contenttype "project-abyssoftime-cms-v2/api/internal/usecase/content_type"
 )
 
@@ -18,6 +19,11 @@ func NewSchemaBuilder(defs []contenttype.ContentTypeDefinition) *SchemaBuilder {
 func (b *SchemaBuilder) BuildBaseSchema() string {
 	return `scalar JSON
 scalar Time
+
+enum SortOrder {
+  ASC
+  DESC
+}
 
 type ContentType {
   id: ID!
@@ -40,17 +46,28 @@ func (b *SchemaBuilder) BuildContentTypeSDL(def contenttype.ContentTypeDefinitio
 
 	var sb strings.Builder
 
+	// Component types
+	for _, f := range def.Fields {
+		if f.Type == "component" {
+			writeComponentType(&sb, typeName, f)
+		}
+	}
+
 	// Object type
 	fmt.Fprintf(&sb, "type %s {\n", typeName)
 	sb.WriteString("  documentId: ID!\n")
 	for _, f := range def.Fields {
-		if f.Type == "layout" || f.Type == "component" {
+		if f.Type == "layout" {
+			continue
+		}
+		if f.Type == "component" {
+			compType := typeName + slugToPascalCase(f.Name)
+			fmt.Fprintf(&sb, "  %s: %s\n", f.Name, compType)
 			continue
 		}
 		fmt.Fprintf(&sb, "  %s: %s\n", f.Name, fieldTypeToGraphQL(f.Type))
 	}
 	sb.WriteString("  locale: String!\n")
-	sb.WriteString("  status: String!\n")
 	sb.WriteString("  createdAt: Time!\n")
 	sb.WriteString("  updatedAt: Time!\n")
 	sb.WriteString("  publishedAt: Time\n")
@@ -66,19 +83,29 @@ func (b *SchemaBuilder) BuildContentTypeSDL(def contenttype.ContentTypeDefinitio
 	}
 	sb.WriteString("}\n\n")
 
-	if def.Kind == "collection" {
-		// Connection type
-		fmt.Fprintf(&sb, "type %sConnection {\n", typeName)
-		fmt.Fprintf(&sb, "  items: [%s!]!\n", typeName)
-		sb.WriteString("  total: Int!\n")
-		sb.WriteString("  start: Int!\n")
-		sb.WriteString("  size: Int!\n")
-		sb.WriteString("}\n\n")
+	// Response wrapper types
+	fmt.Fprintf(&sb, "type %sResponse {\n", typeName)
+	fmt.Fprintf(&sb, "  data: %s\n", typeName)
+	sb.WriteString("}\n\n")
 
+	fmt.Fprintf(&sb, "type %sListResponse {\n", typeName)
+	fmt.Fprintf(&sb, "  data: [%s!]!\n", typeName)
+	sb.WriteString("  total: Int!\n")
+	sb.WriteString("  start: Int!\n")
+	sb.WriteString("  size: Int!\n")
+	sb.WriteString("}\n\n")
+
+	// Filter type
+	writeFilterType(&sb, typeName, def.Fields)
+
+	// OrderBy type
+	writeOrderByType(&sb, typeName, def.Fields)
+
+	if def.Kind == "collection" {
 		// Queries
 		sb.WriteString("extend type Query {\n")
-		fmt.Fprintf(&sb, "  %s(%sId: ID!, locale: String): %s\n", camel, camel, typeName)
-		fmt.Fprintf(&sb, "  %sList(start: Int, size: Int, locale: String): %sConnection!\n", camel, typeName)
+		fmt.Fprintf(&sb, "  %s(%sId: ID!, locale: String): %sResponse\n", camel, camel, typeName)
+		fmt.Fprintf(&sb, "  %sList(where: %sFilter, orderBy: %sOrderBy, start: Int, size: Int, locale: String): %sListResponse!\n", camel, typeName, typeName, typeName)
 		sb.WriteString("}\n\n")
 
 		// Mutations
@@ -92,7 +119,7 @@ func (b *SchemaBuilder) BuildContentTypeSDL(def contenttype.ContentTypeDefinitio
 	} else {
 		// Single-type queries
 		sb.WriteString("extend type Query {\n")
-		fmt.Fprintf(&sb, "  %s(locale: String): %s\n", camel, typeName)
+		fmt.Fprintf(&sb, "  %s(locale: String): %sResponse\n", camel, typeName)
 		sb.WriteString("}\n\n")
 
 		// Single-type mutations (no delete)
@@ -104,6 +131,50 @@ func (b *SchemaBuilder) BuildContentTypeSDL(def contenttype.ContentTypeDefinitio
 	}
 
 	return sb.String()
+}
+
+func writeComponentType(sb *strings.Builder, parentType string, f entity.FieldDefinition) {
+	compType := parentType + slugToPascalCase(f.Name)
+	fmt.Fprintf(sb, "type %s {\n", compType)
+	for _, sub := range f.Fields {
+		fmt.Fprintf(sb, "  %s: %s\n", sub.Name, fieldTypeToGraphQL(sub.Type))
+	}
+	sb.WriteString("}\n\n")
+}
+
+func writeFilterType(sb *strings.Builder, typeName string, fields []entity.FieldDefinition) {
+	fmt.Fprintf(sb, "input %sFilter {\n", typeName)
+	for _, f := range fields {
+		if f.Type == "layout" {
+			continue
+		}
+		switch f.Type {
+		case "text", "richtext":
+			fmt.Fprintf(sb, "  %s: StringFilter\n", f.Name)
+		case "number":
+			fmt.Fprintf(sb, "  %s: NumberFilter\n", f.Name)
+		case "boolean":
+			fmt.Fprintf(sb, "  %s: BooleanFilter\n", f.Name)
+		}
+	}
+	fmt.Fprintf(sb, "  AND: [%sFilter!]\n", typeName)
+	fmt.Fprintf(sb, "  OR: [%sFilter!]\n", typeName)
+	fmt.Fprintf(sb, "  NOT: %sFilter\n", typeName)
+	sb.WriteString("}\n\n")
+}
+
+func writeOrderByType(sb *strings.Builder, typeName string, fields []entity.FieldDefinition) {
+	fmt.Fprintf(sb, "input %sOrderBy {\n", typeName)
+	for _, f := range fields {
+		switch f.Type {
+		case "text", "richtext", "number", "boolean":
+			fmt.Fprintf(sb, "  %s: SortOrder\n", f.Name)
+		}
+	}
+	sb.WriteString("  createdAt: SortOrder\n")
+	sb.WriteString("  updatedAt: SortOrder\n")
+	sb.WriteString("  publishedAt: SortOrder\n")
+	sb.WriteString("}\n\n")
 }
 
 func (b *SchemaBuilder) BuildSDL() string {

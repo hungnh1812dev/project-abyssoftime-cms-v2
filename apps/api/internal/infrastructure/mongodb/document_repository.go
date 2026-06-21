@@ -114,6 +114,32 @@ func (r *documentRepository) FindDraftsByContentTypePaginated(ctx context.Contex
 	return results, total, nil
 }
 
+func (r *documentRepository) FindPublishedByContentTypePaginated(ctx context.Context, contentTypeSlug string, start, size int, locale string) ([]*entity.Document, int64, error) {
+	col := r.collection(contentTypeSlug)
+	filter := bson.M{"version": entity.VersionPublished, "locale": locale}
+
+	total, err := col.CountDocuments(ctx, filter)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	opts := options.Find().
+		SetSort(bson.D{{Key: "createdAt", Value: -1}}).
+		SetSkip(int64(start)).
+		SetLimit(int64(size))
+	cursor, err := col.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer cursor.Close(ctx)
+
+	var results []*entity.Document
+	if err := cursor.All(ctx, &results); err != nil {
+		return nil, 0, err
+	}
+	return results, total, nil
+}
+
 func (r *documentRepository) FindPublishedByDocumentIDs(ctx context.Context, contentTypeSlug string, documentIDs []string, locale string) ([]*entity.Document, error) {
 	if len(documentIDs) == 0 {
 		return nil, nil

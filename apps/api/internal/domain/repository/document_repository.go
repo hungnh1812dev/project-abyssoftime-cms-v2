@@ -17,6 +17,7 @@ type DocumentRepository interface {
 	UpsertPublished(ctx context.Context, contentTypeSlug string, doc *entity.Document) error
 	FindDraftsByContentType(ctx context.Context, contentTypeSlug string) ([]*entity.Document, error)
 	FindDraftsByContentTypePaginated(ctx context.Context, contentTypeSlug string, start, size int, locale string) ([]*entity.Document, int64, error)
+	FindPublishedByContentTypePaginated(ctx context.Context, contentTypeSlug string, start, size int, locale string) ([]*entity.Document, int64, error)
 	FindPublishedByDocumentIDs(ctx context.Context, contentTypeSlug string, documentIDs []string, locale string) ([]*entity.Document, error)
 	DeleteByDocumentID(ctx context.Context, contentTypeSlug, documentID, locale string) error
 	DeletePublishedByDocumentID(ctx context.Context, contentTypeSlug, documentID, locale string) error

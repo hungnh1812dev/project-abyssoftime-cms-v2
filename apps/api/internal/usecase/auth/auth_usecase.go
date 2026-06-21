@@ -3,7 +3,9 @@ package auth
 import (
 	"context"
 	"fmt"
+	"time"
 
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 
 	"project-abyssoftime-cms-v2/api/internal/domain/entity"
@@ -49,10 +51,13 @@ func (uc *UseCase) Register(ctx context.Context, email, password string) (*entit
 	}
 
 	user := &entity.User{
+		ID:           uuid.New().String(),
+		DocumentID:   uuid.New().String(),
 		Email:        email,
 		PasswordHash: string(hash),
 		Role:         entity.RoleSuperAdmin,
 		RoleID:       saRole.DocumentID,
+		CreatedAt:    time.Now().UTC(),
 	}
 	if err := uc.repo.Create(ctx, user); err != nil {
 		return nil, err

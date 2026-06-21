@@ -5,6 +5,7 @@ import { useCollectionDocument, useCreateCollectionDocument, useUpdateCollection
 import { useLocales } from '@/hooks/useLocales';
 import { api } from '@/lib/api';
 import type { Document as CmsDocument, ContentType } from '@/types/cms';
+import { stripSystemFields } from '@/types/cms';
 import { useState } from 'react';
 import { ContentDetailLayout } from './ContentDetailLayout';
 import { ContentTypeBuilder } from './ContentTypeBuilder';
@@ -58,7 +59,7 @@ export function ContentTypePanel({ contentType, id, isNew }: Props) {
             locale: activeLocale,
           });
           navigate(
-            `/admin/content-type/collection-type/${contentType.Slug}/${created.documentId}?locale=${activeLocale}`,
+            `/admin/content-type/collection-type/${contentType.Slug}/${created.data.documentId}?locale=${activeLocale}`,
             { replace: true },
           );
         }
@@ -96,7 +97,7 @@ export function ContentTypePanel({ contentType, id, isNew }: Props) {
     : (data: Record<string, unknown>) =>
         updateCollection.mutateAsync({
           contentTypeSlug: contentType.Slug,
-          id: doc.documentId,
+          id: (doc.data.documentId as string),
           data,
           locale: activeLocale,
         });
@@ -105,7 +106,7 @@ export function ContentTypePanel({ contentType, id, isNew }: Props) {
     if (isSingle) {
       publishSingle.mutate({ contentTypeSlug: contentType.Slug, locale: activeLocale });
     } else {
-      publishCollection.mutate({ contentTypeSlug: contentType.Slug, id: doc.documentId, locale: activeLocale });
+      publishCollection.mutate({ contentTypeSlug: contentType.Slug, id: (doc.data.documentId as string), locale: activeLocale });
     }
   };
 
@@ -113,7 +114,7 @@ export function ContentTypePanel({ contentType, id, isNew }: Props) {
     if (isSingle) {
       unpublishSingle.mutate({ contentTypeSlug: contentType.Slug, locale: activeLocale });
     } else {
-      unpublishCollection.mutate({ contentTypeSlug: contentType.Slug, id: doc.documentId, locale: activeLocale });
+      unpublishCollection.mutate({ contentTypeSlug: contentType.Slug, id: (doc.data.documentId as string), locale: activeLocale });
     }
   };
 
@@ -126,7 +127,7 @@ export function ContentTypePanel({ contentType, id, isNew }: Props) {
 
   const apiBase = isSingle
     ? `/api/document-manager/single-type/${contentType.Slug}`
-    : `/api/document-manager/collection-type/${contentType.Slug}/${doc.documentId}`;
+    : `/api/document-manager/collection-type/${contentType.Slug}/${(doc.data.documentId as string)}`;
 
   return (
     <ContentDetailLayout
@@ -165,11 +166,11 @@ export function ContentTypePanel({ contentType, id, isNew }: Props) {
       <ContentTypeBuilder
         schema={schema}
         query={{
-          queryKey: ['documents', isSingle ? 'single-type' : 'collection-type', 'detail', contentType.Slug, doc.documentId, activeLocale, 'data'],
+          queryKey: ['documents', isSingle ? 'single-type' : 'collection-type', 'detail', contentType.Slug, (doc.data.documentId as string), activeLocale, 'data'],
           queryFn: () =>
             api
               .get<CmsDocument>(apiBase, { params: { locale: activeLocale } })
-              .then((r) => (r.data as CmsDocument).data),
+              .then((r) => stripSystemFields((r.data as CmsDocument).data)),
         }}
         mutationFn={mutationFn}
       />

@@ -15,6 +15,9 @@ func TestBuildBaseSchema(t *testing.T) {
 	for _, want := range []string{
 		"scalar JSON",
 		"scalar Time",
+		"enum SortOrder {",
+		"ASC",
+		"DESC",
 		"type ContentType {",
 		"id: ID!",
 		"name: String!",
@@ -116,16 +119,27 @@ func TestBuildContentTypeSDL_Collection(t *testing.T) {
 		"readingTime: Float",
 		"documentId: ID!",
 		"locale: String!",
-		"status: String!",
 		"createdAt: Time!",
 		"updatedAt: Time!",
-		"type BlogPostsConnection {",
-		"items: [BlogPosts!]!",
-		"total: Int!",
 		"input BlogPostsInput {",
+		"type BlogPostsResponse {",
+		"data: BlogPosts",
+		"type BlogPostsListResponse {",
+		"data: [BlogPosts!]!",
+		"total: Int!",
+		"input BlogPostsFilter {",
+		"title: StringFilter",
+		"featured: BooleanFilter",
+		"readingTime: NumberFilter",
+		"AND: [BlogPostsFilter!]",
+		"OR: [BlogPostsFilter!]",
+		"NOT: BlogPostsFilter",
+		"input BlogPostsOrderBy {",
+		"title: SortOrder",
+		"createdAt: SortOrder",
 		"extend type Query {",
-		"blogPosts(blogPostsId: ID!, locale: String): BlogPosts",
-		"blogPostsList(start: Int, size: Int, locale: String): BlogPostsConnection!",
+		"blogPosts(blogPostsId: ID!, locale: String): BlogPostsResponse",
+		"blogPostsList(where: BlogPostsFilter, orderBy: BlogPostsOrderBy, start: Int, size: Int, locale: String): BlogPostsListResponse!",
 		"extend type Mutation {",
 		"createBlogPosts(data: BlogPostsInput!): BlogPosts!",
 		"updateBlogPosts(blogPostsId: ID!, data: BlogPostsInput!): BlogPosts!",
@@ -156,7 +170,8 @@ func TestBuildContentTypeSDL_Single(t *testing.T) {
 		"type AboutPage {",
 		"headline: String",
 		"openToWork: Boolean",
-		"aboutPage(locale: String): AboutPage",
+		"type AboutPageResponse {",
+		"aboutPage(locale: String): AboutPageResponse",
 		"saveAboutPage(data: AboutPageInput!, locale: String): AboutPage!",
 		"publishAboutPage(locale: String): AboutPage!",
 		"unpublishAboutPage(locale: String): AboutPage!",
@@ -169,8 +184,33 @@ func TestBuildContentTypeSDL_Single(t *testing.T) {
 	if strings.Contains(sdl, "deleteAboutPage") {
 		t.Error("single-type should not have delete mutation")
 	}
-	if strings.Contains(sdl, "Connection") {
-		t.Error("single-type should not have Connection type")
+}
+
+func TestBuildContentTypeSDL_Component(t *testing.T) {
+	def := contenttype.ContentTypeDefinition{
+		Slug: "blog-posts",
+		Name: "Blog Posts",
+		Kind: "collection",
+		Fields: []entity.FieldDefinition{
+			{Name: "title", Type: "text"},
+			{Name: "banner", Type: "component", Fields: []entity.FieldDefinition{
+				{Name: "background", Type: "media"},
+				{Name: "title", Type: "text"},
+			}},
+		},
+	}
+	b := NewSchemaBuilder(nil)
+	sdl := b.BuildContentTypeSDL(def)
+
+	for _, want := range []string{
+		"type BlogPostsBanner {",
+		"background: String",
+		"title: String",
+		"banner: BlogPostsBanner",
+	} {
+		if !strings.Contains(sdl, want) {
+			t.Errorf("component SDL missing %q\n\nFull SDL:\n%s", want, sdl)
+		}
 	}
 }
 
@@ -197,10 +237,11 @@ func TestBuildSDL_MergesAllDefinitions(t *testing.T) {
 		"type ContentType {",
 		"contentTypes: [ContentType!]!",
 		"type AboutPage {",
+		"AboutPageResponse",
 		"saveAboutPage(",
 		"type BlogPosts {",
 		"createBlogPosts(",
-		"BlogPostsConnection",
+		"BlogPostsListResponse",
 		"type CommonText {",
 		"saveCommonText(",
 	} {

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, Navigate, Link } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -50,6 +50,10 @@ export function RegisterPage() {
         <p className="text-muted-foreground text-sm">Loading…</p>
       </div>
     )
+  }
+
+  if (adminExists) {
+    return <Navigate to="/login" replace />
   }
 
   return (

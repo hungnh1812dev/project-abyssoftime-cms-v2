@@ -73,6 +73,16 @@ describe('RegisterPage', () => {
     })
   })
 
+  it('redirects to /login when admin already exists', async () => {
+    mock.onGet('/auth/setup').reply(200, { adminExists: true })
+    renderWithProviders(<RegisterPage />)
+
+    await waitFor(() => {
+      expect(screen.queryByLabelText(/email/i)).not.toBeInTheDocument()
+      expect(screen.queryByLabelText(/password/i)).not.toBeInTheDocument()
+    })
+  })
+
   it('shows error message when registration fails', async () => {
     const user = userEvent.setup()
     mock.onPost('/auth/register').reply(409, { message: 'Email already exists' })
