@@ -61,11 +61,11 @@ func (uc *UseCase) extractAndSaveComponents(ctx context.Context, slug string, do
 	}
 	now := time.Now().UTC()
 	for _, name := range componentFieldNames(fields) {
-		raw, ok := doc.Data[name]
+		raw, ok := doc.Fields[name]
 		if !ok {
 			continue
 		}
-		delete(doc.Data, name)
+		delete(doc.Fields, name)
 
 		var components []*entity.Component
 		switch v := raw.(type) {
@@ -74,7 +74,7 @@ func (uc *UseCase) extractAndSaveComponents(ctx context.Context, slug string, do
 				if m, ok := item.(map[string]any); ok {
 					components = append(components, &entity.Component{
 						ComponentID: uuid.New().String(),
-						Data:        m,
+						Fields:      m,
 						CreatedAt:   now,
 						UpdatedAt:   now,
 					})
@@ -83,7 +83,7 @@ func (uc *UseCase) extractAndSaveComponents(ctx context.Context, slug string, do
 		case map[string]any:
 			components = append(components, &entity.Component{
 				ComponentID: uuid.New().String(),
-				Data:        v,
+				Fields:      v,
 				CreatedAt:   now,
 				UpdatedAt:   now,
 			})
@@ -106,13 +106,13 @@ func (uc *UseCase) mergeComponents(ctx context.Context, slug string, doc *entity
 			return err
 		}
 		if len(components) == 1 {
-			doc.Data[name] = components[0].Data
+			doc.Fields[name] = components[0].Fields
 		} else if len(components) > 1 {
 			arr := make([]map[string]any, len(components))
 			for i, c := range components {
-				arr[i] = c.Data
+				arr[i] = c.Fields
 			}
-			doc.Data[name] = arr
+			doc.Fields[name] = arr
 		}
 	}
 	return nil
@@ -140,9 +140,6 @@ func (uc *UseCase) Save(ctx context.Context, contentTypeSlug string, doc *entity
 	if existing != nil {
 		doc.CreatedAt = existing.CreatedAt
 		doc.CreatedBy = existing.CreatedBy
-		if doc.ContentTypeID == "" {
-			doc.ContentTypeID = existing.ContentTypeID
-		}
 	} else {
 		doc.CreatedAt = now
 		doc.CreatedBy = userID
@@ -244,17 +241,17 @@ func (uc *UseCase) Publish(ctx context.Context, contentTypeSlug, documentID, loc
 	if err != nil {
 		return err
 	}
+	now := time.Now().UTC()
 	published := &entity.Document{
-		DocumentID:    draft.DocumentID,
-		ContentTypeID: draft.ContentTypeID,
-		Data:          draft.Data,
-		Locale:        draft.Locale,
-		CreatedAt:     draft.CreatedAt,
-		CreatedBy:     draft.CreatedBy,
-		UpdatedAt:     draft.UpdatedAt,
-		UpdatedBy:     draft.UpdatedBy,
-		PublishedAt:   time.Now().UTC(),
-		PublishedBy:   userID,
+		DocumentID:  draft.DocumentID,
+		Fields:      draft.Fields,
+		Locale:      draft.Locale,
+		CreatedAt:   draft.CreatedAt,
+		CreatedBy:   draft.CreatedBy,
+		UpdatedAt:   draft.UpdatedAt,
+		UpdatedBy:   draft.UpdatedBy,
+		PublishedAt: &now,
+		PublishedBy: userID,
 	}
 	if err := uc.repo.UpsertPublished(ctx, contentTypeSlug, published); err != nil {
 		return err
@@ -314,7 +311,7 @@ func (uc *UseCase) SaveSingleType(ctx context.Context, contentTypeSlug string, d
 	if err != nil {
 		return nil, err
 	}
-	doc := &entity.Document{Data: data, Locale: resolvedLocale}
+	doc := &entity.Document{Fields: data, Locale: resolvedLocale}
 	if len(drafts) > 0 {
 		doc.DocumentID = drafts[0].DocumentID
 	}

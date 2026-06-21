@@ -329,8 +329,8 @@ func TestSync_RemovesMissingDefinitions_CascadesEntries(t *testing.T) {
 	entries := &fakeEntryManager{
 		getAllFn: func(_ context.Context, slug string) ([]*entity.Document, error) {
 			return []*entity.Document{
-				{DocumentID: "doc-1", ContentTypeID: "ct-stale"},
-				{DocumentID: "doc-2", ContentTypeID: "ct-stale"},
+				{DocumentID: "doc-1", },
+				{DocumentID: "doc-2", },
 			}, nil
 		},
 		deleteFn: func(_ context.Context, _, _ string, _ []entity.FieldDefinition) error { return nil },

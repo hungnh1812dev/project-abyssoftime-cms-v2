@@ -67,8 +67,8 @@ func TestComponentRepository_UpsertAll_And_FindByDocumentID(t *testing.T) {
 	now := time.Now().UTC()
 
 	components := []*entity.Component{
-		{ComponentID: "c1", Data: map[string]any{"title": "SEO Title"}, CreatedAt: now, UpdatedAt: now},
-		{ComponentID: "c2", Data: map[string]any{"description": "SEO Desc"}, CreatedAt: now, UpdatedAt: now},
+		{ComponentID: "c1", Fields: map[string]any{"title": "SEO Title"}, CreatedAt: now, UpdatedAt: now},
+		{ComponentID: "c2", Fields: map[string]any{"description": "SEO Desc"}, CreatedAt: now, UpdatedAt: now},
 	}
 
 	if err := repo.UpsertAll(ctx, "blog", "seo", "d1", "en", entity.VersionDraft, components); err != nil {
@@ -82,10 +82,7 @@ func TestComponentRepository_UpsertAll_And_FindByDocumentID(t *testing.T) {
 	if len(found) != 2 {
 		t.Fatalf("count = %d, want 2", len(found))
 	}
-	if found[0].Order != 0 || found[1].Order != 1 {
-		t.Errorf("order = [%d, %d], want [0, 1]", found[0].Order, found[1].Order)
-	}
-	title, _ := found[0].Data["title"].(string)
+	title, _ := found[0].Fields["title"].(string)
 	if title != "SEO Title" {
 		t.Errorf("Data.title = %q, want %q", title, "SEO Title")
 	}
@@ -97,13 +94,13 @@ func TestComponentRepository_UpsertAll_Replaces(t *testing.T) {
 	now := time.Now().UTC()
 
 	initial := []*entity.Component{
-		{ComponentID: "c1", Data: map[string]any{"v": 1}, CreatedAt: now, UpdatedAt: now},
-		{ComponentID: "c2", Data: map[string]any{"v": 2}, CreatedAt: now, UpdatedAt: now},
+		{ComponentID: "c1", Fields: map[string]any{"v": 1}, CreatedAt: now, UpdatedAt: now},
+		{ComponentID: "c2", Fields: map[string]any{"v": 2}, CreatedAt: now, UpdatedAt: now},
 	}
 	_ = repo.UpsertAll(ctx, "blog", "seo", "d1", "en", entity.VersionDraft, initial)
 
 	replacement := []*entity.Component{
-		{ComponentID: "c3", Data: map[string]any{"v": 3}, CreatedAt: now, UpdatedAt: now},
+		{ComponentID: "c3", Fields: map[string]any{"v": 3}, CreatedAt: now, UpdatedAt: now},
 	}
 	if err := repo.UpsertAll(ctx, "blog", "seo", "d1", "en", entity.VersionDraft, replacement); err != nil {
 		t.Fatalf("UpsertAll replace: %v", err)
@@ -124,7 +121,7 @@ func TestComponentRepository_DeleteByDocumentID(t *testing.T) {
 	now := time.Now().UTC()
 
 	_ = repo.UpsertAll(ctx, "blog", "seo", "d1", "en", entity.VersionDraft, []*entity.Component{
-		{ComponentID: "c1", Data: map[string]any{}, CreatedAt: now, UpdatedAt: now},
+		{ComponentID: "c1", Fields: map[string]any{}, CreatedAt: now, UpdatedAt: now},
 	})
 
 	if err := repo.DeleteByDocumentID(ctx, "blog", "seo", "d1", "en"); err != nil {
@@ -143,10 +140,10 @@ func TestComponentRepository_DeleteAllByContentType(t *testing.T) {
 	now := time.Now().UTC()
 
 	_ = repo.UpsertAll(ctx, "blog", "seo", "d1", "en", entity.VersionDraft, []*entity.Component{
-		{ComponentID: "c1", Data: map[string]any{}, CreatedAt: now, UpdatedAt: now},
+		{ComponentID: "c1", Fields: map[string]any{}, CreatedAt: now, UpdatedAt: now},
 	})
 	_ = repo.UpsertAll(ctx, "blog", "seo", "d2", "en", entity.VersionDraft, []*entity.Component{
-		{ComponentID: "c2", Data: map[string]any{}, CreatedAt: now, UpdatedAt: now},
+		{ComponentID: "c2", Fields: map[string]any{}, CreatedAt: now, UpdatedAt: now},
 	})
 
 	if err := repo.DeleteAllByContentType(ctx, "blog", "seo"); err != nil {

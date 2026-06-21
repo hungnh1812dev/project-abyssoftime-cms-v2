@@ -27,7 +27,7 @@ func (r *componentRepository) FindByDocumentID(ctx context.Context, contentTypeS
 	var components []*entity.Component
 	err := r.table(contentTypeSlug, componentName).WithContext(ctx).
 		Where("document_id = ? AND version = ? AND locale = ?", documentID, version, locale).
-		Order(`"order" ASC`).
+		Order("gorm_id ASC").
 		Find(&components).Error
 	return components, err
 }
@@ -45,11 +45,10 @@ func (r *componentRepository) UpsertAll(ctx context.Context, contentTypeSlug, co
 		return nil
 	}
 
-	for i, c := range components {
+	for _, c := range components {
 		c.DocumentID = documentID
 		c.Version = version
 		c.Locale = locale
-		c.Order = i
 	}
 
 	return r.table(contentTypeSlug, componentName).WithContext(ctx).Create(&components).Error

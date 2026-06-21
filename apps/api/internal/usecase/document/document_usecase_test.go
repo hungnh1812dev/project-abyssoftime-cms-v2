@@ -32,7 +32,7 @@ func TestSave_NewEntry_GeneratesDocumentIDAndSetsAudit(t *testing.T) {
 	}
 	uc := docuc.New(repo, nil, &repomock.MediaAssetRepository{}, supportedLocales)
 
-	doc := &entity.Document{ContentTypeID: "ct-1", Data: map[string]any{"title": "Hello"}}
+	doc := &entity.Document{Fields: map[string]any{"title": "Hello"}}
 	saved, err := uc.Save(ctx, testSlug, doc, nil, "user-1")
 	if err != nil {
 		t.Fatalf("Save() error = %v", err)
@@ -54,8 +54,8 @@ func TestSave_NewEntry_GeneratesDocumentIDAndSetsAudit(t *testing.T) {
 func TestSave_ExistingEntry_PreservesCreatedAtAndCreatedBy(t *testing.T) {
 	createdAt := time.Now().UTC().Add(-time.Hour)
 	existing := &entity.Document{
-		DocumentID: "entry-1", ContentTypeID: "ct-1",
-		CreatedAt: createdAt, CreatedBy: "original-author",
+		DocumentID: "entry-1",
+		CreatedAt:  createdAt, CreatedBy: "original-author",
 	}
 
 	repo := &repomock.DocumentRepository{}
@@ -72,7 +72,7 @@ func TestSave_ExistingEntry_PreservesCreatedAtAndCreatedBy(t *testing.T) {
 	}
 	uc := docuc.New(repo, nil, &repomock.MediaAssetRepository{}, supportedLocales)
 
-	doc := &entity.Document{DocumentID: "entry-1", Data: map[string]any{"title": "Updated"}}
+	doc := &entity.Document{DocumentID: "entry-1", Fields: map[string]any{"title": "Updated"}}
 	saved, err := uc.Save(ctx, testSlug, doc, nil, "editor-2")
 	if err != nil {
 		t.Fatalf("Save() error = %v", err)
@@ -86,9 +86,6 @@ func TestSave_ExistingEntry_PreservesCreatedAtAndCreatedBy(t *testing.T) {
 	if saved.UpdatedBy != "editor-2" {
 		t.Errorf("Save() UpdatedBy = %q, want editor-2", saved.UpdatedBy)
 	}
-	if saved.ContentTypeID != "ct-1" {
-		t.Errorf("Save() ContentTypeID = %q, want ct-1 (preserved from existing)", saved.ContentTypeID)
-	}
 	_ = upserted
 }
 
@@ -100,7 +97,7 @@ func TestSave_RejectsUnsupportedLocale(t *testing.T) {
 	}
 	uc := docuc.New(repo, nil, &repomock.MediaAssetRepository{}, supportedLocales)
 
-	doc := &entity.Document{ContentTypeID: "ct-1", Locale: "fr", Data: map[string]any{}}
+	doc := &entity.Document{Locale: "fr", Fields: map[string]any{}}
 	_, err := uc.Save(ctx, testSlug, doc, nil, "user-1")
 	if !pkgerrors.Is(err, pkgerrors.ErrValidation) {
 		t.Errorf("Save() error = %v, want ErrValidation", err)
@@ -262,8 +259,8 @@ func TestGetAll_ReturnsEntryDrafts(t *testing.T) {
 	repo := &repomock.DocumentRepository{}
 	repo.FindDraftsByContentTypeFn = func(_ context.Context, slug string) ([]*entity.Document, error) {
 		return []*entity.Document{
-			{DocumentID: "1", ContentTypeID: "ct-1"},
-			{DocumentID: "2", ContentTypeID: "ct-1"},
+			{DocumentID: "1", },
+			{DocumentID: "2", },
 		}, nil
 	}
 	uc := docuc.New(repo, nil, &repomock.MediaAssetRepository{}, supportedLocales)
@@ -282,7 +279,7 @@ func TestGetAll_ReturnsEntryDrafts(t *testing.T) {
 func TestPublish_CopiesDraftAndSyncsTimestamps(t *testing.T) {
 	draftUpdatedAt := time.Now().UTC()
 	draft := &entity.Document{
-		DocumentID: "e1", ContentTypeID: "ct-1", Data: map[string]any{"title": "v2"},
+		DocumentID: "e1", Fields: map[string]any{"title": "v2"},
 		Locale: "en", UpdatedAt: draftUpdatedAt, UpdatedBy: "editor-1",
 	}
 
@@ -312,8 +309,8 @@ func TestPublish_CopiesDraftAndSyncsTimestamps(t *testing.T) {
 	if published.PublishedAt.IsZero() {
 		t.Error("Publish() did not set PublishedAt")
 	}
-	if published.Data["title"] != "v2" {
-		t.Errorf("Publish() did not copy draft data, got %v", published.Data)
+	if published.Fields["title"] != "v2" {
+		t.Errorf("Publish() did not copy draft data, got %v", published.Fields)
 	}
 }
 
@@ -343,7 +340,7 @@ func TestPublish_RejectsUnsupportedLocale(t *testing.T) {
 }
 
 func TestPublish_LocaleIsolation_OnlyTouchesRequestedLocale(t *testing.T) {
-	enDraft := &entity.Document{DocumentID: "e1", Locale: "en", Data: map[string]any{"title": "en-title"}}
+	enDraft := &entity.Document{DocumentID: "e1", Locale: "en", Fields: map[string]any{"title": "en-title"}}
 
 	repo := &repomock.DocumentRepository{}
 	repo.FindDraftByDocumentIDFn = func(_ context.Context, _, _, locale string) (*entity.Document, error) {
@@ -503,7 +500,7 @@ func TestSaveSingleType_SubsequentSave_ReusesDocumentID(t *testing.T) {
 // ---- PublishSingleType -------------------------------------------------------
 
 func TestPublishSingleType_Delegates(t *testing.T) {
-	draft := &entity.Document{DocumentID: "e1", Locale: "en", Data: map[string]any{"title": "v1"}, UpdatedAt: time.Now().UTC()}
+	draft := &entity.Document{DocumentID: "e1", Locale: "en", Fields: map[string]any{"title": "v1"}, UpdatedAt: time.Now().UTC()}
 
 	repo := &repomock.DocumentRepository{}
 	repo.FindDraftsByContentTypePaginatedFn = func(_ context.Context, _ string, _, _ int, _, _ string, _ int) ([]*entity.Document, int64, error) {

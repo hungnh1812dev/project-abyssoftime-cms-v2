@@ -29,7 +29,7 @@ type DocumentUseCase interface {
 	SaveSingleType(ctx context.Context, contentTypeSlug string, data map[string]any, locale string, fields []entity.FieldDefinition, userID string) (*entity.Document, error)
 	PublishSingleType(ctx context.Context, contentTypeSlug, locale string, fields []entity.FieldDefinition, userID string) error
 	UnpublishSingleType(ctx context.Context, contentTypeSlug, locale string) error
-	GetAllPaginated(ctx context.Context, contentTypeSlug string, start, size int, locale string, fields []entity.FieldDefinition) ([]*entity.Document, []string, int64, error)
+	GetAllPaginated(ctx context.Context, contentTypeSlug string, start, size int, locale string, fields []entity.FieldDefinition, orderBy string, sortDir int) ([]*entity.Document, []string, int64, error)
 	GetPublishedPaginated(ctx context.Context, contentTypeSlug string, start, size int, locale string, fields []entity.FieldDefinition) ([]*entity.Document, int64, error)
 	GetPublishedSingleType(ctx context.Context, contentTypeSlug, locale string, fields []entity.FieldDefinition) (*entity.Document, error)
 }
@@ -263,7 +263,7 @@ func (f *ResolverFactory) addCollectionFields(
 			locale, _ := p.Args["locale"].(string)
 			statusFilter, _ := p.Args["status"].(string)
 			if statusFilter == "draft" && middleware.UserID(p.Context) != "" {
-				docs, _, total, err := f.docUC.GetAllPaginated(p.Context, slug, start, size, locale, fields)
+				docs, _, total, err := f.docUC.GetAllPaginated(p.Context, slug, start, size, locale, fields, "createdAt", -1)
 				if err != nil {
 					return nil, err
 				}
@@ -292,7 +292,7 @@ func (f *ResolverFactory) addCollectionFields(
 		},
 		Resolve: f.authRequired(func(p graphql.ResolveParams) (any, error) {
 			data := inputToMap(p.Args["data"])
-			doc := &entity.Document{Data: data}
+			doc := &entity.Document{Fields: data}
 			saved, err := f.docUC.Save(p.Context, slug, doc, fields, middleware.UserID(p.Context))
 			if err != nil {
 				return nil, err
@@ -310,7 +310,7 @@ func (f *ResolverFactory) addCollectionFields(
 		Resolve: f.authRequired(func(p graphql.ResolveParams) (any, error) {
 			docID := p.Args[camel+"Id"].(string)
 			data := inputToMap(p.Args["data"])
-			doc := &entity.Document{DocumentID: docID, Data: data}
+			doc := &entity.Document{DocumentID: docID, Fields: data}
 			saved, err := f.docUC.Save(p.Context, slug, doc, fields, middleware.UserID(p.Context))
 			if err != nil {
 				return nil, err
@@ -488,10 +488,10 @@ func docToMap(d *entity.Document) map[string]any {
 		"updatedAt":   d.UpdatedAt,
 		"publishedAt": nil,
 	}
-	if !d.PublishedAt.IsZero() {
-		m["publishedAt"] = d.PublishedAt
+	if d.PublishedAt != nil {
+		m["publishedAt"] = *d.PublishedAt
 	}
-	for k, v := range d.Data {
+	for k, v := range d.Fields {
 		m[k] = v
 	}
 	return m
