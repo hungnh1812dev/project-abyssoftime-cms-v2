@@ -122,29 +122,29 @@ describe('Sidebar', () => {
       '/admin/settings/media',
     )
   })
-})
 
-describe('TopBar', () => {
   it('renders a Logout button', async () => {
-    mock.onPost('/auth/refresh').reply(200, { accessToken: ADMIN_TOKEN })
-    renderWithProviders(<AuthProvider><SidebarProvider><TopBar /></SidebarProvider></AuthProvider>)
+    mock.onGet('/api/content-types').reply(200, [])
+    renderSidebar()
     await waitFor(() =>
       expect(screen.getByRole('button', { name: /logout/i })).toBeInTheDocument(),
     )
   })
 
   it('clears the access token when Logout is clicked', async () => {
-    mock.onPost('/auth/refresh').reply(200, { accessToken: ADMIN_TOKEN })
+    mock.onGet('/api/content-types').reply(200, [])
     mock.onPost('/auth/logout').reply(200)
     const user = userEvent.setup()
-    renderWithProviders(<AuthProvider><SidebarProvider><TopBar /></SidebarProvider></AuthProvider>)
+    renderSidebar()
     await waitFor(() =>
       expect(screen.getByRole('button', { name: /logout/i })).toBeInTheDocument(),
     )
     await user.click(screen.getByRole('button', { name: /logout/i }))
     expect(getAccessToken()).toBeNull()
   })
+})
 
+describe('TopBar', () => {
   it('renders breadcrumbs', async () => {
     mock.onPost('/auth/refresh').reply(200, { accessToken: ADMIN_TOKEN })
     renderWithProviders(

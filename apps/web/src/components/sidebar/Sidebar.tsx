@@ -1,4 +1,4 @@
-import { FileText, Settings } from 'lucide-react'
+import { FileText, LogOut, Settings } from 'lucide-react'
 import { useContentTypes } from '@/hooks/useContentTypes'
 import { useAuth } from '@/hooks/useAuth'
 import { roleLevel } from '@/lib/roles'
@@ -13,7 +13,7 @@ import { SidebarCollapseToggle } from './SidebarCollapseToggle'
 export function Sidebar() {
   const { collapsed } = useSidebar()
   const { data: contentTypes } = useContentTypes()
-  const { role } = useAuth()
+  const { role, logout } = useAuth()
 
   const singleTypes = (contentTypes ?? []).filter((ct) => ct.Kind === 'single')
   const collectionTypes = (contentTypes ?? []).filter((ct) => ct.Kind === 'collection')
@@ -67,7 +67,23 @@ export function Sidebar() {
         </SidebarGroup>
       </nav>
 
-      <SidebarCollapseToggle />
+      <div className="border-t border-sidebar-border p-2 space-y-1">
+        {role && !collapsed && (
+          <span className="block px-3 py-1 text-xs text-sidebar-muted capitalize">{role}</span>
+        )}
+        <button
+          type="button"
+          onClick={logout}
+          className={cn(
+            'flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-sidebar-muted transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+            collapsed && 'justify-center px-0',
+          )}
+        >
+          <LogOut className="size-4 shrink-0" />
+          <span className={cn('truncate', collapsed && 'sr-only')}>Logout</span>
+        </button>
+        <SidebarCollapseToggle />
+      </div>
     </aside>
   )
 }
