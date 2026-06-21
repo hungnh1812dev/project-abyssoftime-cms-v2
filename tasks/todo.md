@@ -46,8 +46,8 @@ See [ui-design-system.md](ui-design-system.md) for full plan. Spec: [specs/ui-de
 - [x] T8 Breadcrumbs hook + TopBar rebuild with hamburger
 - [x] T9 StickyActionBar: glassmorphism sticky header for content pages
 - [x] T10 Card component + page-level spacing polish
-- [ ] T11 Dark mode verification pass
-- [ ] ✅ Checkpoint 2 (Final): full design system complete
+- [x] T11 Dark mode verification pass
+- [x] ✅ Checkpoint 2 (Final): full design system complete
 
 ---
 
