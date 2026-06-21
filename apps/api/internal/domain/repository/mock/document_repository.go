@@ -21,7 +21,7 @@ type DocumentRepository struct {
 	DeleteByDocumentIDFn                 func(ctx context.Context, contentTypeSlug, documentID, locale string) error
 	DeletePublishedByDocumentIDFn func(ctx context.Context, contentTypeSlug, documentID, locale string) error
 	DeleteAllByContentTypeFn    func(ctx context.Context, contentTypeSlug string) error
-	EnsureCollectionFn          func(ctx context.Context, contentTypeSlug string) error
+	EnsureCollectionFn          func(ctx context.Context, contentTypeSlug string, fields []entity.FieldDefinition) error
 	DropCollectionFn            func(ctx context.Context, contentTypeSlug string) error
 }
 
@@ -69,9 +69,9 @@ func (m *DocumentRepository) DeleteAllByContentType(ctx context.Context, content
 	return m.DeleteAllByContentTypeFn(ctx, contentTypeSlug)
 }
 
-func (m *DocumentRepository) EnsureCollection(ctx context.Context, contentTypeSlug string) error {
+func (m *DocumentRepository) EnsureCollection(ctx context.Context, contentTypeSlug string, fields []entity.FieldDefinition) error {
 	if m.EnsureCollectionFn != nil {
-		return m.EnsureCollectionFn(ctx, contentTypeSlug)
+		return m.EnsureCollectionFn(ctx, contentTypeSlug, fields)
 	}
 	return nil
 }

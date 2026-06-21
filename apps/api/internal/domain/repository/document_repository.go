@@ -22,6 +22,6 @@ type DocumentRepository interface {
 	DeleteByDocumentID(ctx context.Context, contentTypeSlug, documentID, locale string) error
 	DeletePublishedByDocumentID(ctx context.Context, contentTypeSlug, documentID, locale string) error
 	DeleteAllByContentType(ctx context.Context, contentTypeSlug string) error
-	EnsureCollection(ctx context.Context, contentTypeSlug string) error
+	EnsureCollection(ctx context.Context, contentTypeSlug string, fields []entity.FieldDefinition) error
 	DropCollection(ctx context.Context, contentTypeSlug string) error
 }

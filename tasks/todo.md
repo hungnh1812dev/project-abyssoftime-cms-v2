@@ -58,8 +58,8 @@ See [sync-table-fields.md](sync-table-fields.md) for full plan. Spec: [specs/syn
 - [x] T1 Static table column rename (`id` → `gorm_id`) + UUID standardization
 - [x] T2 MediaAsset cleanup + add `FindByDocumentID`
 - [x] T3 Document & Component entity cleanup (`Data` → `Fields`, `*time.Time`, remove obsolete)
-- [ ] ✅ Checkpoint A: backend compiles + tests pass
-- [ ] T4 Per-field dynamic columns (repository rewrite)
+- [x] ✅ Checkpoint A: backend compiles + tests pass
+- [x] T4 Per-field dynamic columns (repository rewrite)
 - [ ] T5 GraphQL: media as object + remove response wrappers
 - [ ] T6 Frontend: MediaInput stores `documentId` + aspect ratio fix
 - [ ] ✅ Checkpoint B (Final): full system verification

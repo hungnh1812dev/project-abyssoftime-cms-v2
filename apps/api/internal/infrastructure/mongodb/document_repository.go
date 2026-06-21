@@ -204,7 +204,7 @@ func (r *documentRepository) DeleteAllByContentType(ctx context.Context, content
 	return err
 }
 
-func (r *documentRepository) EnsureCollection(ctx context.Context, contentTypeSlug string) error {
+func (r *documentRepository) EnsureCollection(ctx context.Context, contentTypeSlug string, _ []entity.FieldDefinition) error {
 	col := r.collection(contentTypeSlug)
 	_, err := col.Indexes().CreateOne(ctx, mongo.IndexModel{
 		Keys:    bson.D{{Key: "documentId", Value: 1}, {Key: "version", Value: 1}, {Key: "locale", Value: 1}},

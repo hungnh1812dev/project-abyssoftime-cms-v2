@@ -2,6 +2,7 @@ package gormdb
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -13,6 +14,11 @@ import (
 
 func ptrTime(t time.Time) *time.Time { return &t }
 
+var testFields = []entity.FieldDefinition{
+	{Name: "title", Type: "text"},
+	{Name: "body", Type: "richtext"},
+}
+
 func setupDocDB(t *testing.T, slugs ...string) *gorm.DB {
 	t.Helper()
 	db, err := NewClient("sqlite", ":memory:")
@@ -22,7 +28,7 @@ func setupDocDB(t *testing.T, slugs ...string) *gorm.DB {
 	repo := NewDocumentRepository(db)
 	ctx := context.Background()
 	for _, slug := range slugs {
-		if err := repo.EnsureCollection(ctx, slug); err != nil {
+		if err := repo.EnsureCollection(ctx, slug, testFields); err != nil {
 			t.Fatalf("EnsureCollection(%s): %v", slug, err)
 		}
 	}
@@ -125,9 +131,9 @@ func TestDocumentRepository_FindDraftsByContentTypePaginated(t *testing.T) {
 
 	for i := 0; i < 5; i++ {
 		doc := &entity.Document{
-			DocumentID: "d" + string(rune('0'+i)),
+			DocumentID: fmt.Sprintf("d%d", i),
 			Version:    entity.VersionDraft,
-			Fields:       map[string]any{"i": i},
+			Fields:     map[string]any{"title": fmt.Sprintf("Post %d", i)},
 			Locale:     "en",
 			CreatedAt:  time.Now().UTC().Add(time.Duration(i) * time.Second),
 			UpdatedAt:  time.Now().UTC(),
@@ -233,7 +239,7 @@ func TestDocumentRepository_EnsureCollection_CreatesTable(t *testing.T) {
 	repo := NewDocumentRepository(db)
 	ctx := context.Background()
 
-	if err := repo.EnsureCollection(ctx, "blog-posts"); err != nil {
+	if err := repo.EnsureCollection(ctx, "blog-posts", testFields); err != nil {
 		t.Fatalf("EnsureCollection: %v", err)
 	}
 
@@ -242,7 +248,7 @@ func TestDocumentRepository_EnsureCollection_CreatesTable(t *testing.T) {
 	}
 
 	// idempotent
-	if err := repo.EnsureCollection(ctx, "blog-posts"); err != nil {
+	if err := repo.EnsureCollection(ctx, "blog-posts", testFields); err != nil {
 		t.Fatalf("EnsureCollection (2nd call): %v", err)
 	}
 }
@@ -255,7 +261,7 @@ func TestDocumentRepository_DropCollection_DropsTable(t *testing.T) {
 	repo := NewDocumentRepository(db)
 	ctx := context.Background()
 
-	_ = repo.EnsureCollection(ctx, "blog-posts")
+	_ = repo.EnsureCollection(ctx, "blog-posts", testFields)
 	if err := repo.DropCollection(ctx, "blog-posts"); err != nil {
 		t.Fatalf("DropCollection: %v", err)
 	}

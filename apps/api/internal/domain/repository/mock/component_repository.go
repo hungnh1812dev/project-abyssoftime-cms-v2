@@ -14,7 +14,7 @@ type ComponentRepository struct {
 	UpsertAllFn            func(ctx context.Context, contentTypeSlug, componentName, documentID, locale string, version entity.DocumentVersion, components []*entity.Component) error
 	DeleteByDocumentIDFn   func(ctx context.Context, contentTypeSlug, componentName, documentID, locale string) error
 	DeleteAllByContentTypeFn func(ctx context.Context, contentTypeSlug, componentName string) error
-	EnsureCollectionFn     func(ctx context.Context, contentTypeSlug, componentName string) error
+	EnsureCollectionFn     func(ctx context.Context, contentTypeSlug, componentName string, fields []entity.FieldDefinition) error
 	DropCollectionFn       func(ctx context.Context, contentTypeSlug, componentName string) error
 }
 
@@ -46,9 +46,9 @@ func (m *ComponentRepository) DeleteAllByContentType(ctx context.Context, conten
 	return nil
 }
 
-func (m *ComponentRepository) EnsureCollection(ctx context.Context, contentTypeSlug, componentName string) error {
+func (m *ComponentRepository) EnsureCollection(ctx context.Context, contentTypeSlug, componentName string, fields []entity.FieldDefinition) error {
 	if m.EnsureCollectionFn != nil {
-		return m.EnsureCollectionFn(ctx, contentTypeSlug, componentName)
+		return m.EnsureCollectionFn(ctx, contentTypeSlug, componentName, fields)
 	}
 	return nil
 }

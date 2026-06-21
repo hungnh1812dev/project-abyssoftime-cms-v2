@@ -66,13 +66,13 @@ func (s *Syncer) syncOne(ctx context.Context, def ContentTypeDefinition) error {
 		if err := s.Create(ctx, ct); err != nil {
 			return err
 		}
-		if err := s.docRepo.EnsureCollection(ctx, def.Slug); err != nil {
+		if err := s.docRepo.EnsureCollection(ctx, def.Slug, def.Fields); err != nil {
 			return err
 		}
 		return s.ensureComponentTables(ctx, def.Slug, def.Fields)
 	}
 
-	if err := s.docRepo.EnsureCollection(ctx, current.Slug); err != nil {
+	if err := s.docRepo.EnsureCollection(ctx, current.Slug, def.Fields); err != nil {
 		return err
 	}
 	if err := s.ensureComponentTables(ctx, current.Slug, def.Fields); err != nil {
@@ -95,7 +95,7 @@ func (s *Syncer) ensureComponentTables(ctx context.Context, slug string, fields 
 	}
 	for _, f := range fields {
 		if f.Type == "component" {
-			if err := s.compRepo.EnsureCollection(ctx, slug, f.Name); err != nil {
+			if err := s.compRepo.EnsureCollection(ctx, slug, f.Name, f.Fields); err != nil {
 				return err
 			}
 		}

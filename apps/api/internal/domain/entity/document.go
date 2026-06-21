@@ -13,7 +13,7 @@ type Document struct {
 	GormID      uint            `bson:"gormId"                    json:"id"                      gorm:"column:gorm_id;primaryKey;autoIncrement"`
 	DocumentID  string          `bson:"documentId"                json:"documentId"              gorm:"column:document_id"`
 	Version     DocumentVersion `bson:"version"                   json:"version"                 gorm:"column:version;type:varchar(20)"`
-	Fields      map[string]any  `bson:"data"                      json:"data"                    gorm:"column:data;serializer:json"`
+	Fields      map[string]any  `bson:"data"                      json:"data"                    gorm:"-"`
 	Locale      string          `bson:"locale"                    json:"locale"                  gorm:"column:locale"`
 	CreatedAt   time.Time       `bson:"createdAt"                 json:"createdAt"               gorm:"column:created_at"`
 	UpdatedAt   time.Time       `bson:"updatedAt"                 json:"updatedAt"               gorm:"column:updated_at"`

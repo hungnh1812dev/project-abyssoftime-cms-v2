@@ -376,7 +376,7 @@ func TestSync_EnsuresComponentTables(t *testing.T) {
 	compRepo := &repomock.ComponentRepository{}
 
 	var ensured []string
-	compRepo.EnsureCollectionFn = func(_ context.Context, slug, comp string) error {
+	compRepo.EnsureCollectionFn = func(_ context.Context, slug, comp string, _ []entity.FieldDefinition) error {
 		ensured = append(ensured, slug+"/"+comp)
 		return nil
 	}

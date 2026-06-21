@@ -8,6 +8,11 @@ import (
 	"project-abyssoftime-cms-v2/api/internal/domain/entity"
 )
 
+var compTestFields = []entity.FieldDefinition{
+	{Name: "title", Type: "text"},
+	{Name: "description", Type: "text"},
+}
+
 func setupCompDB(t *testing.T, slug, comp string) *componentRepository {
 	t.Helper()
 	db, err := NewClient("sqlite", ":memory:")
@@ -15,7 +20,7 @@ func setupCompDB(t *testing.T, slug, comp string) *componentRepository {
 		t.Fatalf("NewClient: %v", err)
 	}
 	repo := &componentRepository{db: db}
-	if err := repo.EnsureCollection(context.Background(), slug, comp); err != nil {
+	if err := repo.EnsureCollection(context.Background(), slug, comp, compTestFields); err != nil {
 		t.Fatalf("EnsureCollection: %v", err)
 	}
 	return repo
@@ -29,7 +34,7 @@ func TestComponentRepository_EnsureCollection_CreatesTable(t *testing.T) {
 	repo := NewComponentRepository(db)
 	ctx := context.Background()
 
-	if err := repo.EnsureCollection(ctx, "blog-posts", "banner"); err != nil {
+	if err := repo.EnsureCollection(ctx, "blog-posts", "banner", compTestFields); err != nil {
 		t.Fatalf("EnsureCollection: %v", err)
 	}
 
@@ -38,7 +43,7 @@ func TestComponentRepository_EnsureCollection_CreatesTable(t *testing.T) {
 	}
 
 	// idempotent
-	if err := repo.EnsureCollection(ctx, "blog-posts", "banner"); err != nil {
+	if err := repo.EnsureCollection(ctx, "blog-posts", "banner", compTestFields); err != nil {
 		t.Fatalf("EnsureCollection (2nd): %v", err)
 	}
 }
@@ -51,7 +56,7 @@ func TestComponentRepository_DropCollection(t *testing.T) {
 	repo := NewComponentRepository(db)
 	ctx := context.Background()
 
-	_ = repo.EnsureCollection(ctx, "blog-posts", "banner")
+	_ = repo.EnsureCollection(ctx, "blog-posts", "banner", compTestFields)
 	if err := repo.DropCollection(ctx, "blog-posts", "banner"); err != nil {
 		t.Fatalf("DropCollection: %v", err)
 	}
@@ -94,13 +99,13 @@ func TestComponentRepository_UpsertAll_Replaces(t *testing.T) {
 	now := time.Now().UTC()
 
 	initial := []*entity.Component{
-		{ComponentID: "c1", Fields: map[string]any{"v": 1}, CreatedAt: now, UpdatedAt: now},
-		{ComponentID: "c2", Fields: map[string]any{"v": 2}, CreatedAt: now, UpdatedAt: now},
+		{ComponentID: "c1", Fields: map[string]any{"title": "v1"}, CreatedAt: now, UpdatedAt: now},
+		{ComponentID: "c2", Fields: map[string]any{"title": "v2"}, CreatedAt: now, UpdatedAt: now},
 	}
 	_ = repo.UpsertAll(ctx, "blog", "seo", "d1", "en", entity.VersionDraft, initial)
 
 	replacement := []*entity.Component{
-		{ComponentID: "c3", Fields: map[string]any{"v": 3}, CreatedAt: now, UpdatedAt: now},
+		{ComponentID: "c3", Fields: map[string]any{"title": "v3"}, CreatedAt: now, UpdatedAt: now},
 	}
 	if err := repo.UpsertAll(ctx, "blog", "seo", "d1", "en", entity.VersionDraft, replacement); err != nil {
 		t.Fatalf("UpsertAll replace: %v", err)
