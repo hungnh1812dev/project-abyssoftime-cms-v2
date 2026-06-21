@@ -11,20 +11,24 @@ import (
 	pkgerrors "project-abyssoftime-cms-v2/api/pkg/errors"
 )
 
-func setupDocDB(t *testing.T) *gorm.DB {
+func setupDocDB(t *testing.T, slugs ...string) *gorm.DB {
 	t.Helper()
 	db, err := NewClient("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
-	if err := db.AutoMigrate(&entity.Document{}); err != nil {
-		t.Fatalf("AutoMigrate: %v", err)
+	repo := NewDocumentRepository(db)
+	ctx := context.Background()
+	for _, slug := range slugs {
+		if err := repo.EnsureCollection(ctx, slug); err != nil {
+			t.Fatalf("EnsureCollection(%s): %v", slug, err)
+		}
 	}
 	return db
 }
 
 func TestDocumentRepository_UpsertDraft_And_FindDraft(t *testing.T) {
-	db := setupDocDB(t)
+	db := setupDocDB(t, "blog")
 	repo := NewDocumentRepository(db)
 	ctx := context.Background()
 
@@ -54,7 +58,7 @@ func TestDocumentRepository_UpsertDraft_And_FindDraft(t *testing.T) {
 }
 
 func TestDocumentRepository_UpsertDraft_Updates(t *testing.T) {
-	db := setupDocDB(t)
+	db := setupDocDB(t, "blog")
 	repo := NewDocumentRepository(db)
 	ctx := context.Background()
 
@@ -79,7 +83,7 @@ func TestDocumentRepository_UpsertDraft_Updates(t *testing.T) {
 }
 
 func TestDocumentRepository_FindDraft_NotFound(t *testing.T) {
-	db := setupDocDB(t)
+	db := setupDocDB(t, "blog")
 	repo := NewDocumentRepository(db)
 
 	_, err := repo.FindDraftByDocumentID(context.Background(), "blog", "nope", "en")
@@ -89,7 +93,7 @@ func TestDocumentRepository_FindDraft_NotFound(t *testing.T) {
 }
 
 func TestDocumentRepository_UpsertPublished_And_FindPublished(t *testing.T) {
-	db := setupDocDB(t)
+	db := setupDocDB(t, "blog")
 	repo := NewDocumentRepository(db)
 	ctx := context.Background()
 
@@ -113,7 +117,7 @@ func TestDocumentRepository_UpsertPublished_And_FindPublished(t *testing.T) {
 }
 
 func TestDocumentRepository_FindDraftsByContentTypePaginated(t *testing.T) {
-	db := setupDocDB(t)
+	db := setupDocDB(t, "blog")
 	repo := NewDocumentRepository(db)
 	ctx := context.Background()
 
@@ -142,7 +146,7 @@ func TestDocumentRepository_FindDraftsByContentTypePaginated(t *testing.T) {
 }
 
 func TestDocumentRepository_FindPublishedByDocumentIDs(t *testing.T) {
-	db := setupDocDB(t)
+	db := setupDocDB(t, "blog")
 	repo := NewDocumentRepository(db)
 	ctx := context.Background()
 
@@ -165,7 +169,7 @@ func TestDocumentRepository_FindPublishedByDocumentIDs(t *testing.T) {
 }
 
 func TestDocumentRepository_DeleteByDocumentID(t *testing.T) {
-	db := setupDocDB(t)
+	db := setupDocDB(t, "blog")
 	repo := NewDocumentRepository(db)
 	ctx := context.Background()
 
@@ -187,7 +191,7 @@ func TestDocumentRepository_DeleteByDocumentID(t *testing.T) {
 }
 
 func TestDocumentRepository_DeleteAllByContentType(t *testing.T) {
-	db := setupDocDB(t)
+	db := setupDocDB(t, "blog", "other")
 	repo := NewDocumentRepository(db)
 	ctx := context.Background()
 
@@ -219,24 +223,48 @@ func TestDocumentRepository_DeleteAllByContentType(t *testing.T) {
 	}
 }
 
-func TestDocumentRepository_EnsureCollection_NoOp(t *testing.T) {
-	db := setupDocDB(t)
+func TestDocumentRepository_EnsureCollection_CreatesTable(t *testing.T) {
+	db, err := NewClient("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
 	repo := NewDocumentRepository(db)
-	if err := repo.EnsureCollection(context.Background(), "anything"); err != nil {
-		t.Errorf("EnsureCollection: %v", err)
+	ctx := context.Background()
+
+	if err := repo.EnsureCollection(ctx, "blog-posts"); err != nil {
+		t.Fatalf("EnsureCollection: %v", err)
+	}
+
+	if !db.Migrator().HasTable(documentTableName("blog-posts")) {
+		t.Error("expected table documents_blog_posts to exist")
+	}
+
+	// idempotent
+	if err := repo.EnsureCollection(ctx, "blog-posts"); err != nil {
+		t.Fatalf("EnsureCollection (2nd call): %v", err)
 	}
 }
 
-func TestDocumentRepository_DropCollection_NoOp(t *testing.T) {
-	db := setupDocDB(t)
+func TestDocumentRepository_DropCollection_DropsTable(t *testing.T) {
+	db, err := NewClient("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
 	repo := NewDocumentRepository(db)
-	if err := repo.DropCollection(context.Background(), "anything"); err != nil {
-		t.Errorf("DropCollection: %v", err)
+	ctx := context.Background()
+
+	_ = repo.EnsureCollection(ctx, "blog-posts")
+	if err := repo.DropCollection(ctx, "blog-posts"); err != nil {
+		t.Fatalf("DropCollection: %v", err)
+	}
+
+	if db.Migrator().HasTable(documentTableName("blog-posts")) {
+		t.Error("expected table documents_blog_posts to not exist after drop")
 	}
 }
 
 func TestDocumentRepository_FindDraftsByContentType(t *testing.T) {
-	db := setupDocDB(t)
+	db := setupDocDB(t, "blog")
 	repo := NewDocumentRepository(db)
 	ctx := context.Background()
 
@@ -256,7 +284,7 @@ func TestDocumentRepository_FindDraftsByContentType(t *testing.T) {
 }
 
 func TestDocumentRepository_DeletePublishedByDocumentID(t *testing.T) {
-	db := setupDocDB(t)
+	db := setupDocDB(t, "blog")
 	repo := NewDocumentRepository(db)
 	ctx := context.Background()
 

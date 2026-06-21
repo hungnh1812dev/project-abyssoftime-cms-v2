@@ -169,4 +169,6 @@ The frontend spec is not modularized. Key sections:
 
 | Status | Module | Description |
 |--------|--------|-------------|
-| — | — | No pending changes |
+| Specced | content | PostgreSQL: per-content-type document tables (`documents_<slug_underscored>`) replacing single `documents` table |
+| Specced | content | PostgreSQL: component tables (`components_<slug_underscored>_<component_name_underscored>`) for `type: "component"` fields |
+| Specced | content | GraphQL: list query renamed `<slug>List`, response wrapped in `data`, filter/orderBy/pagination |
