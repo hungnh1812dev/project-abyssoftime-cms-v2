@@ -36,7 +36,7 @@ See [bugfix-v1.8.md](bugfix-v1.8.md) for full plan. Spec: [specs/BUGFIX-SPEC.md]
 See [ui-design-system.md](ui-design-system.md) for full plan. Spec: [specs/ui-design-system.md](../specs/ui-design-system.md).
 
 - [x] T1 Color tokens: migrate to indigo primary + add success/warning/sidebar-muted tokens
-- [ ] T2 Button: add `success` variant, `loading` prop, update hover/active states
+- [x] T2 Button: add `success` variant, `loading` prop, update hover/active states
 - [ ] T3 Badge: add `draft`/`published`/`modified` semantic variants
 - [ ] T4 SidebarContext: collapsed state + localStorage + mobile detection
 - [ ] T5 Sidebar components: Brand, Group, SubGroup, Item, CollapseToggle, rail popover
