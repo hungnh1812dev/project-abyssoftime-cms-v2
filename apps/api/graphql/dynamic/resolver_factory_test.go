@@ -108,7 +108,7 @@ func TestResolverFactory_ContentTypesQuery(t *testing.T) {
 		},
 	}
 
-	factory := NewResolverFactory(&mockDocUC{}, ctUC)
+	factory := NewResolverFactory(&mockDocUC{}, ctUC, nil)
 	h, err := factory.BuildHandler(nil)
 	if err != nil {
 		t.Fatalf("BuildHandler: %v", err)
@@ -144,21 +144,20 @@ func TestResolverFactory_SingleTypeQuery(t *testing.T) {
 		{Slug: "about-page", Kind: "single", Fields: []entity.FieldDefinition{{Name: "headline", Type: "text"}}},
 	}
 
-	factory := NewResolverFactory(docUC, &mockCTUC{findAllFn: func(_ context.Context) ([]*entity.ContentType, error) { return nil, nil }})
+	factory := NewResolverFactory(docUC, &mockCTUC{findAllFn: func(_ context.Context) ([]*entity.ContentType, error) { return nil, nil }}, nil)
 	h, err := factory.BuildHandler(defs)
 	if err != nil {
 		t.Fatalf("BuildHandler: %v", err)
 	}
 
-	result := gqlQuery(t, h, `{ aboutPage(locale: "en") { data { documentId headline } } }`)
+	result := gqlQuery(t, h, `{ aboutPage(locale: "en") { documentId headline } }`)
 	data := result["data"].(map[string]any)
 	ap := data["aboutPage"].(map[string]any)
-	apData := ap["data"].(map[string]any)
-	if apData["documentId"] != "d1" {
-		t.Errorf("documentId = %v, want d1", apData["documentId"])
+	if ap["documentId"] != "d1" {
+		t.Errorf("documentId = %v, want d1", ap["documentId"])
 	}
-	if apData["headline"] != "Hello" {
-		t.Errorf("headline = %v, want Hello", apData["headline"])
+	if ap["headline"] != "Hello" {
+		t.Errorf("headline = %v, want Hello", ap["headline"])
 	}
 }
 
@@ -175,21 +174,17 @@ func TestResolverFactory_CollectionListQuery(t *testing.T) {
 		{Slug: "blog-posts", Kind: "collection", Fields: []entity.FieldDefinition{{Name: "title", Type: "text"}}},
 	}
 
-	factory := NewResolverFactory(docUC, &mockCTUC{findAllFn: func(_ context.Context) ([]*entity.ContentType, error) { return nil, nil }})
+	factory := NewResolverFactory(docUC, &mockCTUC{findAllFn: func(_ context.Context) ([]*entity.ContentType, error) { return nil, nil }}, nil)
 	h, err := factory.BuildHandler(defs)
 	if err != nil {
 		t.Fatalf("BuildHandler: %v", err)
 	}
 
-	result := gqlQuery(t, h, `{ blogPostsList(start: 0, size: 10, locale: "en") { data { documentId title } total } }`)
+	result := gqlQuery(t, h, `{ blogPostsList(start: 0, size: 10, locale: "en") { documentId title } }`)
 	data := result["data"].(map[string]any)
-	list := data["blogPostsList"].(map[string]any)
-	if list["total"].(float64) != 5 {
-		t.Errorf("total = %v, want 5", list["total"])
-	}
-	items := list["data"].([]any)
+	items := data["blogPostsList"].([]any)
 	if len(items) != 1 {
-		t.Fatalf("data count = %d, want 1", len(items))
+		t.Fatalf("blogPostsList count = %d, want 1", len(items))
 	}
 	item := items[0].(map[string]any)
 	if item["title"] != "Post 1" {

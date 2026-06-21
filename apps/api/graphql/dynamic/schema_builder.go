@@ -25,6 +25,15 @@ enum SortOrder {
   DESC
 }
 
+type MediaAsset {
+  documentId: ID!
+  url: String!
+  thumbnailUrl: String
+  fileName: String
+  width: Int
+  height: Int
+}
+
 type ContentType {
   id: ID!
   name: String!
@@ -83,18 +92,6 @@ func (b *SchemaBuilder) BuildContentTypeSDL(def contenttype.ContentTypeDefinitio
 	}
 	sb.WriteString("}\n\n")
 
-	// Response wrapper types
-	fmt.Fprintf(&sb, "type %sResponse {\n", typeName)
-	fmt.Fprintf(&sb, "  data: %s\n", typeName)
-	sb.WriteString("}\n\n")
-
-	fmt.Fprintf(&sb, "type %sListResponse {\n", typeName)
-	fmt.Fprintf(&sb, "  data: [%s!]!\n", typeName)
-	sb.WriteString("  total: Int!\n")
-	sb.WriteString("  start: Int!\n")
-	sb.WriteString("  size: Int!\n")
-	sb.WriteString("}\n\n")
-
 	// Filter type
 	writeFilterType(&sb, typeName, def.Fields)
 
@@ -104,8 +101,8 @@ func (b *SchemaBuilder) BuildContentTypeSDL(def contenttype.ContentTypeDefinitio
 	if def.Kind == "collection" {
 		// Queries
 		sb.WriteString("extend type Query {\n")
-		fmt.Fprintf(&sb, "  %s(%sId: ID!, locale: String): %sResponse\n", camel, camel, typeName)
-		fmt.Fprintf(&sb, "  %sList(where: %sFilter, orderBy: %sOrderBy, start: Int, size: Int, locale: String): %sListResponse!\n", camel, typeName, typeName, typeName)
+		fmt.Fprintf(&sb, "  %s(%sId: ID!, locale: String): %s\n", camel, camel, typeName)
+		fmt.Fprintf(&sb, "  %sList(where: %sFilter, orderBy: %sOrderBy, start: Int, size: Int, locale: String): [%s!]!\n", camel, typeName, typeName, typeName)
 		sb.WriteString("}\n\n")
 
 		// Mutations
@@ -119,7 +116,7 @@ func (b *SchemaBuilder) BuildContentTypeSDL(def contenttype.ContentTypeDefinitio
 	} else {
 		// Single-type queries
 		sb.WriteString("extend type Query {\n")
-		fmt.Fprintf(&sb, "  %s(locale: String): %sResponse\n", camel, typeName)
+		fmt.Fprintf(&sb, "  %s(locale: String): %s\n", camel, typeName)
 		sb.WriteString("}\n\n")
 
 		// Single-type mutations (no delete)
@@ -214,7 +211,7 @@ func fieldTypeToGraphQL(ft string) string {
 	case "boolean":
 		return "Boolean"
 	case "media":
-		return "String"
+		return "MediaAsset"
 	case "json":
 		return "JSON"
 	default:

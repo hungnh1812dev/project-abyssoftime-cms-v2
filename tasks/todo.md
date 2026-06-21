@@ -60,7 +60,7 @@ See [sync-table-fields.md](sync-table-fields.md) for full plan. Spec: [specs/syn
 - [x] T3 Document & Component entity cleanup (`Data` → `Fields`, `*time.Time`, remove obsolete)
 - [x] ✅ Checkpoint A: backend compiles + tests pass
 - [x] T4 Per-field dynamic columns (repository rewrite)
-- [ ] T5 GraphQL: media as object + remove response wrappers
+- [x] T5 GraphQL: media as object + remove response wrappers
 - [ ] T6 Frontend: MediaInput stores `documentId` + aspect ratio fix
 - [ ] ✅ Checkpoint B (Final): full system verification
 

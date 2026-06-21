@@ -86,7 +86,7 @@ func TestFieldTypeToGraphQL(t *testing.T) {
 		{"richtext", "String"},
 		{"number", "Float"},
 		{"boolean", "Boolean"},
-		{"media", "String"},
+		{"media", "MediaAsset"},
 		{"json", "JSON"},
 		{"unknown", "String"},
 	}
@@ -122,11 +122,6 @@ func TestBuildContentTypeSDL_Collection(t *testing.T) {
 		"createdAt: Time!",
 		"updatedAt: Time!",
 		"input BlogPostsInput {",
-		"type BlogPostsResponse {",
-		"data: BlogPosts",
-		"type BlogPostsListResponse {",
-		"data: [BlogPosts!]!",
-		"total: Int!",
 		"input BlogPostsFilter {",
 		"title: StringFilter",
 		"featured: BooleanFilter",
@@ -138,8 +133,8 @@ func TestBuildContentTypeSDL_Collection(t *testing.T) {
 		"title: SortOrder",
 		"createdAt: SortOrder",
 		"extend type Query {",
-		"blogPosts(blogPostsId: ID!, locale: String): BlogPostsResponse",
-		"blogPostsList(where: BlogPostsFilter, orderBy: BlogPostsOrderBy, start: Int, size: Int, locale: String): BlogPostsListResponse!",
+		"blogPosts(blogPostsId: ID!, locale: String): BlogPosts",
+		"blogPostsList(where: BlogPostsFilter, orderBy: BlogPostsOrderBy, start: Int, size: Int, locale: String): [BlogPosts!]!",
 		"extend type Mutation {",
 		"createBlogPosts(data: BlogPostsInput!): BlogPosts!",
 		"updateBlogPosts(blogPostsId: ID!, data: BlogPostsInput!): BlogPosts!",
@@ -170,8 +165,7 @@ func TestBuildContentTypeSDL_Single(t *testing.T) {
 		"type AboutPage {",
 		"headline: String",
 		"openToWork: Boolean",
-		"type AboutPageResponse {",
-		"aboutPage(locale: String): AboutPageResponse",
+		"aboutPage(locale: String): AboutPage",
 		"saveAboutPage(data: AboutPageInput!, locale: String): AboutPage!",
 		"publishAboutPage(locale: String): AboutPage!",
 		"unpublishAboutPage(locale: String): AboutPage!",
@@ -204,7 +198,7 @@ func TestBuildContentTypeSDL_Component(t *testing.T) {
 
 	for _, want := range []string{
 		"type BlogPostsBanner {",
-		"background: String",
+		"background: MediaAsset",
 		"title: String",
 		"banner: BlogPostsBanner",
 	} {
@@ -234,14 +228,15 @@ func TestBuildSDL_MergesAllDefinitions(t *testing.T) {
 
 	for _, want := range []string{
 		"scalar JSON",
+		"type MediaAsset {",
 		"type ContentType {",
 		"contentTypes: [ContentType!]!",
 		"type AboutPage {",
-		"AboutPageResponse",
+		"aboutPage(locale: String): AboutPage",
 		"saveAboutPage(",
 		"type BlogPosts {",
 		"createBlogPosts(",
-		"BlogPostsListResponse",
+		"[BlogPosts!]!",
 		"type CommonText {",
 		"saveCommonText(",
 	} {
