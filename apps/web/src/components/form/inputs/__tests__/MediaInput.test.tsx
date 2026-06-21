@@ -98,7 +98,7 @@ describe('MediaInput', () => {
     await userEvent.click(screen.getByRole('img', { name: mediaResponse.items[0].fileName }))
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    const zoneImg = await screen.findByRole('img', { name: /media preview/i })
+    const zoneImg = await screen.findByRole('img', { name: mediaResponse.items[0].fileName })
     expect(zoneImg).toHaveAttribute('src', 'https://cdn/a1.jpg')
   })
 

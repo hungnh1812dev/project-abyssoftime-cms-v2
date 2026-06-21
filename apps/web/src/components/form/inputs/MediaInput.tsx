@@ -18,6 +18,7 @@ export function MediaInput({
 }: MediaInputProps) {
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
 
   return (
     <Controller
@@ -31,12 +32,14 @@ export function MediaInput({
         function handleSelect(asset: MediaAsset) {
           field.onChange(asset.documentId);
           setPreviewUrl(asset.thumbnailUrl || asset.url);
+          setFileName(asset.fileName);
         }
 
         function handleRemove(e: React.MouseEvent) {
           e.stopPropagation();
           field.onChange(null);
           setPreviewUrl(null);
+          setFileName(null);
         }
 
         return (
@@ -56,9 +59,14 @@ export function MediaInput({
                 <>
                   <img
                     src={displayUrl}
-                    alt="media preview"
+                    alt={fileName ?? "media preview"}
                     className="w-full h-auto max-h-40 object-contain"
                   />
+                  {fileName && (
+                    <span className="block text-[11px] text-muted-foreground truncate px-2 py-1 border-t">
+                      {fileName}
+                    </span>
+                  )}
                   <button
                     type="button"
                     aria-label="Remove image"

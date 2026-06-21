@@ -127,6 +127,9 @@ export function MediaLibrary({ isOpen, onClose, onSelect, ext }: MediaLibraryPro
                       alt={asset.fileName}
                       className="w-full h-full object-cover"
                     />
+                    <span className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] px-1.5 py-0.5 truncate">
+                      {asset.fileName}
+                    </span>
                   </button>
                   <button
                     type="button"
