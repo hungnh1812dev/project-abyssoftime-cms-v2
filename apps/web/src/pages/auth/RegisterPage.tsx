@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
 interface RegisterFields {
+  displayName: string
   email: string
   password: string
 }
@@ -77,6 +78,21 @@ export function RegisterPage() {
         )}
 
         <form onSubmit={handleSubmit((data) => mutation.mutate(data))} className="space-y-4" noValidate>
+          <div className="space-y-1">
+            <Label htmlFor="displayName">Display Name</Label>
+            <Input
+              id="displayName"
+              type="text"
+              autoComplete="name"
+              aria-invalid={!!errors.displayName}
+              {...register('displayName', {
+                required: 'Display name is required',
+                maxLength: { value: 100, message: 'Display name must be at most 100 characters' },
+              })}
+            />
+            {errors.displayName && <p className="text-destructive text-xs">{errors.displayName.message}</p>}
+          </div>
+
           <div className="space-y-1">
             <Label htmlFor="email">Email</Label>
             <Input

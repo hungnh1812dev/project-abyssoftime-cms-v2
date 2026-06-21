@@ -193,7 +193,7 @@ func TestAccept_Success(t *testing.T) {
 	}
 
 	uc := invite.New(inviteRepo, userRepo, defaultInviteRoleRepo())
-	user, err := uc.Accept(context.Background(), plaintext, "password123")
+	user, err := uc.Accept(context.Background(), plaintext, "password123", "Test User")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -228,7 +228,7 @@ func TestAccept_ExpiredToken(t *testing.T) {
 	userRepo := &repomock.UserRepository{}
 
 	uc := invite.New(inviteRepo, userRepo, defaultInviteRoleRepo())
-	_, err := uc.Accept(context.Background(), plaintext, "password123")
+	_, err := uc.Accept(context.Background(), plaintext, "password123", "Test User")
 	if !pkgerrors.Is(err, pkgerrors.ErrValidation) {
 		t.Errorf("err = %v, want ErrValidation", err)
 	}
@@ -243,7 +243,7 @@ func TestAccept_InvalidToken(t *testing.T) {
 	userRepo := &repomock.UserRepository{}
 
 	uc := invite.New(inviteRepo, userRepo, defaultInviteRoleRepo())
-	_, err := uc.Accept(context.Background(), "invalid-token", "password123")
+	_, err := uc.Accept(context.Background(), "invalid-token", "password123", "Test User")
 	if !pkgerrors.Is(err, pkgerrors.ErrNotFound) {
 		t.Errorf("err = %v, want ErrNotFound", err)
 	}

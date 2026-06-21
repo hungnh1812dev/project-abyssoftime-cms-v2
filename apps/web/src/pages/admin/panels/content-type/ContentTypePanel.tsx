@@ -10,6 +10,29 @@ import { useState } from 'react';
 import { ContentDetailLayout } from './ContentDetailLayout';
 import { ContentTypeBuilder } from './ContentTypeBuilder';
 
+function formatAuditDate(value: unknown): string {
+  if (!value) return '';
+  const date = new Date(String(value));
+  if (isNaN(date.getTime())) return '';
+  const diffMs = Date.now() - date.getTime();
+  const diffHours = diffMs / (1000 * 60 * 60);
+  if (diffHours < 1) {
+    const mins = Math.floor(diffMs / (1000 * 60));
+    return mins <= 1 ? 'just now' : `${mins} minutes ago`;
+  }
+  if (diffHours < 24) {
+    const hours = Math.floor(diffHours);
+    return hours === 1 ? '1 hour ago' : `${hours} hours ago`;
+  }
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(date);
+}
+
 interface Props {
   contentType: ContentType;
   id?: string;
@@ -140,6 +163,11 @@ export function ContentTypePanel({ contentType, id, isNew }: Props) {
           </Link>
         ) : undefined
       }
+      metadata={doc.data.updatedByName ? (
+        <p className="text-muted-foreground text-sm">
+          Last updated by {doc.data.updatedByName as string} on {formatAuditDate(doc.data.updatedAt)}
+        </p>
+      ) : undefined}
       renderActions={() => (
         <>
           {locales.length > 1 && (

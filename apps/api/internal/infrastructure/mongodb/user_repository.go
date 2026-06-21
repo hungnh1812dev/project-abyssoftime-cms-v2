@@ -62,6 +62,23 @@ func (r *userRepository) FindByID(ctx context.Context, id string) (*entity.User,
 	return &user, nil
 }
 
+func (r *userRepository) FindByIDs(ctx context.Context, ids []string) ([]*entity.User, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	cursor, err := r.col.Find(ctx, bson.M{"_id": bson.M{"$in": ids}})
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var users []*entity.User
+	if err := cursor.All(ctx, &users); err != nil {
+		return nil, err
+	}
+	return users, nil
+}
+
 func (r *userRepository) HasSuperAdmin(ctx context.Context) (bool, error) {
 	count, err := r.col.CountDocuments(ctx, bson.M{"role": string(entity.RoleSuperAdmin)})
 	if err != nil {

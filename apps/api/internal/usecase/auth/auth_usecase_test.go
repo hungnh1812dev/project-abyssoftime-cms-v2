@@ -138,7 +138,7 @@ func TestRegister(t *testing.T) {
 			tc.setupRepo(repo)
 
 			uc := auth.New(repo, defaultRoleRepo())
-			user, err := uc.Register(ctx, tc.email, tc.password)
+			user, err := uc.Register(ctx, tc.email, tc.password, "Test User")
 
 			if tc.wantErr != nil {
 				if err == nil {

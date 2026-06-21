@@ -205,7 +205,7 @@ func main() {
 	router := deliveryhttp.SetupRouter(deliveryhttp.RouterConfig{
 		AuthHandler:        deliveryhandler.NewAuthHandler(authUC, cfg.CookieSecure, cfg.CookieSameSite),
 		CTHandler:          deliveryhandler.NewContentTypeHandler(ctUC),
-		DocHandler:         deliveryhandler.NewDocumentHandler(documentUC, ctUC),
+		DocHandler:         deliveryhandler.NewDocumentHandler(documentUC, ctUC, userRepo),
 		MediaHandler:       deliveryhandler.NewMediaHandler(mediaUC),
 		LocaleHandler:      deliveryhandler.NewLocaleHandler(cfg.SupportedLocales),
 		UserHandler:        deliveryhandler.NewUserHandler(userUC),

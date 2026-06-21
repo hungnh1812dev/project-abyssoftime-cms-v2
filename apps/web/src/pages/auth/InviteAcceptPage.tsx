@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
 interface AcceptFields {
+  displayName: string
   password: string
   confirmPassword: string
 }
@@ -30,7 +31,7 @@ export function InviteAcceptPage() {
     if (!token) return
     setErrorMsg(null)
     acceptInvite.mutate(
-      { token, password: data.password },
+      { token, password: data.password, displayName: data.displayName },
       {
         onSuccess: () => navigate('/login'),
         onError: () => setErrorMsg('This invite link is invalid or has expired.'),
@@ -58,6 +59,23 @@ export function InviteAcceptPage() {
         )}
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+          <div className="space-y-1">
+            <Label htmlFor="displayName">Display Name</Label>
+            <Input
+              id="displayName"
+              type="text"
+              autoComplete="name"
+              aria-invalid={!!errors.displayName}
+              {...register('displayName', {
+                required: 'Display name is required',
+                maxLength: { value: 100, message: 'Display name must be at most 100 characters' },
+              })}
+            />
+            {errors.displayName && (
+              <p className="text-destructive text-xs">{errors.displayName.message}</p>
+            )}
+          </div>
+
           <div className="space-y-1">
             <Label htmlFor="password">Password</Label>
             <Input

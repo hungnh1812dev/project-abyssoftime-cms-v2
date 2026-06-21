@@ -57,6 +57,20 @@ func (r *documentRepository) upsertVersion(ctx context.Context, contentTypeSlug 
 	if doc.DocumentID == "" {
 		doc.DocumentID = primitive.NewObjectID().Hex()
 	}
+	if version == entity.VersionDraft && doc.GormID == 0 {
+		col := r.collection(contentTypeSlug)
+		var maxDoc struct {
+			GormID uint `bson:"gormId"`
+		}
+		findOpts := options.FindOne().
+			SetSort(bson.D{{Key: "gormId", Value: -1}}).
+			SetProjection(bson.D{{Key: "gormId", Value: 1}})
+		err := col.FindOne(ctx, bson.M{"version": entity.VersionDraft}, findOpts).Decode(&maxDoc)
+		if err != nil && err != mongo.ErrNoDocuments {
+			return err
+		}
+		doc.GormID = maxDoc.GormID + 1
+	}
 	_, err := r.collection(contentTypeSlug).ReplaceOne(
 		ctx,
 		versionFilter(doc.DocumentID, version, doc.Locale),
@@ -88,7 +102,20 @@ func (r *documentRepository) FindDraftsByContentType(ctx context.Context, conten
 	return results, nil
 }
 
-func (r *documentRepository) FindDraftsByContentTypePaginated(ctx context.Context, contentTypeSlug string, start, size int, locale string) ([]*entity.Document, int64, error) {
+var mongoBsonSortKey = map[string]string{
+	"id":        "gormId",
+	"createdAt": "createdAt",
+	"updatedAt": "updatedAt",
+}
+
+func resolveBsonSortKey(orderBy string) string {
+	if k, ok := mongoBsonSortKey[orderBy]; ok {
+		return k
+	}
+	return "createdAt"
+}
+
+func (r *documentRepository) FindDraftsByContentTypePaginated(ctx context.Context, contentTypeSlug string, start, size int, locale, orderBy string, sortDir int) ([]*entity.Document, int64, error) {
 	col := r.collection(contentTypeSlug)
 	filter := bson.M{"version": entity.VersionDraft, "locale": locale}
 
@@ -98,7 +125,7 @@ func (r *documentRepository) FindDraftsByContentTypePaginated(ctx context.Contex
 	}
 
 	opts := options.Find().
-		SetSort(bson.D{{Key: "createdAt", Value: -1}}).
+		SetSort(bson.D{{Key: resolveBsonSortKey(orderBy), Value: sortDir}}).
 		SetSkip(int64(start)).
 		SetLimit(int64(size))
 	cursor, err := col.Find(ctx, filter, opts)
@@ -114,7 +141,7 @@ func (r *documentRepository) FindDraftsByContentTypePaginated(ctx context.Contex
 	return results, total, nil
 }
 
-func (r *documentRepository) FindPublishedByContentTypePaginated(ctx context.Context, contentTypeSlug string, start, size int, locale string) ([]*entity.Document, int64, error) {
+func (r *documentRepository) FindPublishedByContentTypePaginated(ctx context.Context, contentTypeSlug string, start, size int, locale, orderBy string, sortDir int) ([]*entity.Document, int64, error) {
 	col := r.collection(contentTypeSlug)
 	filter := bson.M{"version": entity.VersionPublished, "locale": locale}
 
@@ -124,7 +151,7 @@ func (r *documentRepository) FindPublishedByContentTypePaginated(ctx context.Con
 	}
 
 	opts := options.Find().
-		SetSort(bson.D{{Key: "createdAt", Value: -1}}).
+		SetSort(bson.D{{Key: resolveBsonSortKey(orderBy), Value: sortDir}}).
 		SetSkip(int64(start)).
 		SetLimit(int64(size))
 	cursor, err := col.Find(ctx, filter, opts)

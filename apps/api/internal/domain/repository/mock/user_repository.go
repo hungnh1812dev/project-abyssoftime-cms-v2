@@ -13,6 +13,7 @@ type UserRepository struct {
 	CreateFn        func(ctx context.Context, user *entity.User) error
 	FindByEmailFn   func(ctx context.Context, email string) (*entity.User, error)
 	FindByIDFn      func(ctx context.Context, id string) (*entity.User, error)
+	FindByIDsFn     func(ctx context.Context, ids []string) ([]*entity.User, error)
 	HasSuperAdminFn func(ctx context.Context) (bool, error)
 	FindAllFn       func(ctx context.Context, page, limit int) ([]*entity.User, int64, error)
 	UpdateFn        func(ctx context.Context, user *entity.User) error
@@ -29,6 +30,13 @@ func (m *UserRepository) FindByEmail(ctx context.Context, email string) (*entity
 
 func (m *UserRepository) FindByID(ctx context.Context, id string) (*entity.User, error) {
 	return m.FindByIDFn(ctx, id)
+}
+
+func (m *UserRepository) FindByIDs(ctx context.Context, ids []string) ([]*entity.User, error) {
+	if m.FindByIDsFn != nil {
+		return m.FindByIDsFn(ctx, ids)
+	}
+	return nil, nil
 }
 
 func (m *UserRepository) HasSuperAdmin(ctx context.Context) (bool, error) {

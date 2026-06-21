@@ -1,10 +1,20 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from '@/components/ui/table';
 import { useCollectionDocuments, useDeleteCollectionDocument } from '@/hooks/useCollectionDocuments';
 import { useLocales } from '@/hooks/useLocales';
 import { getRegistration, type CollectionColumnDef } from '@/content-type-registry';
 import type { ContentType, Document, FieldDefinition } from '@/types/cms';
+import { Pencil, Trash2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 
 interface Props {
   contentType: ContentType;
@@ -40,20 +50,71 @@ function cellValue(doc: Document, col: CollectionColumnDef): React.ReactNode {
     case 'number':
       return String(raw ?? '');
     case 'image':
-      return <img src={String(raw ?? '')} alt={col.label} className="h-8 w-8 object-cover" />;
+      return <img src={String(raw ?? '')} alt={col.label} className="h-8 w-8 object-cover rounded" />;
     default:
       return String(raw ?? '');
   }
 }
 
+function formatDate(value: unknown): string {
+  if (!value) return '—';
+  const date = new Date(String(value));
+  if (isNaN(date.getTime())) return '—';
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(date);
+}
+
+type SortField = 'id' | 'createdAt' | 'updatedAt';
+type SortDir = 'asc' | 'desc';
+
+function SortableHeader({
+  label,
+  field,
+  activeField,
+  activeDir,
+  onSort,
+}: {
+  label: string;
+  field: SortField;
+  activeField: string;
+  activeDir: SortDir;
+  onSort: (field: SortField) => void;
+}) {
+  const isActive = activeField === field;
+  const Icon = isActive ? (activeDir === 'asc' ? ArrowUp : ArrowDown) : ArrowUpDown;
+  return (
+    <button
+      type="button"
+      className="flex items-center gap-1 font-medium hover:text-foreground"
+      onClick={() => onSort(field)}
+    >
+      {label}
+      <Icon className={`h-3.5 w-3.5 ${isActive ? 'text-foreground' : 'text-muted-foreground'}`} />
+    </button>
+  );
+}
+
+const statusVariant: Record<string, 'draft' | 'published' | 'modified'> = {
+  draft: 'draft',
+  published: 'published',
+  modified: 'modified',
+};
+
 const PAGE_SIZE = 20;
 
 export function CollectionListPage({ contentType }: Props) {
   const [start, setStart] = useState(0);
+  const [orderBy, setOrderBy] = useState<SortField>('id');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
   const { data: locales = [] } = useLocales();
   const activeLocale = locales[0] || '';
 
-  const { data: page, isLoading } = useCollectionDocuments(contentType.Slug, start, PAGE_SIZE, activeLocale);
+  const { data: page, isLoading } = useCollectionDocuments(contentType.Slug, start, PAGE_SIZE, activeLocale, orderBy, sortDir);
   const { mutate: deleteDoc } = useDeleteCollectionDocument();
   const navigate = useNavigate();
 
@@ -65,13 +126,33 @@ export function CollectionListPage({ contentType }: Props) {
     navigate(`/admin/content-type/collection-type/${contentType.Slug}/new`);
   }
 
-  function handleDelete(doc: Document) {
+  function handleDelete(e: React.MouseEvent, doc: Document) {
+    e.stopPropagation();
     if (!window.confirm('Delete this entry?')) return;
     deleteDoc({ contentTypeSlug: contentType.Slug, id: doc.data.documentId as string });
   }
 
+  function handleEdit(e: React.MouseEvent, doc: Document) {
+    e.stopPropagation();
+    navigate(`/admin/content-type/collection-type/${contentType.Slug}/${doc.data.documentId}`);
+  }
+
+  function handleSort(field: SortField) {
+    if (orderBy === field) {
+      setSortDir((prev) => (prev === 'desc' ? 'asc' : 'desc'));
+    } else {
+      setOrderBy(field);
+      setSortDir('desc');
+    }
+    setStart(0);
+  }
+
+  function handleRowClick(doc: Document) {
+    navigate(`/admin/content-type/collection-type/${contentType.Slug}/${doc.data.documentId}`);
+  }
+
   if (isLoading) {
-    return <p className="text-muted-foreground">Loading…</p>;
+    return <p className="text-muted-foreground p-6">Loading…</p>;
   }
 
   const showingFrom = total === 0 ? 0 : start + 1;
@@ -88,39 +169,59 @@ export function CollectionListPage({ contentType }: Props) {
         <p className="text-muted-foreground">No entries yet.</p>
       ) : (
         <>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-left">
-                {columns.map((col) => (
-                  <th key={col.key} className="py-2 pr-4 font-medium">
-                    {col.label}
-                  </th>
-                ))}
-                <th className="py-2 pr-4 font-medium">Status</th>
-                <th className="py-2 font-medium">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {docs.map((doc) => (
-                <tr key={doc.data.documentId as string} className="border-b">
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-16">
+                    <SortableHeader label="Id" field="id" activeField={orderBy} activeDir={sortDir} onSort={handleSort} />
+                  </TableHead>
                   {columns.map((col) => (
-                    <td key={col.key} className="py-2 pr-4">
-                      {cellValue(doc, col)}
-                    </td>
+                    <TableHead key={col.key}>{col.label}</TableHead>
                   ))}
-                  <td className="py-2 pr-4 capitalize">{doc.status}</td>
-                  <td className="flex gap-2 py-2">
-                    <Link to={`/admin/content-type/collection-type/${contentType.Slug}/${doc.data.documentId}`} className="text-primary underline-offset-4 hover:underline">
-                      Edit
-                    </Link>
-                    <Button variant="destructive" size="sm" onClick={() => handleDelete(doc)}>
-                      Delete
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  <TableHead>Status</TableHead>
+                  <TableHead>
+                    <SortableHeader label="Created At" field="createdAt" activeField={orderBy} activeDir={sortDir} onSort={handleSort} />
+                  </TableHead>
+                  <TableHead>
+                    <SortableHeader label="Updated At" field="updatedAt" activeField={orderBy} activeDir={sortDir} onSort={handleSort} />
+                  </TableHead>
+                  <TableHead>Updated By</TableHead>
+                  <TableHead className="w-24 text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {docs.map((doc) => (
+                  <TableRow
+                    key={doc.data.documentId as string}
+                    className="cursor-pointer"
+                    onClick={() => handleRowClick(doc)}
+                  >
+                    <TableCell className="font-mono text-sm">{String(doc.data.id ?? '')}</TableCell>
+                    {columns.map((col) => (
+                      <TableCell key={col.key}>{cellValue(doc, col)}</TableCell>
+                    ))}
+                    <TableCell>
+                      <Badge variant={statusVariant[doc.status] ?? 'draft'}>{doc.status}</Badge>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{formatDate(doc.data.createdAt)}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{formatDate(doc.data.updatedAt)}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{String(doc.data.updatedByName ?? '')}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon" aria-label="Edit" onClick={(e) => handleEdit(e, doc)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" aria-label="Delete" onClick={(e) => handleDelete(e, doc)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
 
           <div className="text-muted-foreground flex items-center justify-between text-sm">
             <span>

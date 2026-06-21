@@ -3,6 +3,7 @@ package gormdb
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"gorm.io/gorm"
 
@@ -10,6 +11,24 @@ import (
 	"project-abyssoftime-cms-v2/api/internal/domain/repository"
 	pkgerrors "project-abyssoftime-cms-v2/api/pkg/errors"
 )
+
+var gormSortColumn = map[string]string{
+	"id":        "gorm_id",
+	"createdAt": "created_at",
+	"updatedAt": "updated_at",
+}
+
+func resolveGormSortClause(orderBy string, sortDir int) string {
+	col, ok := gormSortColumn[orderBy]
+	if !ok {
+		col = "created_at"
+	}
+	dir := "DESC"
+	if sortDir == 1 {
+		dir = "ASC"
+	}
+	return fmt.Sprintf("%s %s", col, dir)
+}
 
 var _ repository.DocumentRepository = (*documentRepository)(nil)
 
@@ -82,7 +101,7 @@ func (r *documentRepository) FindDraftsByContentType(ctx context.Context, conten
 	return docs, err
 }
 
-func (r *documentRepository) FindDraftsByContentTypePaginated(ctx context.Context, contentTypeSlug string, start, size int, locale string) ([]*entity.Document, int64, error) {
+func (r *documentRepository) FindDraftsByContentTypePaginated(ctx context.Context, contentTypeSlug string, start, size int, locale, orderBy string, sortDir int) ([]*entity.Document, int64, error) {
 	var total int64
 	q := r.table(contentTypeSlug).WithContext(ctx).
 		Where("version = ? AND locale = ?", entity.VersionDraft, locale)
@@ -92,13 +111,13 @@ func (r *documentRepository) FindDraftsByContentTypePaginated(ctx context.Contex
 	}
 
 	var docs []*entity.Document
-	if err := q.Order("created_at DESC").Offset(start).Limit(size).Find(&docs).Error; err != nil {
+	if err := q.Order(resolveGormSortClause(orderBy, sortDir)).Offset(start).Limit(size).Find(&docs).Error; err != nil {
 		return nil, 0, err
 	}
 	return docs, total, nil
 }
 
-func (r *documentRepository) FindPublishedByContentTypePaginated(ctx context.Context, contentTypeSlug string, start, size int, locale string) ([]*entity.Document, int64, error) {
+func (r *documentRepository) FindPublishedByContentTypePaginated(ctx context.Context, contentTypeSlug string, start, size int, locale, orderBy string, sortDir int) ([]*entity.Document, int64, error) {
 	var total int64
 	q := r.table(contentTypeSlug).WithContext(ctx).
 		Where("version = ? AND locale = ?", entity.VersionPublished, locale)
@@ -108,7 +127,7 @@ func (r *documentRepository) FindPublishedByContentTypePaginated(ctx context.Con
 	}
 
 	var docs []*entity.Document
-	if err := q.Order("created_at DESC").Offset(start).Limit(size).Find(&docs).Error; err != nil {
+	if err := q.Order(resolveGormSortClause(orderBy, sortDir)).Offset(start).Limit(size).Find(&docs).Error; err != nil {
 		return nil, 0, err
 	}
 	return docs, total, nil

@@ -15,13 +15,13 @@ const KEYS = {
     ['documents', 'collection-type', 'detail', slug, id, locale] as const,
 }
 
-export function useCollectionDocuments(slug: string, start: number, size: number, locale: string) {
+export function useCollectionDocuments(slug: string, start: number, size: number, locale: string, orderBy: string = 'id', sortDir: 'asc' | 'desc' = 'desc') {
   return useQuery({
-    queryKey: [...KEYS.list(slug), start, size, locale] as const,
+    queryKey: [...KEYS.list(slug), start, size, locale, orderBy, sortDir] as const,
     queryFn: () =>
       api
         .get<PaginatedResponse<Document>>(`/api/document-manager/collection-type/${slug}`, {
-          params: { start, size, locale },
+          params: { start, size, locale, orderBy, sortDir },
         })
         .then((r) => r.data),
     enabled: Boolean(slug),

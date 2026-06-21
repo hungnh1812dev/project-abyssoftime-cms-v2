@@ -23,7 +23,11 @@ func New(repo repository.UserRepository, roleRepo repository.RoleRepository) *Us
 	return &UseCase{repo: repo, roleRepo: roleRepo}
 }
 
-func (uc *UseCase) Register(ctx context.Context, email, password string) (*entity.User, error) {
+func (uc *UseCase) Register(ctx context.Context, email, password, displayName string) (*entity.User, error) {
+	if displayName == "" || len(displayName) > 100 {
+		return nil, pkgerrors.ErrValidation
+	}
+
 	hasSA, err := uc.repo.HasSuperAdmin(ctx)
 	if err != nil {
 		return nil, err
@@ -54,6 +58,7 @@ func (uc *UseCase) Register(ctx context.Context, email, password string) (*entit
 		ID:           uuid.New().String(),
 		DocumentID:   uuid.New().String(),
 		Email:        email,
+		DisplayName:  displayName,
 		PasswordHash: string(hash),
 		Role:         entity.RoleSuperAdmin,
 		RoleID:       saRole.DocumentID,
