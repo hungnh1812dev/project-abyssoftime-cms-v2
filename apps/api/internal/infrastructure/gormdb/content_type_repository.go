@@ -27,7 +27,7 @@ func (r *contentTypeRepository) Create(ctx context.Context, ct *entity.ContentTy
 
 func (r *contentTypeRepository) FindByID(ctx context.Context, id string) (*entity.ContentType, error) {
 	var ct entity.ContentType
-	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&ct).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("gorm_id = ?", id).First(&ct).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, pkgerrors.ErrNotFound
 		}
@@ -60,7 +60,7 @@ func (r *contentTypeRepository) Update(ctx context.Context, ct *entity.ContentTy
 }
 
 func (r *contentTypeRepository) Delete(ctx context.Context, id string) error {
-	result := r.db.WithContext(ctx).Where("id = ?", id).Delete(&entity.ContentType{})
+	result := r.db.WithContext(ctx).Where("gorm_id = ?", id).Delete(&entity.ContentType{})
 	if result.Error != nil {
 		return result.Error
 	}

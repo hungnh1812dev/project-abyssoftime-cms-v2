@@ -17,7 +17,7 @@ type FieldDefinition struct {
 }
 
 type ContentType struct {
-	ID         string            `bson:"_id,omitempty"            gorm:"column:id;primaryKey"`
+	ID         string            `bson:"_id,omitempty"            gorm:"column:gorm_id;primaryKey"`
 	Name       string            `bson:"name"                     gorm:"column:name"`
 	Slug       string            `bson:"slug"                     gorm:"column:slug;uniqueIndex"`
 	Kind       ContentKind       `bson:"kind"                     gorm:"column:kind;type:varchar(20)"`

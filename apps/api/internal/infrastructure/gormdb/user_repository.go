@@ -38,13 +38,24 @@ func (r *userRepository) FindByEmail(ctx context.Context, email string) (*entity
 
 func (r *userRepository) FindByID(ctx context.Context, id string) (*entity.User, error) {
 	var user entity.User
-	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&user).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("gorm_id = ?", id).First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, pkgerrors.ErrNotFound
 		}
 		return nil, err
 	}
 	return &user, nil
+}
+
+func (r *userRepository) FindByIDs(ctx context.Context, ids []string) ([]*entity.User, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	var users []*entity.User
+	if err := r.db.WithContext(ctx).Where("gorm_id IN ?", ids).Find(&users).Error; err != nil {
+		return nil, err
+	}
+	return users, nil
 }
 
 func (r *userRepository) HasSuperAdmin(ctx context.Context) (bool, error) {
@@ -80,7 +91,7 @@ func (r *userRepository) Update(ctx context.Context, user *entity.User) error {
 }
 
 func (r *userRepository) Delete(ctx context.Context, id string) error {
-	result := r.db.WithContext(ctx).Where("id = ?", id).Delete(&entity.User{})
+	result := r.db.WithContext(ctx).Where("gorm_id = ?", id).Delete(&entity.User{})
 	if result.Error != nil {
 		return result.Error
 	}

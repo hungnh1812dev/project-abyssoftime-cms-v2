@@ -27,7 +27,7 @@ func (r *mediaAssetRepository) Create(ctx context.Context, asset *entity.MediaAs
 
 func (r *mediaAssetRepository) FindByID(ctx context.Context, id string) (*entity.MediaAsset, error) {
 	var asset entity.MediaAsset
-	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&asset).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("gorm_id = ?", id).First(&asset).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, pkgerrors.ErrNotFound
 		}
@@ -61,5 +61,5 @@ func (r *mediaAssetRepository) DeleteByDocumentRef(ctx context.Context, document
 }
 
 func (r *mediaAssetRepository) Delete(ctx context.Context, id string) error {
-	return r.db.WithContext(ctx).Where("id = ?", id).Delete(&entity.MediaAsset{}).Error
+	return r.db.WithContext(ctx).Where("gorm_id = ?", id).Delete(&entity.MediaAsset{}).Error
 }

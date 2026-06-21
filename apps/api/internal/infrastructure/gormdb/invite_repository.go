@@ -49,7 +49,7 @@ func (r *inviteRepository) FindByEmail(ctx context.Context, email string) (*enti
 }
 
 func (r *inviteRepository) Delete(ctx context.Context, id string) error {
-	result := r.db.WithContext(ctx).Where("id = ?", id).Delete(&entity.Invite{})
+	result := r.db.WithContext(ctx).Where("gorm_id = ?", id).Delete(&entity.Invite{})
 	if result.Error != nil {
 		return result.Error
 	}
