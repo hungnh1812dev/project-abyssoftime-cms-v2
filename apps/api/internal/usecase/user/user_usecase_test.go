@@ -48,10 +48,10 @@ func makeUserRepo(users map[string]*entity.User) *repomock.UserRepository {
 			return &cp, nil
 		},
 		UpdateFn: func(_ context.Context, u *entity.User) error {
-			if _, ok := users[u.ID]; !ok {
+			if _, ok := users[u.DocumentID]; !ok {
 				return pkgerrors.ErrNotFound
 			}
-			users[u.ID] = u
+			users[u.DocumentID] = u
 			return nil
 		},
 		DeleteFn: func(_ context.Context, id string) error {
@@ -81,47 +81,47 @@ func TestUpdateRole(t *testing.T) {
 	}{
 		{
 			name:      "super_admin promotes guest to editor",
-			actor:     &entity.User{ID: "sa", RoleID: "role-sa"},
-			target:    &entity.User{ID: "g", RoleID: "role-guest"},
+			actor:     &entity.User{DocumentID: "sa", RoleID: "role-sa"},
+			target:    &entity.User{DocumentID: "g", RoleID: "role-guest"},
 			newRoleID: "role-editor",
 		},
 		{
 			name:      "super_admin promotes editor to admin",
-			actor:     &entity.User{ID: "sa", RoleID: "role-sa"},
-			target:    &entity.User{ID: "e", RoleID: "role-editor"},
+			actor:     &entity.User{DocumentID: "sa", RoleID: "role-sa"},
+			target:    &entity.User{DocumentID: "e", RoleID: "role-editor"},
 			newRoleID: "role-admin",
 		},
 		{
 			name:      "admin demotes editor to guest",
-			actor:     &entity.User{ID: "a", RoleID: "role-admin"},
-			target:    &entity.User{ID: "e", RoleID: "role-editor"},
+			actor:     &entity.User{DocumentID: "a", RoleID: "role-admin"},
+			target:    &entity.User{DocumentID: "e", RoleID: "role-editor"},
 			newRoleID: "role-guest",
 		},
 		{
 			name:      "admin cannot change another admin",
-			actor:     &entity.User{ID: "a1", RoleID: "role-admin"},
-			target:    &entity.User{ID: "a2", RoleID: "role-admin"},
+			actor:     &entity.User{DocumentID: "a1", RoleID: "role-admin"},
+			target:    &entity.User{DocumentID: "a2", RoleID: "role-admin"},
 			newRoleID: "role-editor",
 			wantErr:   pkgerrors.ErrForbidden,
 		},
 		{
 			name:      "admin cannot promote to admin",
-			actor:     &entity.User{ID: "a", RoleID: "role-admin"},
-			target:    &entity.User{ID: "e", RoleID: "role-editor"},
+			actor:     &entity.User{DocumentID: "a", RoleID: "role-admin"},
+			target:    &entity.User{DocumentID: "e", RoleID: "role-editor"},
 			newRoleID: "role-admin",
 			wantErr:   pkgerrors.ErrForbidden,
 		},
 		{
 			name:      "editor cannot promote guest to editor (equal to own role)",
-			actor:     &entity.User{ID: "e", RoleID: "role-editor"},
-			target:    &entity.User{ID: "g", RoleID: "role-guest"},
+			actor:     &entity.User{DocumentID: "e", RoleID: "role-editor"},
+			target:    &entity.User{DocumentID: "g", RoleID: "role-guest"},
 			newRoleID: "role-editor",
 			wantErr:   pkgerrors.ErrForbidden,
 		},
 		{
 			name:      "cannot change own role",
-			actor:     &entity.User{ID: "sa", RoleID: "role-sa"},
-			target:    &entity.User{ID: "sa", RoleID: "role-sa"},
+			actor:     &entity.User{DocumentID: "sa", RoleID: "role-sa"},
+			target:    &entity.User{DocumentID: "sa", RoleID: "role-sa"},
 			newRoleID: "role-admin",
 			wantErr:   pkgerrors.ErrForbidden,
 		},
@@ -130,15 +130,15 @@ func TestUpdateRole(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			users := map[string]*entity.User{
-				tt.actor.ID: tt.actor,
+				tt.actor.DocumentID: tt.actor,
 			}
-			if tt.actor.ID != tt.target.ID {
-				users[tt.target.ID] = tt.target
+			if tt.actor.DocumentID != tt.target.DocumentID {
+				users[tt.target.DocumentID] = tt.target
 			}
 			repo := makeUserRepo(users)
 			uc := user.New(repo, defaultRoleRepo())
 
-			err := uc.UpdateRole(context.Background(), tt.actor.ID, tt.target.ID, tt.newRoleID)
+			err := uc.UpdateRole(context.Background(), tt.actor.DocumentID, tt.target.DocumentID, tt.newRoleID)
 			if tt.wantErr != nil {
 				if !pkgerrors.Is(err, tt.wantErr) {
 					t.Errorf("err = %v, want %v", err, tt.wantErr)
@@ -148,8 +148,8 @@ func TestUpdateRole(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if users[tt.target.ID].RoleID != tt.newRoleID {
-				t.Errorf("roleID = %q, want %q", users[tt.target.ID].RoleID, tt.newRoleID)
+			if users[tt.target.DocumentID].RoleID != tt.newRoleID {
+				t.Errorf("roleID = %q, want %q", users[tt.target.DocumentID].RoleID, tt.newRoleID)
 			}
 		})
 	}
@@ -164,24 +164,24 @@ func TestDelete(t *testing.T) {
 	}{
 		{
 			name:   "super_admin deletes admin",
-			actor:  &entity.User{ID: "sa", RoleID: "role-sa"},
-			target: &entity.User{ID: "a", RoleID: "role-admin"},
+			actor:  &entity.User{DocumentID: "sa", RoleID: "role-sa"},
+			target: &entity.User{DocumentID: "a", RoleID: "role-admin"},
 		},
 		{
 			name:   "admin deletes editor",
-			actor:  &entity.User{ID: "a", RoleID: "role-admin"},
-			target: &entity.User{ID: "e", RoleID: "role-editor"},
+			actor:  &entity.User{DocumentID: "a", RoleID: "role-admin"},
+			target: &entity.User{DocumentID: "e", RoleID: "role-editor"},
 		},
 		{
 			name:    "admin cannot delete another admin",
-			actor:   &entity.User{ID: "a1", RoleID: "role-admin"},
-			target:  &entity.User{ID: "a2", RoleID: "role-admin"},
+			actor:   &entity.User{DocumentID: "a1", RoleID: "role-admin"},
+			target:  &entity.User{DocumentID: "a2", RoleID: "role-admin"},
 			wantErr: pkgerrors.ErrForbidden,
 		},
 		{
 			name:    "cannot delete self",
-			actor:   &entity.User{ID: "sa", RoleID: "role-sa"},
-			target:  &entity.User{ID: "sa", RoleID: "role-sa"},
+			actor:   &entity.User{DocumentID: "sa", RoleID: "role-sa"},
+			target:  &entity.User{DocumentID: "sa", RoleID: "role-sa"},
 			wantErr: pkgerrors.ErrForbidden,
 		},
 	}
@@ -189,15 +189,15 @@ func TestDelete(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			users := map[string]*entity.User{
-				tt.actor.ID: tt.actor,
+				tt.actor.DocumentID: tt.actor,
 			}
-			if tt.actor.ID != tt.target.ID {
-				users[tt.target.ID] = tt.target
+			if tt.actor.DocumentID != tt.target.DocumentID {
+				users[tt.target.DocumentID] = tt.target
 			}
 			repo := makeUserRepo(users)
 			uc := user.New(repo, defaultRoleRepo())
 
-			err := uc.Delete(context.Background(), tt.actor.ID, tt.target.ID)
+			err := uc.Delete(context.Background(), tt.actor.DocumentID, tt.target.DocumentID)
 			if tt.wantErr != nil {
 				if !pkgerrors.Is(err, tt.wantErr) {
 					t.Errorf("err = %v, want %v", err, tt.wantErr)
@@ -207,7 +207,7 @@ func TestDelete(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if _, ok := users[tt.target.ID]; ok {
+			if _, ok := users[tt.target.DocumentID]; ok {
 				t.Error("target should have been deleted")
 			}
 		})

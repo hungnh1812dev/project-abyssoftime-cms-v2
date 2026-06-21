@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
@@ -25,9 +24,7 @@ func NewMediaAssetRepository(db *mongo.Database) repository.MediaAssetRepository
 }
 
 func (r *mediaAssetRepository) Create(ctx context.Context, asset *entity.MediaAsset) error {
-	if asset.ID == "" {
-		asset.ID = primitive.NewObjectID().Hex()
-	}
+
 	if asset.CreatedAt.IsZero() {
 		asset.CreatedAt = time.Now().UTC()
 	}

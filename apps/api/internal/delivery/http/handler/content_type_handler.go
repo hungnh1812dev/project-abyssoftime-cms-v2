@@ -42,7 +42,7 @@ func (h *ContentTypeHandler) ListSummary(c *gin.Context) {
 	summaries := make([]contentTypeSummary, len(cts))
 	for i, ct := range cts {
 		summaries[i] = contentTypeSummary{
-			ID:   ct.ID,
+			ID:   ct.DocumentID,
 			Name: ct.Name,
 			Slug: ct.Slug,
 			Kind: ct.Kind,

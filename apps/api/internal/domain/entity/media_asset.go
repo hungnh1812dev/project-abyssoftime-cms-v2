@@ -3,7 +3,7 @@ package entity
 import "time"
 
 type MediaAsset struct {
-	ID           string    `bson:"_id,omitempty"  json:"ID"            gorm:"column:gorm_id;primaryKey"`
+	ID           uint      `bson:"_id,omitempty"  json:"ID"            gorm:"column:gorm_id;primaryKey;autoIncrement"`
 	DocumentID   string    `bson:"documentId"     json:"documentId"    gorm:"column:document_id;uniqueIndex"`
 	URL          string    `bson:"url"            json:"url"           gorm:"column:url"`
 	ThumbnailURL string    `bson:"thumbnailUrl"   json:"thumbnailUrl"  gorm:"column:thumbnail_url"`

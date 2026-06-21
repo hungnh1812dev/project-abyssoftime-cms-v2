@@ -124,8 +124,8 @@ func TestList_ReturnsPaginatedAssets(t *testing.T) {
 	assetRepo := &repomock.MediaAssetRepository{}
 	assetRepo.FindAllFn = func(_ context.Context, page, limit int) ([]*entity.MediaAsset, int64, error) {
 		return []*entity.MediaAsset{
-			{ID: "a1", URL: "https://cdn/a1.jpg"},
-			{ID: "a2", URL: "https://cdn/a2.jpg"},
+			{DocumentID: "a1", URL: "https://cdn/a1.jpg"},
+			{DocumentID: "a2", URL: "https://cdn/a2.jpg"},
 		}, 10, nil
 	}
 	storage := &repomock.StorageAdapter{}
@@ -247,7 +247,7 @@ func TestDelete_CallsStorageAndRepo(t *testing.T) {
 
 	assetRepo := &repomock.MediaAssetRepository{}
 	assetRepo.FindByIDFn = func(_ context.Context, id string) (*entity.MediaAsset, error) {
-		return &entity.MediaAsset{ID: id, PublicID: "pub-123"}, nil
+		return &entity.MediaAsset{DocumentID: id, PublicID: "pub-123"}, nil
 	}
 	assetRepo.DeleteFn = func(_ context.Context, id string) error {
 		repoDeleteID = id
@@ -303,7 +303,7 @@ func TestDelete_StorageError_DoesNotDeleteFromRepo(t *testing.T) {
 
 	assetRepo := &repomock.MediaAssetRepository{}
 	assetRepo.FindByIDFn = func(_ context.Context, id string) (*entity.MediaAsset, error) {
-		return &entity.MediaAsset{ID: id, PublicID: "pub-123"}, nil
+		return &entity.MediaAsset{DocumentID: id, PublicID: "pub-123"}, nil
 	}
 	assetRepo.DeleteFn = func(_ context.Context, _ string) error {
 		repoDeleteCalled = true
@@ -330,7 +330,7 @@ func TestDelete_RepoDeleteError_ReturnsError(t *testing.T) {
 
 	assetRepo := &repomock.MediaAssetRepository{}
 	assetRepo.FindByIDFn = func(_ context.Context, id string) (*entity.MediaAsset, error) {
-		return &entity.MediaAsset{ID: id, PublicID: "pub-123"}, nil
+		return &entity.MediaAsset{DocumentID: id, PublicID: "pub-123"}, nil
 	}
 	assetRepo.DeleteFn = func(_ context.Context, _ string) error {
 		return repoErr

@@ -15,6 +15,8 @@ import (
 
 	_ "golang.org/x/image/webp"
 
+	"github.com/google/uuid"
+
 	"project-abyssoftime-cms-v2/api/internal/domain/entity"
 	"project-abyssoftime-cms-v2/api/internal/domain/repository"
 )
@@ -68,6 +70,7 @@ func (uc *UseCase) Upload(ctx context.Context, file io.Reader, filename string) 
 	}
 
 	asset := &entity.MediaAsset{
+		DocumentID:   uuid.NewString(),
 		URL:          result.URL,
 		ThumbnailURL: result.ThumbnailURL,
 		PublicID:     result.PublicID,

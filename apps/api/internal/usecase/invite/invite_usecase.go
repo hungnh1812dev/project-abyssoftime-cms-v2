@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 
 	"project-abyssoftime-cms-v2/api/internal/domain/entity"
@@ -54,7 +55,7 @@ func (uc *UseCase) Create(ctx context.Context, actorID, email string, role entit
 	}
 
 	if pending, err := uc.inviteRepo.FindByEmail(ctx, email); err == nil {
-		_ = uc.inviteRepo.Delete(ctx, pending.ID)
+		_ = uc.inviteRepo.Delete(ctx, pending.DocumentID)
 	}
 
 	raw := make([]byte, 32)
@@ -66,6 +67,7 @@ func (uc *UseCase) Create(ctx context.Context, actorID, email string, role entit
 	tokenHash := fmt.Sprintf("%x", hash)
 
 	inv := &entity.Invite{
+		DocumentID: uuid.NewString(),
 		Email:     email,
 		Role:      role,
 		TokenHash: tokenHash,
@@ -122,6 +124,7 @@ func (uc *UseCase) Accept(ctx context.Context, token, password, displayName stri
 	}
 
 	user := &entity.User{
+		DocumentID:   uuid.NewString(),
 		Email:        inv.Email,
 		DisplayName:  displayName,
 		PasswordHash: string(passHash),
@@ -132,7 +135,7 @@ func (uc *UseCase) Accept(ctx context.Context, token, password, displayName stri
 		return nil, err
 	}
 
-	_ = uc.inviteRepo.Delete(ctx, inv.ID)
+	_ = uc.inviteRepo.Delete(ctx, inv.DocumentID)
 	return user, nil
 }
 

@@ -3,7 +3,8 @@ package entity
 import "time"
 
 type Invite struct {
-	ID        string    `bson:"_id,omitempty" gorm:"column:gorm_id;primaryKey"`
+	ID        uint      `bson:"_id,omitempty" gorm:"column:gorm_id;primaryKey;autoIncrement"`
+	DocumentID string   `bson:"documentId"    gorm:"column:document_id;uniqueIndex"`
 	Email     string    `bson:"email"         gorm:"column:email;uniqueIndex"`
 	Role      Role      `bson:"role"          gorm:"column:role;type:varchar(20)"`
 	TokenHash string    `bson:"tokenHash"     gorm:"column:token_hash;uniqueIndex"`

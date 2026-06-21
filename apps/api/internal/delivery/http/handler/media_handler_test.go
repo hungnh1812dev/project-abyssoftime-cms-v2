@@ -65,7 +65,7 @@ func TestMediaHandler_Upload_OK(t *testing.T) {
 	uc := &mockMediaUC{}
 	uc.uploadFn = func(_ context.Context, _ io.Reader, filename string) (*entity.MediaAsset, error) {
 		return &entity.MediaAsset{
-			ID:  "asset-1",
+			DocumentID: "asset-1",
 			URL: "https://cdn.example.com/" + filename,
 		}, nil
 	}
@@ -102,7 +102,7 @@ func TestMediaHandler_List_OK(t *testing.T) {
 	uc := &mockMediaUC{}
 	uc.listFn = func(_ context.Context, page, limit int) ([]*entity.MediaAsset, int64, error) {
 		return []*entity.MediaAsset{
-			{ID: "a1", URL: "https://cdn/a1.jpg"},
+			{DocumentID: "a1", URL: "https://cdn/a1.jpg"},
 		}, 5, nil
 	}
 	h := handler.NewMediaHandler(uc)

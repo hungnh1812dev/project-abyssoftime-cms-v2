@@ -82,7 +82,7 @@ func TestAuthService_Login_Unauthorized(t *testing.T) {
 func TestAuthService_Register_OK(t *testing.T) {
 	uc := &mockAuthUC{
 		registerFn: func(_ context.Context, email, _, _ string) (*entity.User, error) {
-			return &entity.User{ID: "u1", Email: email, Role: entity.RoleAdmin}, nil
+			return &entity.User{DocumentID: "u1", Email: email, Role: entity.RoleAdmin}, nil
 		},
 	}
 	svc := NewAuthServiceServer(uc)
@@ -128,7 +128,7 @@ func TestContentTypeService_ListContentTypes(t *testing.T) {
 	uc := &mockCTUC{
 		findAllFn: func(_ context.Context) ([]*entity.ContentType, error) {
 			return []*entity.ContentType{
-				{ID: "1", Name: "Blog", Slug: "blog", Kind: entity.KindCollection},
+				{DocumentID: "1", Name: "Blog", Slug: "blog", Kind: entity.KindCollection},
 			}, nil
 		},
 	}
@@ -148,7 +148,7 @@ func TestContentTypeService_ListContentTypes(t *testing.T) {
 func TestContentTypeService_GetContentType_OK(t *testing.T) {
 	uc := &mockCTUC{
 		findBySlugFn: func(_ context.Context, slug string) (*entity.ContentType, error) {
-			return &entity.ContentType{ID: "1", Slug: slug, Kind: entity.KindSingle}, nil
+			return &entity.ContentType{DocumentID: "1", Slug: slug, Kind: entity.KindSingle}, nil
 		},
 	}
 	svc := NewContentTypeServiceServer(uc)

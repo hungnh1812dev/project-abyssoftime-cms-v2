@@ -55,7 +55,6 @@ func (uc *UseCase) Register(ctx context.Context, email, password, displayName st
 	}
 
 	user := &entity.User{
-		ID:           uuid.New().String(),
 		DocumentID:   uuid.New().String(),
 		Email:        email,
 		DisplayName:  displayName,
@@ -92,15 +91,15 @@ func (uc *UseCase) Login(ctx context.Context, email, password string) (accessTok
 		return "", "", err
 	}
 
-	access, err := pkgjwt.GenerateAccessToken(user.ID, roleSlug)
+	access, err := pkgjwt.GenerateAccessToken(user.DocumentID, roleSlug)
 	if err != nil {
 		return "", "", err
 	}
-	refresh, err := pkgjwt.GenerateRefreshToken(user.ID)
+	refreshToken, err = pkgjwt.GenerateRefreshToken(user.DocumentID)
 	if err != nil {
 		return "", "", err
 	}
-	return access, refresh, nil
+	return access, refreshToken, nil
 }
 
 func (uc *UseCase) RefreshToken(ctx context.Context, refreshToken string) (string, string, error) {
@@ -119,12 +118,12 @@ func (uc *UseCase) RefreshToken(ctx context.Context, refreshToken string) (strin
 		return "", "", pkgerrors.ErrUnauthorized
 	}
 
-	access, err := pkgjwt.GenerateAccessToken(user.ID, roleSlug)
+	access, err := pkgjwt.GenerateAccessToken(user.DocumentID, roleSlug)
 	if err != nil {
 		return "", "", err
 	}
 
-	newRefresh, err := pkgjwt.GenerateRefreshToken(user.ID)
+	newRefresh, err := pkgjwt.GenerateRefreshToken(user.DocumentID)
 	if err != nil {
 		return "", "", err
 	}

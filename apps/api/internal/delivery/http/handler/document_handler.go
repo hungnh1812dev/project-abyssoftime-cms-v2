@@ -236,7 +236,7 @@ func (h *DocumentHandler) resolveUserDisplayNames(ctx context.Context, userIDs [
 		return nameMap
 	}
 	for _, u := range users {
-		nameMap[u.ID] = u.DisplayName
+		nameMap[u.DocumentID] = u.DisplayName
 	}
 	return nameMap
 }

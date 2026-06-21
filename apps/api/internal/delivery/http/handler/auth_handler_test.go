@@ -82,7 +82,7 @@ func TestRegisterHandler(t *testing.T) {
 			name: "success → 201 with user JSON",
 			uc: &mockAuthUC{
 				registerFn: func(_ context.Context, email, _, displayName string) (*entity.User, error) {
-					return &entity.User{ID: "u1", Email: email, DisplayName: displayName, Role: entity.RoleGuest}, nil
+					return &entity.User{DocumentID: "u1", Email: email, DisplayName: displayName, Role: entity.RoleGuest}, nil
 				},
 			},
 			body:       `{"email":"a@b.com","password":"secret","displayName":"Test User"}`,

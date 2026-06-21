@@ -67,13 +67,13 @@ func TestCreate_HierarchyEnforcement(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			userRepo := &repomock.UserRepository{
 				FindByIDFn: func(_ context.Context, _ string) (*entity.User, error) {
-					return &entity.User{ID: "actor", Role: tt.actorRole, RoleID: roleIDForSlug(tt.actorRole)}, nil
+					return &entity.User{DocumentID: "actor", Role: tt.actorRole, RoleID: roleIDForSlug(tt.actorRole)}, nil
 				},
 				FindByEmailFn: func(_ context.Context, _ string) (*entity.User, error) {
 					return nil, pkgerrors.ErrNotFound
 				},
 				CreateFn: func(_ context.Context, u *entity.User) error {
-					u.ID = "new-user"
+					u.DocumentID = "new-user"
 					return nil
 				},
 			}
@@ -82,7 +82,7 @@ func TestCreate_HierarchyEnforcement(t *testing.T) {
 					return nil, pkgerrors.ErrNotFound
 				},
 				CreateFn: func(_ context.Context, inv *entity.Invite) error {
-					inv.ID = "inv-1"
+					inv.DocumentID = "inv-1"
 					return nil
 				},
 			}
@@ -104,7 +104,7 @@ func TestCreate_DuplicateEmailReplacesInvite(t *testing.T) {
 	var deletedID string
 	userRepo := &repomock.UserRepository{
 		FindByIDFn: func(_ context.Context, _ string) (*entity.User, error) {
-			return &entity.User{ID: "sa", Role: entity.RoleSuperAdmin, RoleID: "role-sa"}, nil
+			return &entity.User{DocumentID: "sa", Role: entity.RoleSuperAdmin, RoleID: "role-sa"}, nil
 		},
 		FindByEmailFn: func(_ context.Context, _ string) (*entity.User, error) {
 			return nil, pkgerrors.ErrNotFound
@@ -112,14 +112,14 @@ func TestCreate_DuplicateEmailReplacesInvite(t *testing.T) {
 	}
 	inviteRepo := &repomock.InviteRepository{
 		FindByEmailFn: func(_ context.Context, _ string) (*entity.Invite, error) {
-			return &entity.Invite{ID: "old-invite"}, nil
+			return &entity.Invite{DocumentID: "old-invite"}, nil
 		},
 		DeleteFn: func(_ context.Context, id string) error {
 			deletedID = id
 			return nil
 		},
 		CreateFn: func(_ context.Context, inv *entity.Invite) error {
-			inv.ID = "new-invite"
+			inv.DocumentID = "new-invite"
 			return nil
 		},
 	}
@@ -140,10 +140,10 @@ func TestCreate_DuplicateEmailReplacesInvite(t *testing.T) {
 func TestCreate_UserAlreadyRegistered(t *testing.T) {
 	userRepo := &repomock.UserRepository{
 		FindByIDFn: func(_ context.Context, _ string) (*entity.User, error) {
-			return &entity.User{ID: "sa", Role: entity.RoleSuperAdmin, RoleID: "role-sa"}, nil
+			return &entity.User{DocumentID: "sa", Role: entity.RoleSuperAdmin, RoleID: "role-sa"}, nil
 		},
 		FindByEmailFn: func(_ context.Context, _ string) (*entity.User, error) {
-			return &entity.User{ID: "existing"}, nil
+			return &entity.User{DocumentID: "existing"}, nil
 		},
 	}
 	inviteRepo := &repomock.InviteRepository{}
@@ -169,7 +169,7 @@ func TestAccept_Success(t *testing.T) {
 				return nil, pkgerrors.ErrNotFound
 			}
 			return &entity.Invite{
-				ID:        "inv-1",
+				DocumentID: "inv-1",
 				Email:     "new@test.com",
 				Role:      entity.RoleEditor,
 				TokenHash: tokenHash,
@@ -186,7 +186,7 @@ func TestAccept_Success(t *testing.T) {
 			return nil, pkgerrors.ErrNotFound
 		},
 		CreateFn: func(_ context.Context, u *entity.User) error {
-			u.ID = "new-user-id"
+			u.DocumentID = "new-user-id"
 			createdUser = u
 			return nil
 		},
@@ -219,7 +219,7 @@ func TestAccept_ExpiredToken(t *testing.T) {
 	inviteRepo := &repomock.InviteRepository{
 		FindByHashFn: func(_ context.Context, _ string) (*entity.Invite, error) {
 			return &entity.Invite{
-				ID:        "inv-1",
+				DocumentID: "inv-1",
 				TokenHash: tokenHash,
 				ExpiresAt: time.Now().UTC().Add(-time.Hour),
 			}, nil

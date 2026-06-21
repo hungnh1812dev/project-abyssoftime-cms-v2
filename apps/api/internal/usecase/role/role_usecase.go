@@ -49,7 +49,6 @@ func (uc *UseCase) SeedDefaults(ctx context.Context) error {
 	now := time.Now().UTC()
 	for _, def := range entity.DefaultRoles {
 		r := def
-		r.ID = uuid.New().String()
 		r.DocumentID = uuid.New().String()
 		r.CreatedAt = now
 		r.UpdatedAt = now
@@ -79,7 +78,6 @@ func (uc *UseCase) Create(ctx context.Context, input CreateRoleInput, callerLeve
 
 	now := time.Now().UTC()
 	role := &entity.RoleEntity{
-		ID:          uuid.New().String(),
 		DocumentID:  uuid.New().String(),
 		Name:        input.Name,
 		Slug:        input.Slug,

@@ -51,7 +51,7 @@ func (r *accessTokenRepository) FindAll(ctx context.Context, page, limit int) ([
 }
 
 func (r *accessTokenRepository) Delete(ctx context.Context, id string) error {
-	result := r.db.WithContext(ctx).Where("gorm_id = ?", id).Delete(&entity.AccessToken{})
+	result := r.db.WithContext(ctx).Where("document_id = ?", id).Delete(&entity.AccessToken{})
 	if result.Error != nil {
 		return result.Error
 	}

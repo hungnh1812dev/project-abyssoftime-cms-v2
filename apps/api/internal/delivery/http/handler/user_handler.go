@@ -34,7 +34,7 @@ type userResponse struct {
 }
 
 func toUserResponse(u *entity.User) userResponse {
-	return userResponse{ID: u.ID, Email: u.Email, DisplayName: u.DisplayName, Role: string(u.Role), RoleID: u.RoleID}
+	return userResponse{ID: u.DocumentID, Email: u.Email, DisplayName: u.DisplayName, Role: string(u.Role), RoleID: u.RoleID}
 }
 
 func (h *UserHandler) List(c *gin.Context) {

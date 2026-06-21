@@ -42,7 +42,7 @@ func (h *InviteHandler) Create(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{
-		"id":        inv.ID,
+		"id":        inv.DocumentID,
 		"email":     inv.Email,
 		"role":      inv.Role,
 		"expiresAt": inv.ExpiresAt,
@@ -68,7 +68,7 @@ func (h *InviteHandler) List(c *gin.Context) {
 	items := make([]inviteItem, len(invites))
 	for i, inv := range invites {
 		items[i] = inviteItem{
-			ID:        inv.ID,
+			ID:        inv.DocumentID,
 			Email:     inv.Email,
 			Role:      string(inv.Role),
 			ExpiresAt: inv.ExpiresAt.Format("2006-01-02T15:04:05Z"),

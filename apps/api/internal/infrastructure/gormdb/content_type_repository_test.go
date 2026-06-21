@@ -29,10 +29,10 @@ func TestContentTypeRepository_Create_And_FindByID(t *testing.T) {
 	ctx := context.Background()
 
 	ct := &entity.ContentType{
-		ID:   "ct1",
-		Name: "Blog",
-		Slug: "blog",
-		Kind: entity.KindCollection,
+		DocumentID: "ct1",
+		Name:       "Test Content Type",
+		Slug:       "blog",
+		Kind:       entity.KindCollection,
 		Fields: []entity.FieldDefinition{
 			{Name: "title", Type: "text"},
 			{Name: "body", Type: "richtext"},
@@ -49,8 +49,8 @@ func TestContentTypeRepository_Create_And_FindByID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FindByID: %v", err)
 	}
-	if found.Name != "Blog" {
-		t.Errorf("Name = %q, want %q", found.Name, "Blog")
+	if found.Name != "Test Content Type" {
+		t.Errorf("Name = %q, want %q", found.Name, "Test Content Type")
 	}
 	if len(found.Fields) != 2 {
 		t.Errorf("Fields count = %d, want 2", len(found.Fields))
@@ -65,14 +65,14 @@ func TestContentTypeRepository_FindBySlug(t *testing.T) {
 	repo := NewContentTypeRepository(db)
 	ctx := context.Background()
 
-	_ = repo.Create(ctx, &entity.ContentType{ID: "ct1", Name: "Blog", Slug: "blog", Kind: entity.KindCollection})
+	_ = repo.Create(ctx, &entity.ContentType{DocumentID: "ct1", Name: "Blog", Slug: "blog", Kind: entity.KindCollection})
 
 	found, err := repo.FindBySlug(ctx, "blog")
 	if err != nil {
 		t.Fatalf("FindBySlug: %v", err)
 	}
-	if found.ID != "ct1" {
-		t.Errorf("ID = %q, want %q", found.ID, "ct1")
+	if found.DocumentID != "ct1" {
+		t.Errorf("DocumentID = %q, want %q", found.DocumentID, "ct1")
 	}
 }
 
@@ -101,8 +101,8 @@ func TestContentTypeRepository_FindAll(t *testing.T) {
 	repo := NewContentTypeRepository(db)
 	ctx := context.Background()
 
-	_ = repo.Create(ctx, &entity.ContentType{ID: "ct1", Name: "Blog", Slug: "blog", Kind: entity.KindCollection})
-	_ = repo.Create(ctx, &entity.ContentType{ID: "ct2", Name: "Homepage", Slug: "homepage", Kind: entity.KindSingle})
+	_ = repo.Create(ctx, &entity.ContentType{DocumentID: "ct1", Name: "Blog", Slug: "blog", Kind: entity.KindCollection})
+	_ = repo.Create(ctx, &entity.ContentType{DocumentID: "ct2", Name: "Homepage", Slug: "homepage", Kind: entity.KindSingle})
 
 	all, err := repo.FindAll(ctx)
 	if err != nil {
@@ -118,7 +118,7 @@ func TestContentTypeRepository_Update(t *testing.T) {
 	repo := NewContentTypeRepository(db)
 	ctx := context.Background()
 
-	ct := &entity.ContentType{ID: "ct1", Name: "Blog", Slug: "blog", Kind: entity.KindCollection}
+	ct := &entity.ContentType{DocumentID: "ct1", Name: "Blog", Slug: "blog", Kind: entity.KindCollection}
 	_ = repo.Create(ctx, ct)
 
 	ct.Name = "Articles"
@@ -138,7 +138,7 @@ func TestContentTypeRepository_Delete(t *testing.T) {
 	repo := NewContentTypeRepository(db)
 	ctx := context.Background()
 
-	_ = repo.Create(ctx, &entity.ContentType{ID: "ct1", Name: "Blog", Slug: "blog", Kind: entity.KindCollection})
+	_ = repo.Create(ctx, &entity.ContentType{DocumentID: "ct1", Name: "Blog", Slug: "blog", Kind: entity.KindCollection})
 
 	if err := repo.Delete(ctx, "ct1"); err != nil {
 		t.Fatalf("Delete: %v", err)

@@ -87,7 +87,7 @@ func TestRegister(t *testing.T) {
 			setupRepo: func(r *repomock.UserRepository) {
 				r.HasSuperAdminFn = func(_ context.Context) (bool, error) { return false, nil }
 				r.FindByEmailFn = func(_ context.Context, _ string) (*entity.User, error) {
-					return &entity.User{ID: "existing"}, nil
+					return &entity.User{DocumentID: "existing"}, nil
 				}
 			},
 			wantErr: pkgerrors.ErrConflict,
@@ -152,7 +152,7 @@ func TestRegister(t *testing.T) {
 			if tc.wantUserID && user == nil {
 				t.Fatal("expected non-nil user")
 			}
-			if user != nil && user.ID == "" {
+			if user != nil && user.DocumentID == "" {
 				t.Error("expected non-empty ID")
 			}
 			if user != nil && user.DocumentID == "" {
@@ -187,7 +187,7 @@ func TestLogin(t *testing.T) {
 			setupRepo: func(r *repomock.UserRepository) {
 				r.FindByEmailFn = func(_ context.Context, _ string) (*entity.User, error) {
 					return &entity.User{
-						ID:           "u1",
+						DocumentID: "u1",
 						Role:         entity.RoleAdmin,
 						PasswordHash: mustHash(plainPass),
 					}, nil
@@ -220,7 +220,7 @@ func TestLogin(t *testing.T) {
 			setupRepo: func(r *repomock.UserRepository) {
 				r.FindByEmailFn = func(_ context.Context, _ string) (*entity.User, error) {
 					return &entity.User{
-						ID:           "u1",
+						DocumentID: "u1",
 						Role:         entity.RoleAdmin,
 						PasswordHash: mustHash(plainPass),
 					}, nil
@@ -272,7 +272,7 @@ func TestRefreshToken(t *testing.T) {
 			buildToken: func() string { return validRefreshToken(t, "u1") },
 			setupRepo: func(r *repomock.UserRepository) {
 				r.FindByIDFn = func(_ context.Context, id string) (*entity.User, error) {
-					return &entity.User{ID: id, Role: entity.RoleAdmin}, nil
+					return &entity.User{DocumentID: id, Role: entity.RoleAdmin}, nil
 				}
 			},
 			wantNonEmpty: true,

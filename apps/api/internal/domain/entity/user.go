@@ -27,7 +27,7 @@ func RoleLevel(role Role) int {
 }
 
 type User struct {
-	ID           string    `bson:"_id,omitempty" gorm:"column:gorm_id;primaryKey"`
+	ID           uint      `bson:"_id,omitempty" gorm:"column:gorm_id;primaryKey;autoIncrement"`
 	DocumentID   string    `bson:"documentId"    gorm:"column:document_id;uniqueIndex"`
 	Email        string    `bson:"email"         gorm:"column:email;uniqueIndex"`
 	DisplayName  string    `bson:"displayName"   gorm:"column:display_name"   json:"displayName"`

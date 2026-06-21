@@ -29,8 +29,8 @@ func TestMediaAssetRepository_Create_And_FindByID(t *testing.T) {
 	ctx := context.Background()
 
 	asset := &entity.MediaAsset{
-		ID:        "m1",
-		URL:       "https://cdn/photo.jpg",
+		DocumentID:   "m1",
+		URL:          "https://example.com/m1.jpg",
 		FileName:  "photo.jpg",
 		CreatedAt: time.Now().UTC(),
 	}
@@ -42,8 +42,8 @@ func TestMediaAssetRepository_Create_And_FindByID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FindByID: %v", err)
 	}
-	if found.URL != "https://cdn/photo.jpg" {
-		t.Errorf("URL = %q, want %q", found.URL, "https://cdn/photo.jpg")
+	if found.URL != "https://example.com/m1.jpg" {
+		t.Errorf("URL = %q, want %q", found.URL, "https://example.com/m1.jpg")
 	}
 }
 
@@ -62,8 +62,8 @@ func TestMediaAssetRepository_FindByDocumentID(t *testing.T) {
 	repo := NewMediaAssetRepository(db)
 	ctx := context.Background()
 
-	_ = repo.Create(ctx, &entity.MediaAsset{ID: "m1", DocumentID: "doc-uuid-1", URL: "https://cdn/a.jpg", CreatedAt: time.Now().UTC()})
-	_ = repo.Create(ctx, &entity.MediaAsset{ID: "m2", DocumentID: "doc-uuid-2", URL: "https://cdn/b.jpg", CreatedAt: time.Now().UTC()})
+	_ = repo.Create(ctx, &entity.MediaAsset{DocumentID: "doc-uuid-1", URL: "https://cdn/a.jpg", CreatedAt: time.Now().UTC()})
+	_ = repo.Create(ctx, &entity.MediaAsset{DocumentID: "doc-uuid-2", URL: "https://cdn/b.jpg", CreatedAt: time.Now().UTC()})
 
 	found, err := repo.FindByDocumentID(ctx, "doc-uuid-1")
 	if err != nil {
@@ -86,7 +86,6 @@ func TestMediaAssetRepository_FindAll_Paginated(t *testing.T) {
 
 	for i := 0; i < 5; i++ {
 		_ = repo.Create(ctx, &entity.MediaAsset{
-			ID:         "m" + string(rune('0'+i)),
 			DocumentID: "doc-" + string(rune('0'+i)),
 			CreatedAt:  time.Now().UTC().Add(time.Duration(i) * time.Second),
 		})
@@ -108,8 +107,11 @@ func TestMediaAssetRepository_Delete(t *testing.T) {
 	db := setupMediaDB(t)
 	repo := NewMediaAssetRepository(db)
 	ctx := context.Background()
+	m1 := &entity.MediaAsset{DocumentID: "m1", URL: "url1", CreatedAt: time.Now().UTC().Add(-time.Hour)}
+	m2 := &entity.MediaAsset{DocumentID: "m2", URL: "url2", CreatedAt: time.Now().UTC()}
 
-	_ = repo.Create(ctx, &entity.MediaAsset{ID: "m1", CreatedAt: time.Now().UTC()})
+	_ = repo.Create(ctx, m1)
+	_ = repo.Create(ctx, m2)
 
 	if err := repo.Delete(ctx, "m1"); err != nil {
 		t.Fatalf("Delete: %v", err)

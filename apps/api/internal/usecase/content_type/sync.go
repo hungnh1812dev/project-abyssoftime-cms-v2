@@ -152,5 +152,5 @@ func (s *Syncer) removeContentType(ctx context.Context, ct *entity.ContentType) 
 	if err := s.docRepo.DropCollection(ctx, ct.Slug); err != nil {
 		return err
 	}
-	return s.UseCase.Delete(ctx, ct.ID)
+	return s.UseCase.Delete(ctx, ct.DocumentID)
 }

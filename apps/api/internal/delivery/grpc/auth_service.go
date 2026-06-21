@@ -41,7 +41,7 @@ func (s *AuthServiceServer) Register(ctx context.Context, req *pb.RegisterReques
 	if err != nil {
 		return nil, toGRPCError(err)
 	}
-	return &pb.RegisterResponse{Id: user.ID, Email: user.Email, Role: string(user.Role)}, nil
+	return &pb.RegisterResponse{Id: user.DocumentID, Email: user.Email, Role: string(user.Role)}, nil
 }
 
 func (s *AuthServiceServer) Refresh(ctx context.Context, req *pb.RefreshRequest) (*pb.RefreshResponse, error) {
