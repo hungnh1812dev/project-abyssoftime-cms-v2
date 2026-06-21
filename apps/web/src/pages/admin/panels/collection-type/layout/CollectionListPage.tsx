@@ -78,7 +78,7 @@ export function CollectionListPage({ contentType }: Props) {
   const showingTo = Math.min(start + PAGE_SIZE, total);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">{contentType.Name}</h1>
         <Button onClick={handleCreate}>Add new item</Button>

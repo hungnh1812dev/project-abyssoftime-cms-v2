@@ -32,19 +32,19 @@ export function ContentTypeLayout({
     )
 
     return (
-      <div>
-        <div className="sticky top-0 z-30 -mx-6 mb-6 flex h-16 items-center justify-between border-b border-border bg-background/80 px-6 backdrop-blur-sm">
+      <div className="min-h-full">
+        <div className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/80 px-6 backdrop-blur-sm">
           {renderHeader(defaultHeader)}
         </div>
-        {children}
+        <div className="p-6">{children}</div>
       </div>
     )
   }
 
   return (
-    <div>
+    <div className="min-h-full">
       <StickyActionBar title={title} status={status} renderActions={renderActions} />
-      {children}
+      <div className="p-6">{children}</div>
     </div>
   )
 }

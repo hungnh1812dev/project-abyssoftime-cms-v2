@@ -5,11 +5,11 @@ import { TopBar } from './TopBar'
 export function AdminLayout() {
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen">
+      <div className="flex h-screen overflow-hidden">
         <SidebarShell />
         <div className="flex flex-col flex-1 min-w-0">
           <TopBar />
-          <main className="flex-1 p-6">
+          <main className="flex-1 overflow-y-auto">
             <Outlet />
           </main>
         </div>

@@ -1,5 +1,5 @@
 import type { UseQueryOptions } from "@tanstack/react-query";
-import { FormProvider } from "@/components/form";
+import { FormProvider, useCmsFormState } from "@/components/form";
 import type { FieldDefinition } from "@/types/cms";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,14 +9,33 @@ interface ContentTypeBuilderProps {
   schema: FieldDefinition[];
   query?: UseQueryOptions;
   mutationFn: (data: Record<string, unknown>) => Promise<unknown>;
-  children?: React.ReactNode;
+  renderActions?: (formState: { isDirty: boolean; submitting: boolean }) => React.ReactNode;
+}
+
+function FormActions({ renderActions }: { renderActions?: ContentTypeBuilderProps['renderActions'] }) {
+  const { isDirty, submitting } = useCmsFormState();
+
+  return (
+    <div className="flex items-center gap-2">
+      <Button
+        type="submit"
+        variant={isDirty ? 'default' : 'secondary'}
+        disabled={!isDirty || submitting}
+        loading={submitting}
+        loadingText="Saving..."
+      >
+        Save
+      </Button>
+      {renderActions?.({ isDirty, submitting })}
+    </div>
+  );
 }
 
 export function ContentTypeBuilder({
   schema,
   query,
   mutationFn,
-  children,
+  renderActions,
 }: ContentTypeBuilderProps) {
   return (
     <FormProvider query={query} mutationFn={mutationFn}>
@@ -28,7 +47,7 @@ export function ContentTypeBuilder({
             </div>
           </CardContent>
         </Card>
-        {children ?? <Button type="submit">Save</Button>}
+        <FormActions renderActions={renderActions} />
       </div>
     </FormProvider>
   );

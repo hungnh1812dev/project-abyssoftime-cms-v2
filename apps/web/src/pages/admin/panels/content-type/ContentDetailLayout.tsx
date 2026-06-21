@@ -11,10 +11,12 @@ interface Props {
 
 export function ContentDetailLayout({ title, status, backLink, renderActions, children }: Props) {
   return (
-    <div>
+    <div className="min-h-full">
       <StickyActionBar title={title} status={status} renderActions={renderActions} />
-      {backLink && <div className="mb-4">{backLink}</div>}
-      {children}
+      <div className="p-6">
+        {backLink && <div className="mb-4">{backLink}</div>}
+        {children}
+      </div>
     </div>
   )
 }

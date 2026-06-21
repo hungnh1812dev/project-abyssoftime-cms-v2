@@ -15,7 +15,7 @@ interface StickyActionBarProps {
 
 export function StickyActionBar({ title, status, renderActions }: StickyActionBarProps) {
   return (
-    <div className="sticky top-0 z-30 -mx-6 mb-6 flex h-16 items-center justify-between border-b border-border bg-background/80 px-6 backdrop-blur-sm">
+    <div className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/80 px-6 backdrop-blur-sm">
       <div className="flex items-center gap-3">
         <h1 className="text-2xl font-bold">{title}</h1>
         {status && (

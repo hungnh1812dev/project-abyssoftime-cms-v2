@@ -151,16 +151,6 @@ export function ContentTypePanel({ contentType, id, isNew }: Props) {
               ))}
             </select>
           )}
-          {canPublish && (
-            <Button onClick={handlePublish} disabled={isPublishing}>
-              Publish
-            </Button>
-          )}
-          {canUnpublish && (
-            <Button variant="outline" onClick={handleUnpublish} disabled={isUnpublishing}>
-              Unpublish
-            </Button>
-          )}
         </>
       )}>
       <ContentTypeBuilder
@@ -173,6 +163,34 @@ export function ContentTypePanel({ contentType, id, isNew }: Props) {
               .then((r) => stripSystemFields((r.data as CmsDocument).data)),
         }}
         mutationFn={mutationFn}
+        renderActions={({ isDirty, submitting }) => (
+          <>
+            {canPublish && (
+              <Button
+                type="button"
+                variant="success"
+                onClick={handlePublish}
+                disabled={isDirty || submitting || isPublishing}
+                loading={isPublishing}
+                loadingText="Publishing..."
+              >
+                Publish
+              </Button>
+            )}
+            {canUnpublish && (
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={handleUnpublish}
+                disabled={submitting || isUnpublishing}
+                loading={isUnpublishing}
+                loadingText="Unpublishing..."
+              >
+                Unpublish
+              </Button>
+            )}
+          </>
+        )}
       />
     </ContentDetailLayout>
   );
