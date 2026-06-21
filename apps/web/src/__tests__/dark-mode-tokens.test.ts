@@ -20,7 +20,7 @@ function extractBlock(css: string, selector: string): string {
   const match = pattern.exec(css)
   if (!match) return ''
   let depth = 0
-  let start = match.index + match[0].length
+  const start = match.index + match[0].length
   for (let i = start; i < css.length; i++) {
     if (css[i] === '{') depth++
     if (css[i] === '}') {
