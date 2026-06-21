@@ -15,25 +15,36 @@ describe('useBreadcrumbs', () => {
     expect(result.current).toEqual([{ label: 'Home', to: '/admin' }])
   })
 
-  it('returns Content Manager > slug for single-type route', () => {
+  it('returns Content Manager > title-cased slug for single-type route', () => {
     const { result } = renderHook(() => useBreadcrumbs(), {
       wrapper: wrapper('/admin/content-type/single-type/homepage'),
     })
     expect(result.current).toEqual([
       { label: 'Home', to: '/admin' },
       { label: 'Content Manager' },
-      { label: 'homepage' },
+      { label: 'Homepage' },
     ])
   })
 
-  it('returns Content Manager > slug for collection-type route', () => {
+  it('returns Content Manager > title-cased slug for collection-type route', () => {
     const { result } = renderHook(() => useBreadcrumbs(), {
       wrapper: wrapper('/admin/content-type/collection-type/articles'),
     })
     expect(result.current).toEqual([
       { label: 'Home', to: '/admin' },
       { label: 'Content Manager' },
-      { label: 'articles' },
+      { label: 'Articles' },
+    ])
+  })
+
+  it('converts hyphenated slugs to title case', () => {
+    const { result } = renderHook(() => useBreadcrumbs(), {
+      wrapper: wrapper('/admin/content-type/single-type/about-page'),
+    })
+    expect(result.current).toEqual([
+      { label: 'Home', to: '/admin' },
+      { label: 'Content Manager' },
+      { label: 'About Page' },
     ])
   })
 

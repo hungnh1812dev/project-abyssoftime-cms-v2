@@ -6,6 +6,10 @@ export interface BreadcrumbItem {
   to?: string
 }
 
+function slugToTitle(slug: string): string {
+  return slug.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
 const SETTINGS_LABELS: Record<string, string> = {
   media: 'Media',
   users: 'Users',
@@ -30,7 +34,7 @@ export function useBreadcrumbs(): BreadcrumbItem[] {
       const parts = rest.split('/')
       const slug = parts[2]
       if (slug) {
-        crumbs.push({ label: slug })
+        crumbs.push({ label: slugToTitle(slug) })
       }
       return crumbs
     }
