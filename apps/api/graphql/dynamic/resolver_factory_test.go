@@ -103,7 +103,7 @@ func TestResolverFactory_ContentTypesQuery(t *testing.T) {
 	ctUC := &mockCTUC{
 		findAllFn: func(_ context.Context) ([]*entity.ContentType, error) {
 			return []*entity.ContentType{
-				{ID: "1", Name: "Blog", Slug: "blog", Kind: entity.KindCollection},
+				{ID: 1, Name: "Blog", Slug: "blog", Kind: entity.KindCollection},
 			}, nil
 		},
 	}
