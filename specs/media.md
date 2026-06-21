@@ -51,11 +51,13 @@ type MediaAsset struct {
     FileName      string    `bson:"fileName"       gorm:"column:file_name"            json:"fileName"`
     FileExt       string    `bson:"fileExt"        gorm:"column:file_ext"             json:"fileExt"`
     Hash          string    `bson:"hash"           gorm:"column:hash"                 json:"hash"`
-    ContentTypeID string    `bson:"contentTypeId"  gorm:"column:content_type_id"      json:"contentTypeId"`
-    DocumentRef   string    `bson:"documentRef"    gorm:"column:document_ref;index"   json:"documentRef"`
+    Width         int       `bson:"width"          gorm:"column:width"                json:"width"`
+    Height        int       `bson:"height"         gorm:"column:height"               json:"height"`
     CreatedAt     time.Time `bson:"createdAt"      gorm:"column:created_at"           json:"createdAt"`
 }
 ```
+
+**Removed fields:** `ContentTypeID` and `DocumentRef` (media assets are now referenced by their `document_id` from document media fields, not by explicit back-references).
 
 ---
 
@@ -67,11 +69,13 @@ type MediaAsset struct {
 type MediaAssetRepository interface {
     Create(ctx context.Context, asset *entity.MediaAsset) error
     FindByID(ctx context.Context, id string) (*entity.MediaAsset, error)
+    FindByDocumentID(ctx context.Context, documentID string) (*entity.MediaAsset, error)
     FindAll(ctx context.Context) ([]*entity.MediaAsset, error)
     Delete(ctx context.Context, id string) error
-    DeleteByDocumentRef(ctx context.Context, documentRef string) error
 }
 ```
+
+**Changes:** Removed `DeleteByDocumentRef`; added `FindByDocumentID` (used by GraphQL resolvers to resolve media fields into full `MediaAsset` objects).
 
 ### StorageAdapter
 
@@ -222,3 +226,6 @@ func newStorageAdapter(ctx context.Context, cfg *config.Config) (repository.Stor
 | v1.1 | S3 adapter added behind StorageAdapter interface | Resolved Decision #1 |
 | v1.2 | Delete media asset with inline-confirm UX | §8 |
 | v1.3 | gRPC MediaService (list + delete) | §11.7 |
+| v1.4 | Removed `ContentTypeID` and `DocumentRef` fields from MediaAsset entity | sync-table-fields |
+| v1.5 | Added `FindByDocumentID` method to MediaAssetRepository; added `Width`/`Height` fields | sync-table-fields, graphql-overhaul |
+| v1.6 | Media fields in documents now store the media asset's `document_id` (UUID reference), not URL strings | sync-table-fields |
