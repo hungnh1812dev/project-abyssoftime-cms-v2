@@ -11,6 +11,6 @@ type ComponentRepository interface {
 	UpsertAll(ctx context.Context, contentTypeSlug, componentName, documentID, locale string, version entity.DocumentVersion, components []*entity.Component) error
 	DeleteByDocumentID(ctx context.Context, contentTypeSlug, componentName, documentID, locale string) error
 	DeleteAllByContentType(ctx context.Context, contentTypeSlug, componentName string) error
-	EnsureCollection(ctx context.Context, contentTypeSlug, componentName string) error
+	EnsureCollection(ctx context.Context, contentTypeSlug, componentName string, fields []entity.FieldDefinition) error
 	DropCollection(ctx context.Context, contentTypeSlug, componentName string) error
 }

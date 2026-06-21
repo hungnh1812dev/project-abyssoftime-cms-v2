@@ -2,13 +2,14 @@ package grpcdelivery
 
 import (
 	"context"
+	"strings"
 
 	"project-abyssoftime-cms-v2/api/internal/domain/entity"
 	pb "project-abyssoftime-cms-v2/api/proto/cms/v1"
 )
 
 type authUseCase interface {
-	Register(ctx context.Context, email, password string) (*entity.User, error)
+	Register(ctx context.Context, email, password, displayName string) (*entity.User, error)
 	Login(ctx context.Context, email, password string) (accessToken, refreshToken string, err error)
 	RefreshToken(ctx context.Context, refreshToken string) (string, string, error)
 	SetupStatus(ctx context.Context) (bool, error)
@@ -32,11 +33,15 @@ func (s *AuthServiceServer) Login(ctx context.Context, req *pb.LoginRequest) (*p
 }
 
 func (s *AuthServiceServer) Register(ctx context.Context, req *pb.RegisterRequest) (*pb.RegisterResponse, error) {
-	user, err := s.uc.Register(ctx, req.Email, req.Password)
+	displayName := req.Email
+	if idx := strings.Index(req.Email, "@"); idx > 0 {
+		displayName = req.Email[:idx]
+	}
+	user, err := s.uc.Register(ctx, req.Email, req.Password, displayName)
 	if err != nil {
 		return nil, toGRPCError(err)
 	}
-	return &pb.RegisterResponse{Id: user.ID, Email: user.Email, Role: string(user.Role)}, nil
+	return &pb.RegisterResponse{Id: user.DocumentID, Email: user.Email, Role: string(user.Role)}, nil
 }
 
 func (s *AuthServiceServer) Refresh(ctx context.Context, req *pb.RefreshRequest) (*pb.RefreshResponse, error) {

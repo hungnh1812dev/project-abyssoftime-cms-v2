@@ -21,11 +21,7 @@ func TestMediaAssetRepository_FindByID_NotFound(t *testing.T) {
 	t.Skip("integration test: requires live MongoDB — run with -tags integration")
 }
 
-func TestMediaAssetRepository_FindByDocumentRef_Empty(t *testing.T) {
-	t.Skip("integration test: requires live MongoDB — run with -tags integration")
-}
-
-func TestMediaAssetRepository_DeleteByDocumentRef(t *testing.T) {
+func TestMediaAssetRepository_FindByDocumentID(t *testing.T) {
 	t.Skip("integration test: requires live MongoDB — run with -tags integration")
 }
 
@@ -34,12 +30,11 @@ func TestMediaAssetRepository_Delete_NotFound(t *testing.T) {
 }
 
 var mediaAssetRepoTests = []struct {
-	name        string
-	documentRef string
-	url         string
+	name string
+	url  string
 }{
-	{"profile image", "doc-1", "https://res.cloudinary.com/demo/image/upload/sample.jpg"},
-	{"banner", "doc-2", "https://res.cloudinary.com/demo/image/upload/banner.png"},
+	{"profile image", "https://res.cloudinary.com/demo/image/upload/sample.jpg"},
+	{"banner", "https://res.cloudinary.com/demo/image/upload/banner.png"},
 }
 
 func TestMediaAssetRepository_TableDriven(t *testing.T) {

@@ -352,3 +352,7 @@ Full deployment walkthrough: see SPEC.md §13.
 | v1.2 | GORM adapters + per-entity DB selection (Phase C) | §11.6 |
 | v1.3 | gRPC server + client (Phase D) | §11.7 |
 | v1.4 | Deployment to Render.com | §13 |
+| v1.5 | All static tables use `gorm_id` (string UUID) as PK column name; `document_id` standardized to UUID v4 everywhere | sync-table-fields |
+| v1.6 | Dynamic tables (`documents_{slug}`, `components_{slug}_{component}`) use per-field columns instead of JSON `data` blob | sync-table-fields |
+| v1.7 | `EnsureCollection` accepts `[]FieldDefinition` and creates columns per field (DROP+CREATE strategy) | sync-table-fields |
+| v1.8 | Field type mapping for dynamic columns: text/richtext → TEXT, media → VARCHAR (documentId FK), number → REAL, boolean → BOOLEAN, json → TEXT | sync-table-fields |

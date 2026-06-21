@@ -2,11 +2,11 @@ package role
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"fmt"
 	"regexp"
 	"time"
+
+	"github.com/google/uuid"
 
 	"project-abyssoftime-cms-v2/api/internal/domain/entity"
 	"project-abyssoftime-cms-v2/api/internal/domain/repository"
@@ -37,12 +37,6 @@ type UpdateRoleInput struct {
 	Level       *int
 }
 
-func generateDocID() string {
-	b := make([]byte, 12)
-	_, _ = rand.Read(b)
-	return hex.EncodeToString(b)
-}
-
 func (uc *UseCase) SeedDefaults(ctx context.Context) error {
 	has, err := uc.roleRepo.HasAny(ctx)
 	if err != nil {
@@ -55,8 +49,7 @@ func (uc *UseCase) SeedDefaults(ctx context.Context) error {
 	now := time.Now().UTC()
 	for _, def := range entity.DefaultRoles {
 		r := def
-		r.ID = generateDocID()
-		r.DocumentID = generateDocID()
+		r.DocumentID = uuid.New().String()
 		r.CreatedAt = now
 		r.UpdatedAt = now
 		if err := uc.roleRepo.Create(ctx, &r); err != nil {
@@ -85,8 +78,7 @@ func (uc *UseCase) Create(ctx context.Context, input CreateRoleInput, callerLeve
 
 	now := time.Now().UTC()
 	role := &entity.RoleEntity{
-		ID:          generateDocID(),
-		DocumentID:  generateDocID(),
+		DocumentID:  uuid.New().String(),
 		Name:        input.Name,
 		Slug:        input.Slug,
 		Permissions: input.Permissions,

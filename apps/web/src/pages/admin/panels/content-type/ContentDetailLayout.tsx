@@ -1,31 +1,24 @@
 import type { ReactNode } from 'react'
+import { StickyActionBar } from '@/pages/admin/layout/StickyActionBar'
 
 interface Props {
   title: string
   status?: string
   backLink?: ReactNode
+  metadata?: ReactNode
   renderActions?: () => ReactNode
   children: ReactNode
 }
 
-export function ContentDetailLayout({ title, status, backLink, renderActions, children }: Props) {
+export function ContentDetailLayout({ title, status, backLink, metadata, renderActions, children }: Props) {
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h1 className="text-xl font-semibold">{title}</h1>
-          {status && (
-            <span data-testid="status-badge" className="text-sm text-muted-foreground capitalize">
-              {status}
-            </span>
-          )}
-        </div>
-        {renderActions && (
-          <div className="flex items-center gap-2">{renderActions()}</div>
-        )}
+    <div className="min-h-full">
+      <StickyActionBar title={title} status={status} renderActions={renderActions} />
+      <div className="p-6">
+        {backLink && <div className="mb-4">{backLink}</div>}
+        {metadata && <div className="mb-4">{metadata}</div>}
+        {children}
       </div>
-      {backLink && <div>{backLink}</div>}
-      {children}
     </div>
   )
 }

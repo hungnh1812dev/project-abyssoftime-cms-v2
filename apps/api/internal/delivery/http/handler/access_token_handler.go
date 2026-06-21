@@ -91,7 +91,7 @@ func (h *AccessTokenHandler) List(c *gin.Context) {
 	items := make([]tokenItem, len(tokens))
 	for i, t := range tokens {
 		items[i] = tokenItem{
-			ID:         t.ID,
+			ID:         t.DocumentID,
 			Name:       t.Name,
 			Prefix:     t.Prefix,
 			Scopes:     t.Scopes,

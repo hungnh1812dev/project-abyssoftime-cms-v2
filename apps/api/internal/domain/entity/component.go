@@ -8,8 +8,7 @@ type Component struct {
 	DocumentID  string          `gorm:"column:document_id"`
 	Version     DocumentVersion `gorm:"column:version;type:varchar(20)"`
 	Locale      string          `gorm:"column:locale"`
-	Order       int             `gorm:"column:order"`
-	Data        map[string]any  `gorm:"column:data;serializer:json"`
+	Fields      map[string]any  `gorm:"-"`
 	CreatedAt   time.Time       `gorm:"column:created_at"`
 	UpdatedAt   time.Time       `gorm:"column:updated_at"`
 }

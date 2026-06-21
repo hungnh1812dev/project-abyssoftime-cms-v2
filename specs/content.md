@@ -90,18 +90,18 @@ const (
 
 ```go
 type Document struct {
-    DocumentID    string          `bson:"documentId"     gorm:"column:document_id;index"        json:"documentId"`
-    Version       DocumentVersion `bson:"version"        gorm:"column:version;type:varchar(20)"  json:"version"`
-    ContentTypeID string          `bson:"contentTypeId"  gorm:"column:content_type_id;index"     json:"contentTypeId"`
-    Data          map[string]any  `bson:"data"           gorm:"column:data;serializer:json"      json:"data"`
-    Locale        string          `bson:"locale"         gorm:"column:locale"                    json:"locale"`
-    CreatedAt     time.Time       `bson:"createdAt"      gorm:"column:created_at"                json:"createdAt"`
-    UpdatedAt     time.Time       `bson:"updatedAt"      gorm:"column:updated_at"                json:"updatedAt"`
-    PublishedAt   time.Time       `bson:"publishedAt,omitempty"  gorm:"column:published_at"      json:"publishedAt,omitempty"`
-    CreatedBy     string          `bson:"createdBy"      gorm:"column:created_by"                json:"createdBy"`
-    UpdatedBy     string          `bson:"updatedBy"      gorm:"column:updated_by"                json:"updatedBy"`
-    PublishedBy   string          `bson:"publishedBy,omitempty"  gorm:"column:published_by"      json:"publishedBy,omitempty"`
-    Slug          string          `bson:"-"              gorm:"column:slug;index"                json:"-"`
+    GormID      uint            `gorm:"column:gorm_id;primaryKey;autoIncrement"`
+    DocumentID  string          `bson:"documentId"     gorm:"column:document_id;index"        json:"documentId"`
+    Version     DocumentVersion `bson:"version"        gorm:"column:version;type:varchar(20)"  json:"version"`
+    Fields      map[string]any  `bson:"data"           gorm:"-"                               json:"data"`
+    Locale      string          `bson:"locale"         gorm:"column:locale"                    json:"locale"`
+    CreatedAt   time.Time       `bson:"createdAt"      gorm:"column:created_at"                json:"createdAt"`
+    UpdatedAt   time.Time       `bson:"updatedAt"      gorm:"column:updated_at"                json:"updatedAt"`
+    PublishedAt *time.Time      `bson:"publishedAt,omitempty"  gorm:"column:published_at"      json:"publishedAt,omitempty"`
+    CreatedBy   string          `bson:"createdBy"      gorm:"column:created_by"                json:"createdBy"`
+    UpdatedBy   string          `bson:"updatedBy"      gorm:"column:updated_by"                json:"updatedBy"`
+    PublishedBy string          `bson:"publishedBy,omitempty"  gorm:"column:published_by"      json:"publishedBy,omitempty"`
+    Slug        string          `bson:"-"              gorm:"column:slug;index"                json:"-"`
 }
 
 type DocumentVersion string
@@ -111,7 +111,14 @@ const (
 )
 ```
 
-**Database IDs:** Document entities use `documentId` as the primary domain identifier. Higher layers (usecase, handler, frontend) only work with `documentId` and content-type `slug` — never with MongoDB `_id` or generic `id`. ContentType entities retain their MongoDB `_id` as `ID`.
+**Entity changes (v1.8):**
+- Removed `ContentTypeID` field (content type is implicit from the per-content-type table/collection)
+- Renamed `Data` → `Fields` (tagged `gorm:"-"` — GORM uses per-field columns, not a JSON blob)
+- `PublishedAt` changed to `*time.Time` (nullable pointer)
+- Added `GormID` (auto-increment uint) for display ordering in list queries
+- `document_id` standardized to UUID v4
+
+**Database IDs:** Document entities use `documentId` (UUID v4) as the primary domain identifier. Higher layers (usecase, handler, frontend) only work with `documentId` and content-type `slug` — never with MongoDB `_id` or generic `id`. ContentType entities retain their MongoDB `_id` as `ID`.
 
 ---
 
@@ -184,7 +191,7 @@ type DocumentRepository interface {
     DeleteAllByContentType(ctx context.Context, contentTypeSlug string) error
     FindDraftsByContentTypePaginated(ctx context.Context, contentTypeSlug string, start, size int, locale string) ([]*entity.Document, int64, error)
     FindPublishedByDocumentIDs(ctx context.Context, contentTypeSlug string, documentIDs []string, locale string) ([]*entity.Document, error)
-    EnsureCollection(ctx context.Context, contentTypeSlug string) error
+    EnsureCollection(ctx context.Context, contentTypeSlug string, fields []entity.FieldDefinition) error
     DropCollection(ctx context.Context, contentTypeSlug string) error
 }
 ```
@@ -287,6 +294,8 @@ Query param: `?locale=` (defaults to first supported locale).
 | `start` | `0` | — | Offset |
 | `size` | `20` | `100` | Items per page |
 | `locale` | first supported | — | Filter by locale |
+| `orderBy` | `gorm_id` | — | Field to sort by |
+| `sortDir` | `desc` | — | Sort direction (`asc` or `desc`) |
 
 **Paginated list response:**
 ```json
@@ -298,7 +307,8 @@ Query param: `?locale=` (defaults to first supported locale).
       "status": "draft",
       "locale": "en",
       "createdAt": "...",
-      "updatedAt": "..."
+      "updatedAt": "...",
+      "updatedByName": "John Doe"
     }
   ],
   "total": 42,
@@ -307,7 +317,26 @@ Query param: `?locale=` (defaults to first supported locale).
 }
 ```
 
+`updatedByName` is resolved server-side from User entity's `DisplayName` field.
+
 `items[].data` contains **only** the fields specified in `listFields`. Full data available via single-document GET.
+
+**REST document response shape (v1.8):**
+```json
+{
+  "data": {
+    "documentId": "...",
+    "status": "draft",
+    "locale": "en",
+    "createdAt": "...",
+    "updatedAt": "...",
+    "fieldName1": "value1",
+    "fieldName2": "value2"
+  }
+}
+```
+
+System fields and content fields are merged flat inside `data`. Fields `contentTypeId` and `status` are excluded from public API responses.
 
 ### REST — Public Read Route
 
@@ -325,7 +354,7 @@ Query param: `?locale=` (defaults to first supported locale).
 
 **Slug validation:** `^[a-z0-9]+(?:-[a-z0-9]+)*$` — applied on every request that reads `slug` from URL. 400 on invalid.
 
-**DocumentID validation:** `^[a-f0-9]{24}$` (MongoDB ObjectID format) — applied on every request that reads `documentId`. 400 on invalid.
+**DocumentID validation:** UUID v4 format — applied on every request that reads `documentId`. 400 on invalid.
 
 ### gRPC — DocumentService
 
@@ -370,15 +399,15 @@ On startup, after content-type sync:
 | `richtext` | `String` |
 | `number` | `Float` |
 | `boolean` | `Boolean` |
-| `media` | `String` (URL) |
+| `media` | `MediaAsset` object type (`{ documentId, url, thumbnailUrl, fileName, width, height }`) |
 | `json` | `JSON` (scalar) |
-| `component` | Nested object type |
+| `component` | Nested object type (with media sub-fields resolved recursively) |
 
 ### Generated Schema Per Content-Type
 
 **Collection-type** generates:
-- `Query.<slug>(Id: ID!, locale: String): <Type>Response` — fetch one document (with component fields resolved as nested objects)
-- `Query.<slugList>(where: <Type>Filter, orderBy: <Type>OrderBy, start: Int, size: Int, locale: String): <Type>ListResponse` — paginated list with filtering, sorting, and component data
+- `Query.<slug>(Id: ID!, locale: String, status: String): <Type>` — fetch one document (nullable; returns `null` if not found). Defaults to published; `status: "draft"` opt-in for authenticated users.
+- `Query.<slugList>(where: <Type>Filter, orderBy: <Type>OrderBy, start: Int, size: Int, locale: String): [<Type>!]!` — paginated list with filtering, sorting, and component data
 - `Mutation.create<Type>(data: <Type>Input!): <Type>! @auth`
 - `Mutation.update<Type>(Id: ID!, data: <Type>Input!): <Type>! @auth`
 - `Mutation.delete<Type>(Id: ID!): Boolean! @auth`
@@ -386,10 +415,12 @@ On startup, after content-type sync:
 - `Mutation.unpublish<Type>(Id: ID!, locale: String): <Type>! @auth`
 
 **Single-type** generates:
-- `Query.<slug>(locale: String): <Type>Response` — fetch singleton (with component fields resolved)
+- `Query.<slug>(locale: String, status: String): <Type>` — fetch singleton (nullable). Defaults to published; `status: "draft"` opt-in for authenticated users.
 - `Mutation.save<Type>(data: <Type>Input!, locale: String): <Type>! @auth`
 - `Mutation.publish<Type>(locale: String): <Type>! @auth`
 - `Mutation.unpublish<Type>(locale: String): <Type>! @auth`
+
+**Response shape changes (v1.8):** Response wrappers removed — single queries return the type directly (nullable), list queries return `[Type!]!`. The `ResolverFactory` now takes `MediaAssetRepository` as a dependency to resolve media fields into full `MediaAsset` objects.
 
 ### Naming Conventions
 - Type: PascalCase of slug (`blog-posts` → `BlogPost`)
@@ -499,11 +530,18 @@ Example: content type `blog-posts` → table `documents_blog_posts`.
 ```sql
 CREATE TABLE IF NOT EXISTS documents_<slug_underscored> (
     gorm_id         BIGSERIAL PRIMARY KEY,
-    document_id     VARCHAR(255) NOT NULL,
+    document_id     UUID         NOT NULL,
     version         VARCHAR(20)  NOT NULL,
-    content_type_id VARCHAR(255),
-    data            JSONB,
     locale          VARCHAR(10)  NOT NULL,
+    -- per-field columns (type depends on FieldDefinition):
+    --   text/richtext → TEXT
+    --   media         → VARCHAR (stores documentId FK to media_assets)
+    --   number        → REAL
+    --   boolean       → BOOLEAN
+    --   json          → TEXT
+    <field_name_1>  <mapped_type>,
+    <field_name_2>  <mapped_type>,
+    ...
     created_at      TIMESTAMPTZ,
     updated_at      TIMESTAMPTZ,
     published_at    TIMESTAMPTZ,
@@ -515,7 +553,7 @@ CREATE TABLE IF NOT EXISTS documents_<slug_underscored> (
 ```
 
 **Implementation changes:**
-- `EnsureCollection(slug)`: Executes `CREATE TABLE IF NOT EXISTS documents_<slug_underscored>` with the schema above + unique index
+- `EnsureCollection(slug, fields []FieldDefinition)`: DROP+CREATE strategy — drops existing table and recreates with per-field columns based on `FieldDefinition` type mapping
 - `DropCollection(slug)`: Executes `DROP TABLE IF EXISTS documents_<slug_underscored>`
 - All repository queries use `r.db.Table("documents_" + sanitize(slug))` instead of the default model table
 - `Slug` field removed from the `Document` entity (or marked `gorm:"-"`) — table name replaces the discriminator
@@ -536,14 +574,16 @@ Example: content type `blog-posts` with component field `banner` → table `comp
 CREATE TABLE IF NOT EXISTS components_<slug_underscored>_<component_name_underscored> (
     gorm_id       BIGSERIAL PRIMARY KEY,
     component_id  VARCHAR(255) NOT NULL,
-    document_id   VARCHAR(255) NOT NULL,
+    document_id   UUID         NOT NULL,
     version       VARCHAR(20)  NOT NULL,
     locale        VARCHAR(10)  NOT NULL,
-    "order"       INT          NOT NULL DEFAULT 0,
-    data          JSONB,
+    -- per-field columns based on component's FieldDefinition (same type mapping as documents)
+    <field_name_1>  <mapped_type>,
+    <field_name_2>  <mapped_type>,
+    ...
     created_at    TIMESTAMPTZ,
     updated_at    TIMESTAMPTZ,
-    UNIQUE(document_id, version, locale, "order")
+    UNIQUE(document_id, version, locale)
 );
 ```
 
@@ -556,12 +596,13 @@ type Component struct {
     DocumentID  string          `gorm:"column:document_id"`
     Version     DocumentVersion `gorm:"column:version;type:varchar(20)"`
     Locale      string          `gorm:"column:locale"`
-    Order       int             `gorm:"column:order"`
-    Data        map[string]any  `gorm:"column:data;serializer:json"`
+    Fields      map[string]any  `gorm:"-"`
     CreatedAt   time.Time       `gorm:"column:created_at"`
     UpdatedAt   time.Time       `gorm:"column:updated_at"`
 }
 ```
+
+**Component entity changes (v1.8):** Removed `Order` field; renamed `Data` → `Fields` (tagged `gorm:"-"` — per-field columns used instead of JSON blob, matching the document table pattern).
 
 **New repository — `ComponentRepository`:**
 
@@ -633,7 +674,7 @@ type ComponentRepository interface {
 | Rule | Detail |
 |---|---|
 | **Always** | Validate slug format at both usecase (creation) and handler (every request) levels |
-| **Always** | Validate documentID is 24-char hex before passing to usecase |
+| **Always** | Validate documentID is UUID v4 format before passing to usecase |
 | **Always** | Return 404 (not empty object) for single-type GET when no document exists |
 | **Always** | Include computed `status` in every document response |
 | **Always** | Project `data` in collection list responses — never return full data in paginated lists |
@@ -669,3 +710,10 @@ type ComponentRepository interface {
 | v1.5 | PostgreSQL per-content-type document tables (`documents_<slug_underscored>`) replacing single `documents` table | §9 |
 | v1.6 | PostgreSQL component tables (`components_<slug_underscored>_<component_name_underscored>`) — MongoDB keeps nested BSON | §9 |
 | v1.7 | GraphQL: list query renamed to `<slug>List`, response wrapped in `data`, filter/orderBy/pagination support | §8 |
+| v1.8 | Document entity: removed `ContentTypeID`, renamed `Data` → `Fields` (gorm:"-"), `PublishedAt` → `*time.Time`, added `GormID` for ordering | sync-table-fields |
+| v1.9 | Component entity: removed `Order`, renamed `Data` → `Fields` (gorm:"-"); per-field columns in dynamic tables | sync-table-fields |
+| v1.10 | `EnsureCollection` accepts `[]FieldDefinition`, uses DROP+CREATE with per-field columns | sync-table-fields |
+| v1.11 | Document list supports `orderBy`/`sortDir` query params; responses include `updatedByName` | collection-list-enhancements |
+| v1.12 | REST responses wrap content in `{ data: { ...systemFields, ...contentFields } }`; `contentTypeId`/`status` removed from public responses | bugfix-v1.8 |
+| v1.13 | GraphQL: queries default to published (status: "draft" opt-in for auth'd); response wrappers removed (nullable single, `[Type!]!` list) | graphql-overhaul |
+| v1.14 | GraphQL: media fields return `MediaAsset` object type; component sub-fields resolve media recursively; `ResolverFactory` takes `MediaAssetRepository` | graphql-overhaul |

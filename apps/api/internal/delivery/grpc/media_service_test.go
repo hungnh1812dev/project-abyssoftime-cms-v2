@@ -27,7 +27,7 @@ func (m *mockMediaUC) Delete(ctx context.Context, id string) error {
 func TestMediaService_ListMedia_OK(t *testing.T) {
 	uc := &mockMediaUC{
 		listFn: func(_ context.Context, _, _ int) ([]*entity.MediaAsset, int64, error) {
-			return []*entity.MediaAsset{{ID: "m1", URL: "https://cdn/a.jpg"}}, 3, nil
+			return []*entity.MediaAsset{{DocumentID: "m1", URL: "https://cdn/a.jpg"}}, 3, nil
 		},
 	}
 	svc := NewMediaServiceServer(uc)

@@ -25,7 +25,7 @@ export function MediaLibraryPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Media Library</h1>
         <div className="flex items-center gap-3">

@@ -195,7 +195,7 @@ func main() {
 	log.Printf("synced %d content-type definitions from %s", len(defs), defsDir)
 
 	// Dynamic GraphQL — schema generated from content-type definitions
-	gqlFactory := dynamic.NewResolverFactory(documentUC, ctUC)
+	gqlFactory := dynamic.NewResolverFactory(documentUC, ctUC, mediaRepo)
 	gqlHandler, err := gqlFactory.BuildHandler(defs)
 	if err != nil {
 		log.Fatalf("graphql schema: %v", err)
@@ -205,7 +205,7 @@ func main() {
 	router := deliveryhttp.SetupRouter(deliveryhttp.RouterConfig{
 		AuthHandler:        deliveryhandler.NewAuthHandler(authUC, cfg.CookieSecure, cfg.CookieSameSite),
 		CTHandler:          deliveryhandler.NewContentTypeHandler(ctUC),
-		DocHandler:         deliveryhandler.NewDocumentHandler(documentUC, ctUC),
+		DocHandler:         deliveryhandler.NewDocumentHandler(documentUC, ctUC, userRepo),
 		MediaHandler:       deliveryhandler.NewMediaHandler(mediaUC),
 		LocaleHandler:      deliveryhandler.NewLocaleHandler(cfg.SupportedLocales),
 		UserHandler:        deliveryhandler.NewUserHandler(userUC),

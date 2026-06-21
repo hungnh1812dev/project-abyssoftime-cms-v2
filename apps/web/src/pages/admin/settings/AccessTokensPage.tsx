@@ -113,7 +113,7 @@ export function AccessTokensPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Access Tokens</h1>
         <Dialog open={dialogOpen} onOpenChange={(open: boolean) => { if (!open) closeDialog(); else setDialogOpen(true) }}>

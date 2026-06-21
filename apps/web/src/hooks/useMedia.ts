@@ -13,8 +13,6 @@ interface MediaListResponse {
 
 interface UploadArgs {
   file: File
-  documentRef?: string
-  contentTypeId?: string
 }
 
 export function useMediaList(page: number, limit: number) {
@@ -28,11 +26,9 @@ export function useMediaList(page: number, limit: number) {
 export function useUploadMedia() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ file, documentRef = '', contentTypeId = '' }: UploadArgs) => {
+    mutationFn: ({ file }: UploadArgs) => {
       const form = new FormData()
       form.append('file', file, file.name)
-      form.append('documentRef', documentRef)
-      form.append('contentTypeId', contentTypeId)
       return api.post<MediaAsset>('/api/media/upload', form).then((r) => r.data)
     },
     onSuccess: () => {

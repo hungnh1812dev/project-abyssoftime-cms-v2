@@ -19,13 +19,13 @@ import (
 )
 
 type mockMediaUC struct {
-	uploadFn func(ctx context.Context, file io.Reader, filename, documentRef, contentTypeID string) (*entity.MediaAsset, error)
+	uploadFn func(ctx context.Context, file io.Reader, filename string) (*entity.MediaAsset, error)
 	listFn   func(ctx context.Context, page, limit int) ([]*entity.MediaAsset, int64, error)
 	deleteFn func(ctx context.Context, id string) error
 }
 
-func (m *mockMediaUC) Upload(ctx context.Context, file io.Reader, filename, documentRef, contentTypeID string) (*entity.MediaAsset, error) {
-	return m.uploadFn(ctx, file, filename, documentRef, contentTypeID)
+func (m *mockMediaUC) Upload(ctx context.Context, file io.Reader, filename string) (*entity.MediaAsset, error) {
+	return m.uploadFn(ctx, file, filename)
 }
 
 func (m *mockMediaUC) List(ctx context.Context, page, limit int) ([]*entity.MediaAsset, int64, error) {
@@ -36,7 +36,7 @@ func (m *mockMediaUC) Delete(ctx context.Context, id string) error {
 	return m.deleteFn(ctx, id)
 }
 
-func buildMultipartForm(t *testing.T, filename string, content []byte, documentRef, contentTypeID string) (*bytes.Buffer, string) {
+func buildMultipartForm(t *testing.T, filename string, content []byte) (*bytes.Buffer, string) {
 	t.Helper()
 	var buf bytes.Buffer
 	w := multipart.NewWriter(&buf)
@@ -46,9 +46,6 @@ func buildMultipartForm(t *testing.T, filename string, content []byte, documentR
 		t.Fatalf("CreateFormFile: %v", err)
 	}
 	fw.Write(content)
-
-	w.WriteField("documentRef", documentRef)
-	w.WriteField("contentTypeId", contentTypeID)
 	w.Close()
 
 	return &buf, w.FormDataContentType()
@@ -66,15 +63,15 @@ func TestMediaHandler_Upload_OK(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	uc := &mockMediaUC{}
-	uc.uploadFn = func(_ context.Context, _ io.Reader, filename, _, _ string) (*entity.MediaAsset, error) {
+	uc.uploadFn = func(_ context.Context, _ io.Reader, filename string) (*entity.MediaAsset, error) {
 		return &entity.MediaAsset{
-			ID:  "asset-1",
+			DocumentID: "asset-1",
 			URL: "https://cdn.example.com/" + filename,
 		}, nil
 	}
 	h := handler.NewMediaHandler(uc)
 
-	body, contentType := buildMultipartForm(t, "photo.jpg", []byte("fake-image-data"), "doc-1", "ct-1")
+	body, contentType := buildMultipartForm(t, "photo.jpg", []byte("fake-image-data"))
 	w := httptest.NewRecorder()
 	_, r := gin.CreateTestContext(w)
 	r.POST("/api/media/upload", h.Upload)
@@ -105,7 +102,7 @@ func TestMediaHandler_List_OK(t *testing.T) {
 	uc := &mockMediaUC{}
 	uc.listFn = func(_ context.Context, page, limit int) ([]*entity.MediaAsset, int64, error) {
 		return []*entity.MediaAsset{
-			{ID: "a1", URL: "https://cdn/a1.jpg"},
+			{DocumentID: "a1", URL: "https://cdn/a1.jpg"},
 		}, 5, nil
 	}
 	h := handler.NewMediaHandler(uc)

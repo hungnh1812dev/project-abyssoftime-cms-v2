@@ -15,14 +15,14 @@ import (
 // --- auth mock ---
 
 type mockAuthUC struct {
-	registerFn    func(ctx context.Context, email, password string) (*entity.User, error)
+	registerFn    func(ctx context.Context, email, password, displayName string) (*entity.User, error)
 	loginFn       func(ctx context.Context, email, password string) (string, string, error)
 	refreshFn     func(ctx context.Context, rt string) (string, string, error)
 	setupStatusFn func(ctx context.Context) (bool, error)
 }
 
-func (m *mockAuthUC) Register(ctx context.Context, email, password string) (*entity.User, error) {
-	return m.registerFn(ctx, email, password)
+func (m *mockAuthUC) Register(ctx context.Context, email, password, displayName string) (*entity.User, error) {
+	return m.registerFn(ctx, email, password, displayName)
 }
 func (m *mockAuthUC) Login(ctx context.Context, email, password string) (string, string, error) {
 	return m.loginFn(ctx, email, password)
@@ -81,8 +81,8 @@ func TestAuthService_Login_Unauthorized(t *testing.T) {
 
 func TestAuthService_Register_OK(t *testing.T) {
 	uc := &mockAuthUC{
-		registerFn: func(_ context.Context, email, _ string) (*entity.User, error) {
-			return &entity.User{ID: "u1", Email: email, Role: entity.RoleAdmin}, nil
+		registerFn: func(_ context.Context, email, _, _ string) (*entity.User, error) {
+			return &entity.User{DocumentID: "u1", Email: email, Role: entity.RoleAdmin}, nil
 		},
 	}
 	svc := NewAuthServiceServer(uc)
@@ -97,7 +97,7 @@ func TestAuthService_Register_OK(t *testing.T) {
 
 func TestAuthService_Register_Conflict(t *testing.T) {
 	uc := &mockAuthUC{
-		registerFn: func(_ context.Context, _, _ string) (*entity.User, error) {
+		registerFn: func(_ context.Context, _, _, _ string) (*entity.User, error) {
 			return nil, pkgerrors.ErrConflict
 		},
 	}
@@ -128,7 +128,7 @@ func TestContentTypeService_ListContentTypes(t *testing.T) {
 	uc := &mockCTUC{
 		findAllFn: func(_ context.Context) ([]*entity.ContentType, error) {
 			return []*entity.ContentType{
-				{ID: "1", Name: "Blog", Slug: "blog", Kind: entity.KindCollection},
+				{DocumentID: "1", Name: "Blog", Slug: "blog", Kind: entity.KindCollection},
 			}, nil
 		},
 	}
@@ -148,7 +148,7 @@ func TestContentTypeService_ListContentTypes(t *testing.T) {
 func TestContentTypeService_GetContentType_OK(t *testing.T) {
 	uc := &mockCTUC{
 		findBySlugFn: func(_ context.Context, slug string) (*entity.ContentType, error) {
-			return &entity.ContentType{ID: "1", Slug: slug, Kind: entity.KindSingle}, nil
+			return &entity.ContentType{DocumentID: "1", Slug: slug, Kind: entity.KindSingle}, nil
 		},
 	}
 	svc := NewContentTypeServiceServer(uc)

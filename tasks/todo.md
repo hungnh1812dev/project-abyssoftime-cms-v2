@@ -31,6 +31,41 @@ See [bugfix-v1.8.md](bugfix-v1.8.md) for full plan. Spec: [specs/BUGFIX-SPEC.md]
 
 ---
 
+## Phase UI — Design System: Strapi-Inspired UI Overhaul
+
+See [ui-design-system.md](ui-design-system.md) for full plan. Spec: [specs/ui-design-system.md](../specs/ui-design-system.md).
+
+- [x] T1 Color tokens: migrate to indigo primary + add success/warning/sidebar-muted tokens
+- [x] T2 Button: add `success` variant, `loading` prop, update hover/active states
+- [x] T3 Badge: add `draft`/`published`/`modified` semantic variants
+- [x] T4 SidebarContext: collapsed state + localStorage + mobile detection
+- [x] T5 Sidebar components: Brand, Group, SubGroup, Item, CollapseToggle, rail popover
+- [x] T6 Sidebar responsive: mobile overlay with backdrop
+- [x] T7 AdminLayout: wire new sidebar, remove old Sidebar.tsx
+- [x] ✅ Checkpoint 1: foundation + sidebar complete
+- [x] T8 Breadcrumbs hook + TopBar rebuild with hamburger
+- [x] T9 StickyActionBar: glassmorphism sticky header for content pages
+- [x] T10 Card component + page-level spacing polish
+- [x] T11 Dark mode verification pass
+- [x] ✅ Checkpoint 2 (Final): full design system complete
+
+---
+
+## Phase S — Sync Table Fields & Schema Alignment
+
+See [sync-table-fields.md](sync-table-fields.md) for full plan. Spec: [specs/sync-table-fields.md](../specs/sync-table-fields.md).
+
+- [x] T1 Static table column rename (`id` → `gorm_id`) + UUID standardization
+- [x] T2 MediaAsset cleanup + add `FindByDocumentID`
+- [x] T3 Document & Component entity cleanup (`Data` → `Fields`, `*time.Time`, remove obsolete)
+- [x] ✅ Checkpoint A: backend compiles + tests pass
+- [x] T4 Per-field dynamic columns (repository rewrite)
+- [x] T5 GraphQL: media as object + remove response wrappers
+- [x] T6 Frontend: MediaInput stores `documentId` + aspect ratio fix
+- [x] ✅ Checkpoint B (Final): full system verification
+
+---
+
 ## Archive Index
 
 | Archive | Phases | Status |

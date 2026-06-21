@@ -33,7 +33,7 @@ func TestSync_CreatesNewDefinitions(t *testing.T) {
 	}
 	var created []*entity.ContentType
 	repo.CreateFn = func(_ context.Context, ct *entity.ContentType) error {
-		ct.ID = "ct-" + ct.Slug
+		ct.DocumentID = "ct-" + ct.Slug
 		created = append(created, ct)
 		return nil
 	}
@@ -61,7 +61,7 @@ func TestSync_DoesNotCreateSingletonForSingleType(t *testing.T) {
 		return nil, pkgerrors.ErrNotFound
 	}
 	repo.CreateFn = func(_ context.Context, ct *entity.ContentType) error {
-		ct.ID = "ct-homepage"
+		ct.DocumentID = "ct-homepage"
 		return nil
 	}
 
@@ -81,7 +81,7 @@ func TestSync_DoesNotCreateSingletonForSingleType(t *testing.T) {
 }
 
 func TestSync_UpdatesChangedDefinitions(t *testing.T) {
-	existing := &entity.ContentType{ID: "ct-1", Slug: "homepage", Name: "Old Name", Kind: entity.KindSingle}
+	existing := &entity.ContentType{DocumentID: "ct-1", Slug: "homepage", Name: "Old Name", Kind: entity.KindSingle}
 
 	repo := &repomock.ContentTypeRepository{}
 	repo.FindAllFn = func(_ context.Context) ([]*entity.ContentType, error) {
@@ -115,7 +115,7 @@ func TestSync_UpdatesChangedDefinitions(t *testing.T) {
 }
 
 func TestSync_UnchangedDefinition_NoOp(t *testing.T) {
-	existing := &entity.ContentType{ID: "ct-1", Slug: "homepage", Name: "Homepage", Kind: entity.KindSingle}
+	existing := &entity.ContentType{DocumentID: "ct-1", Slug: "homepage", Name: "Homepage", Kind: entity.KindSingle}
 
 	repo := &repomock.ContentTypeRepository{}
 	repo.FindAllFn = func(_ context.Context) ([]*entity.ContentType, error) {
@@ -153,7 +153,7 @@ func TestSync_CreatesContentTypeWithFields(t *testing.T) {
 	}
 	var created *entity.ContentType
 	repo.CreateFn = func(_ context.Context, ct *entity.ContentType) error {
-		ct.ID = "ct-new"
+		ct.DocumentID = "ct-new"
 		created = ct
 		return nil
 	}
@@ -185,7 +185,7 @@ func TestSync_CreatesContentTypeWithFields(t *testing.T) {
 
 func TestSync_UpdatesFieldsWhenChanged(t *testing.T) {
 	existing := &entity.ContentType{
-		ID:   "ct-1",
+		DocumentID: "ct-1",
 		Slug: "article",
 		Name: "Article",
 		Kind: entity.KindCollection,
@@ -237,7 +237,7 @@ func TestSync_CreatesContentTypeWithListFields(t *testing.T) {
 	}
 	var created *entity.ContentType
 	repo.CreateFn = func(_ context.Context, ct *entity.ContentType) error {
-		ct.ID = "ct-new"
+		ct.DocumentID = "ct-new"
 		created = ct
 		return nil
 	}
@@ -270,7 +270,7 @@ func TestSync_CreatesContentTypeWithListFields(t *testing.T) {
 
 func TestSync_UpdatesWhenListFieldsChanged(t *testing.T) {
 	existing := &entity.ContentType{
-		ID:         "ct-1",
+		DocumentID: "ct-1",
 		Slug:       "articles",
 		Name:       "Articles",
 		Kind:       entity.KindCollection,
@@ -314,7 +314,7 @@ func TestSync_UpdatesWhenListFieldsChanged(t *testing.T) {
 }
 
 func TestSync_RemovesMissingDefinitions_CascadesEntries(t *testing.T) {
-	stale := &entity.ContentType{ID: "ct-stale", Slug: "old-type", Name: "Old Type", Kind: entity.KindCollection}
+	stale := &entity.ContentType{DocumentID: "ct-stale", Slug: "old-type", Name: "Old Type", Kind: entity.KindCollection}
 
 	repo := &repomock.ContentTypeRepository{}
 	repo.FindAllFn = func(_ context.Context) ([]*entity.ContentType, error) {
@@ -329,8 +329,8 @@ func TestSync_RemovesMissingDefinitions_CascadesEntries(t *testing.T) {
 	entries := &fakeEntryManager{
 		getAllFn: func(_ context.Context, slug string) ([]*entity.Document, error) {
 			return []*entity.Document{
-				{DocumentID: "doc-1", ContentTypeID: "ct-stale"},
-				{DocumentID: "doc-2", ContentTypeID: "ct-stale"},
+				{DocumentID: "doc-1", },
+				{DocumentID: "doc-2", },
 			}, nil
 		},
 		deleteFn: func(_ context.Context, _, _ string, _ []entity.FieldDefinition) error { return nil },
@@ -367,7 +367,7 @@ func TestSync_EnsuresComponentTables(t *testing.T) {
 		return nil, pkgerrors.ErrNotFound
 	}
 	repo.CreateFn = func(_ context.Context, ct *entity.ContentType) error {
-		ct.ID = "ct-" + ct.Slug
+		ct.DocumentID = "ct-" + ct.Slug
 		return nil
 	}
 
@@ -376,7 +376,7 @@ func TestSync_EnsuresComponentTables(t *testing.T) {
 	compRepo := &repomock.ComponentRepository{}
 
 	var ensured []string
-	compRepo.EnsureCollectionFn = func(_ context.Context, slug, comp string) error {
+	compRepo.EnsureCollectionFn = func(_ context.Context, slug, comp string, _ []entity.FieldDefinition) error {
 		ensured = append(ensured, slug+"/"+comp)
 		return nil
 	}
@@ -406,7 +406,7 @@ func TestSync_EnsuresComponentTables(t *testing.T) {
 
 func TestSync_DropsComponentTablesOnRemoval(t *testing.T) {
 	stale := &entity.ContentType{
-		ID:   "ct-stale",
+		DocumentID: "ct-stale",
 		Slug: "old-type",
 		Name: "Old",
 		Kind: entity.KindCollection,

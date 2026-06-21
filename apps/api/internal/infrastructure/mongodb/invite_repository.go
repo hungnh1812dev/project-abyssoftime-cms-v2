@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 
 	"project-abyssoftime-cms-v2/api/internal/domain/entity"
@@ -24,9 +23,7 @@ func NewInviteRepository(db *mongo.Database) repository.InviteRepository {
 }
 
 func (r *inviteRepository) Create(ctx context.Context, invite *entity.Invite) error {
-	if invite.ID == "" {
-		invite.ID = primitive.NewObjectID().Hex()
-	}
+
 	if invite.CreatedAt.IsZero() {
 		invite.CreatedAt = time.Now().UTC()
 	}

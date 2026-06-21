@@ -52,7 +52,7 @@ func TestCreate(t *testing.T) {
 			input: &entity.ContentType{Name: "Homepage", Slug: "homepage", Kind: entity.KindSingle},
 			setupRepo: func(r *repomock.ContentTypeRepository) {
 				r.FindBySlugFn = func(_ context.Context, _ string) (*entity.ContentType, error) {
-					return &entity.ContentType{ID: "existing-id"}, nil
+					return &entity.ContentType{DocumentID: "existing-id"}, nil
 				}
 			},
 			wantErr: pkgerrors.ErrConflict,
@@ -78,7 +78,7 @@ func TestCreate(t *testing.T) {
 			if !pkgerrors.Is(err, tt.wantErr) {
 				t.Errorf("Create() error = %v, want %v", err, tt.wantErr)
 			}
-			if tt.wantErr == nil && tt.input.ID == "" {
+			if tt.wantErr == nil && tt.input.DocumentID == "" {
 				t.Error("Create() did not set ID on ContentType")
 			}
 		})
@@ -100,7 +100,7 @@ func TestFindByID(t *testing.T) {
 			id:   "abc",
 			setupRepo: func(r *repomock.ContentTypeRepository) {
 				r.FindByIDFn = func(_ context.Context, id string) (*entity.ContentType, error) {
-					return &entity.ContentType{ID: id}, nil
+					return &entity.ContentType{DocumentID: id}, nil
 				}
 			},
 			wantID: "abc",
@@ -128,7 +128,7 @@ func TestFindByID(t *testing.T) {
 			if !pkgerrors.Is(err, tt.wantErr) {
 				t.Errorf("FindByID() error = %v, want %v", err, tt.wantErr)
 			}
-			if tt.wantID != "" && (ct == nil || ct.ID != tt.wantID) {
+			if tt.wantID != "" && (ct == nil || ct.DocumentID != tt.wantID) {
 				t.Errorf("FindByID() ID = %v, want %v", ct, tt.wantID)
 			}
 		})
@@ -141,8 +141,8 @@ func TestFindAll(t *testing.T) {
 	repo := &repomock.ContentTypeRepository{}
 	repo.FindAllFn = func(_ context.Context) ([]*entity.ContentType, error) {
 		return []*entity.ContentType{
-			{ID: "1", Slug: "blog"},
-			{ID: "2", Slug: "homepage"},
+			{DocumentID: "1", Slug: "blog"},
+			{DocumentID: "2", Slug: "homepage"},
 		}, nil
 	}
 	uc := contenttype.New(repo)
@@ -166,7 +166,7 @@ func TestUpdate(t *testing.T) {
 	}{
 		{
 			name:  "valid update",
-			input: &entity.ContentType{ID: "abc", Name: "Updated", Slug: "homepage", Kind: entity.KindSingle},
+			input: &entity.ContentType{DocumentID: "abc", Name: "Updated", Slug: "homepage", Kind: entity.KindSingle},
 			setupRepo: func(r *repomock.ContentTypeRepository) {
 				r.UpdateFn = func(_ context.Context, ct *entity.ContentType) error { return nil }
 			},
@@ -174,13 +174,13 @@ func TestUpdate(t *testing.T) {
 		},
 		{
 			name:  "invalid kind → bad request",
-			input: &entity.ContentType{ID: "abc", Kind: "bad"},
+			input: &entity.ContentType{DocumentID: "abc", Kind: "bad"},
 			setupRepo: func(r *repomock.ContentTypeRepository) {},
 			wantErr:   pkgerrors.ErrBadRequest,
 		},
 		{
 			name:  "not found",
-			input: &entity.ContentType{ID: "missing", Kind: entity.KindCollection},
+			input: &entity.ContentType{DocumentID: "missing", Kind: entity.KindCollection},
 			setupRepo: func(r *repomock.ContentTypeRepository) {
 				r.UpdateFn = func(_ context.Context, _ *entity.ContentType) error {
 					return pkgerrors.ErrNotFound

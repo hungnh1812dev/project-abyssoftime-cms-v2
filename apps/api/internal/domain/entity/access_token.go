@@ -3,7 +3,8 @@ package entity
 import "time"
 
 type AccessToken struct {
-	ID         string     `bson:"_id,omitempty" gorm:"column:id;primaryKey"`
+	ID         uint       `bson:"_id,omitempty" gorm:"column:gorm_id;primaryKey;autoIncrement"`
+	DocumentID string     `bson:"documentId"    gorm:"column:document_id;uniqueIndex"`
 	Name       string     `bson:"name"          gorm:"column:name"`
 	TokenHash  string     `bson:"tokenHash"     gorm:"column:token_hash;uniqueIndex"`
 	Prefix     string     `bson:"prefix"        gorm:"column:prefix"`

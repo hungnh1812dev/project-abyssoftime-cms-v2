@@ -17,7 +17,7 @@ func TestCreate(t *testing.T) {
 	var stored *entity.AccessToken
 	repo := &repomock.AccessTokenRepository{
 		CreateFn: func(_ context.Context, tok *entity.AccessToken) error {
-			tok.ID = "tok-1"
+			tok.DocumentID = "tok-1"
 			stored = tok
 			return nil
 		},
@@ -57,7 +57,7 @@ func TestValidate_Success(t *testing.T) {
 				return nil, pkgerrors.ErrNotFound
 			}
 			return &entity.AccessToken{
-				ID:        "tok-1",
+				DocumentID: "tok-1",
 				TokenHash: tokenHash,
 				Scopes:    []string{"documents:read"},
 			}, nil
@@ -73,8 +73,8 @@ func TestValidate_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if tok.ID != "tok-1" {
-		t.Errorf("ID = %q, want %q", tok.ID, "tok-1")
+	if tok.DocumentID != "tok-1" {
+		t.Errorf("ID = %q, want %q", tok.DocumentID, "tok-1")
 	}
 	if updatedID != "tok-1" {
 		t.Errorf("lastUsedAt not updated, got ID %q", updatedID)
@@ -90,7 +90,7 @@ func TestValidate_Expired(t *testing.T) {
 	repo := &repomock.AccessTokenRepository{
 		FindByHashFn: func(_ context.Context, _ string) (*entity.AccessToken, error) {
 			return &entity.AccessToken{
-				ID:        "tok-1",
+				DocumentID: "tok-1",
 				TokenHash: tokenHash,
 				ExpiresAt: &expired,
 			}, nil

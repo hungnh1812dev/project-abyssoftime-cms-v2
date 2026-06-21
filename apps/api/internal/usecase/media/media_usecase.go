@@ -15,6 +15,8 @@ import (
 
 	_ "golang.org/x/image/webp"
 
+	"github.com/google/uuid"
+
 	"project-abyssoftime-cms-v2/api/internal/domain/entity"
 	"project-abyssoftime-cms-v2/api/internal/domain/repository"
 )
@@ -44,7 +46,7 @@ func (uc *UseCase) Delete(ctx context.Context, id string) error {
 	return uc.assetRepo.Delete(ctx, id)
 }
 
-func (uc *UseCase) Upload(ctx context.Context, file io.Reader, filename, documentRef, contentTypeID string) (*entity.MediaAsset, error) {
+func (uc *UseCase) Upload(ctx context.Context, file io.Reader, filename string) (*entity.MediaAsset, error) {
 	data, err := io.ReadAll(file)
 	if err != nil {
 		return nil, err
@@ -68,16 +70,15 @@ func (uc *UseCase) Upload(ctx context.Context, file io.Reader, filename, documen
 	}
 
 	asset := &entity.MediaAsset{
-		URL:           result.URL,
-		ThumbnailURL:  result.ThumbnailURL,
-		PublicID:      result.PublicID,
-		FileName:      hashedFilename,
-		FileExt:       ext,
-		Hash:          hash12,
-		Width:         width,
-		Height:        height,
-		DocumentRef:   documentRef,
-		ContentTypeID: contentTypeID,
+		DocumentID:   uuid.NewString(),
+		URL:          result.URL,
+		ThumbnailURL: result.ThumbnailURL,
+		PublicID:     result.PublicID,
+		FileName:     hashedFilename,
+		FileExt:      ext,
+		Hash:         hash12,
+		Width:        width,
+		Height:       height,
 	}
 	if err := uc.assetRepo.Create(ctx, asset); err != nil {
 		return nil, err

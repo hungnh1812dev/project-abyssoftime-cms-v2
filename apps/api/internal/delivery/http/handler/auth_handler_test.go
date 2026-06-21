@@ -16,15 +16,15 @@ import (
 )
 
 type mockAuthUC struct {
-	registerFn     func(ctx context.Context, email, password string) (*entity.User, error)
+	registerFn     func(ctx context.Context, email, password, displayName string) (*entity.User, error)
 	loginFn        func(ctx context.Context, email, password string) (string, string, error)
 	refreshTokenFn func(ctx context.Context, refreshToken string) (string, string, error)
 	logoutFn       func(ctx context.Context, userID string) error
 	setupStatusFn  func(ctx context.Context) (bool, error)
 }
 
-func (m *mockAuthUC) Register(ctx context.Context, email, password string) (*entity.User, error) {
-	return m.registerFn(ctx, email, password)
+func (m *mockAuthUC) Register(ctx context.Context, email, password, displayName string) (*entity.User, error) {
+	return m.registerFn(ctx, email, password, displayName)
 }
 func (m *mockAuthUC) Login(ctx context.Context, email, password string) (string, string, error) {
 	return m.loginFn(ctx, email, password)
@@ -81,21 +81,21 @@ func TestRegisterHandler(t *testing.T) {
 		{
 			name: "success → 201 with user JSON",
 			uc: &mockAuthUC{
-				registerFn: func(_ context.Context, email, _ string) (*entity.User, error) {
-					return &entity.User{ID: "u1", Email: email, Role: entity.RoleGuest}, nil
+				registerFn: func(_ context.Context, email, _, displayName string) (*entity.User, error) {
+					return &entity.User{DocumentID: "u1", Email: email, DisplayName: displayName, Role: entity.RoleGuest}, nil
 				},
 			},
-			body:       `{"email":"a@b.com","password":"secret"}`,
+			body:       `{"email":"a@b.com","password":"secret","displayName":"Test User"}`,
 			wantStatus: http.StatusCreated,
 		},
 		{
 			name: "conflict → 409",
 			uc: &mockAuthUC{
-				registerFn: func(_ context.Context, _, _ string) (*entity.User, error) {
+				registerFn: func(_ context.Context, _, _, _ string) (*entity.User, error) {
 					return nil, pkgerrors.ErrConflict
 				},
 			},
-			body:       `{"email":"a@b.com","password":"secret"}`,
+			body:       `{"email":"a@b.com","password":"secret","displayName":"Test User"}`,
 			wantStatus: http.StatusConflict,
 		},
 		{

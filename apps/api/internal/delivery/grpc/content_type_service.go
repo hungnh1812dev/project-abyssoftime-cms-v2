@@ -45,7 +45,7 @@ func (s *ContentTypeServiceServer) ListContentTypes(ctx context.Context, _ *pb.L
 
 func toProtoCT(ct *entity.ContentType) *pb.ContentType {
 	return &pb.ContentType{
-		Id:         ct.ID,
+		Id:         ct.DocumentID,
 		Name:       ct.Name,
 		Slug:       ct.Slug,
 		Kind:       string(ct.Kind),

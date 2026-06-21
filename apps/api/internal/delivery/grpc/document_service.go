@@ -22,7 +22,7 @@ type documentUseCase interface {
 	SaveSingleType(ctx context.Context, contentTypeSlug string, data map[string]any, locale string, fields []entity.FieldDefinition, userID string) (*entity.Document, error)
 	PublishSingleType(ctx context.Context, contentTypeSlug, locale string, fields []entity.FieldDefinition, userID string) error
 	UnpublishSingleType(ctx context.Context, contentTypeSlug, locale string) error
-	GetAllPaginated(ctx context.Context, contentTypeSlug string, start, size int, locale string, fields []entity.FieldDefinition) ([]*entity.Document, []string, int64, error)
+	GetAllPaginated(ctx context.Context, contentTypeSlug string, start, size int, locale string, fields []entity.FieldDefinition, orderBy string, sortDir int) ([]*entity.Document, []string, int64, error)
 }
 
 type DocumentServiceServer struct {
@@ -43,7 +43,7 @@ func (s *DocumentServiceServer) GetDocument(ctx context.Context, req *pb.GetDocu
 }
 
 func (s *DocumentServiceServer) ListDocuments(ctx context.Context, req *pb.ListDocumentsRequest) (*pb.ListDocumentsResponse, error) {
-	docs, _, total, err := s.uc.GetAllPaginated(ctx, req.ContentTypeSlug, int(req.Start), int(req.Size), req.Locale, nil)
+	docs, _, total, err := s.uc.GetAllPaginated(ctx, req.ContentTypeSlug, int(req.Start), int(req.Size), req.Locale, nil, "createdAt", -1)
 	if err != nil {
 		return nil, toGRPCError(err)
 	}
@@ -56,7 +56,7 @@ func (s *DocumentServiceServer) ListDocuments(ctx context.Context, req *pb.ListD
 
 func (s *DocumentServiceServer) SaveDocument(ctx context.Context, req *pb.SaveDocumentRequest) (*pb.Document, error) {
 	data := decodeData(req.Data)
-	doc := &entity.Document{DocumentID: req.DocumentId, Data: data, Locale: req.Locale}
+	doc := &entity.Document{DocumentID: req.DocumentId, Fields: data, Locale: req.Locale}
 	saved, err := s.uc.Save(ctx, req.ContentTypeSlug, doc, nil, middleware.UserID(ctx))
 	if err != nil {
 		return nil, toGRPCError(err)
@@ -140,7 +140,7 @@ func toProtoDoc(d *entity.Document) *pb.Document {
 	pb := &pb.Document{
 		DocumentId:  d.DocumentID,
 		Version:     string(d.Version),
-		Data:        encodeData(d.Data),
+		Data:        encodeData(d.Fields),
 		Locale:      d.Locale,
 		CreatedAt:   timestamppb.New(d.CreatedAt),
 		UpdatedAt:   timestamppb.New(d.UpdatedAt),
@@ -148,8 +148,8 @@ func toProtoDoc(d *entity.Document) *pb.Document {
 		UpdatedBy:   d.UpdatedBy,
 		PublishedBy: d.PublishedBy,
 	}
-	if !d.PublishedAt.IsZero() {
-		pb.PublishedAt = timestamppb.New(d.PublishedAt)
+	if d.PublishedAt != nil {
+		pb.PublishedAt = timestamppb.New(*d.PublishedAt)
 	}
 	return pb
 }

@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
+
 	"project-abyssoftime-cms-v2/api/internal/domain/entity"
 	"project-abyssoftime-cms-v2/api/internal/domain/repository"
 	pkgerrors "project-abyssoftime-cms-v2/api/pkg/errors"
@@ -31,6 +33,7 @@ func (uc *UseCase) Create(ctx context.Context, name string, scopes []string, exp
 	tokenHash := hex.EncodeToString(hash[:])
 
 	token := &entity.AccessToken{
+		DocumentID: uuid.NewString(),
 		Name:      name,
 		TokenHash: tokenHash,
 		Prefix:    plaintext[:6],
@@ -65,8 +68,7 @@ func (uc *UseCase) Validate(ctx context.Context, rawToken string) (*entity.Acces
 		return nil, pkgerrors.ErrUnauthorized
 	}
 
-	now := time.Now().UTC()
-	_ = uc.repo.UpdateLastUsed(ctx, token.ID, now)
+	err = uc.repo.UpdateLastUsed(ctx, token.DocumentID, time.Now().UTC())
 
 	return token, nil
 }

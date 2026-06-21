@@ -61,11 +61,11 @@ func (uc *UseCase) extractAndSaveComponents(ctx context.Context, slug string, do
 	}
 	now := time.Now().UTC()
 	for _, name := range componentFieldNames(fields) {
-		raw, ok := doc.Data[name]
+		raw, ok := doc.Fields[name]
 		if !ok {
 			continue
 		}
-		delete(doc.Data, name)
+		delete(doc.Fields, name)
 
 		var components []*entity.Component
 		switch v := raw.(type) {
@@ -74,7 +74,7 @@ func (uc *UseCase) extractAndSaveComponents(ctx context.Context, slug string, do
 				if m, ok := item.(map[string]any); ok {
 					components = append(components, &entity.Component{
 						ComponentID: uuid.New().String(),
-						Data:        m,
+						Fields:      m,
 						CreatedAt:   now,
 						UpdatedAt:   now,
 					})
@@ -83,7 +83,7 @@ func (uc *UseCase) extractAndSaveComponents(ctx context.Context, slug string, do
 		case map[string]any:
 			components = append(components, &entity.Component{
 				ComponentID: uuid.New().String(),
-				Data:        v,
+				Fields:      v,
 				CreatedAt:   now,
 				UpdatedAt:   now,
 			})
@@ -106,16 +106,48 @@ func (uc *UseCase) mergeComponents(ctx context.Context, slug string, doc *entity
 			return err
 		}
 		if len(components) == 1 {
-			doc.Data[name] = components[0].Data
+			doc.Fields[name] = components[0].Fields
 		} else if len(components) > 1 {
 			arr := make([]map[string]any, len(components))
 			for i, c := range components {
-				arr[i] = c.Data
+				arr[i] = c.Fields
 			}
-			doc.Data[name] = arr
+			doc.Fields[name] = arr
 		}
 	}
 	return nil
+}
+
+func (uc *UseCase) resolveMediaFields(ctx context.Context, data map[string]any, fields []entity.FieldDefinition) {
+	for _, f := range fields {
+		raw, ok := data[f.Name]
+		if !ok || raw == nil {
+			continue
+		}
+
+		if f.Type == "media" {
+			if docID, ok := raw.(string); ok && docID != "" {
+				asset, err := uc.mediaRepo.FindByDocumentID(ctx, docID)
+				if err == nil && asset != nil {
+					data[f.Name] = asset
+				}
+			}
+		} else if f.Type == "component" {
+			if arr, ok := raw.([]map[string]any); ok {
+				for _, compData := range arr {
+					uc.resolveMediaFields(ctx, compData, f.Fields)
+				}
+			} else if arr, ok := raw.([]any); ok {
+				for _, item := range arr {
+					if compData, ok := item.(map[string]any); ok {
+						uc.resolveMediaFields(ctx, compData, f.Fields)
+					}
+				}
+			} else if compData, ok := raw.(map[string]any); ok {
+				uc.resolveMediaFields(ctx, compData, f.Fields)
+			}
+		}
+	}
 }
 
 func (uc *UseCase) Save(ctx context.Context, contentTypeSlug string, doc *entity.Document, fields []entity.FieldDefinition, userID string) (*entity.Document, error) {
@@ -140,9 +172,6 @@ func (uc *UseCase) Save(ctx context.Context, contentTypeSlug string, doc *entity
 	if existing != nil {
 		doc.CreatedAt = existing.CreatedAt
 		doc.CreatedBy = existing.CreatedBy
-		if doc.ContentTypeID == "" {
-			doc.ContentTypeID = existing.ContentTypeID
-		}
 	} else {
 		doc.CreatedAt = now
 		doc.CreatedBy = userID
@@ -170,6 +199,7 @@ func (uc *UseCase) GetForEdit(ctx context.Context, contentTypeSlug, documentID, 
 	if err := uc.mergeComponents(ctx, contentTypeSlug, draft, fields); err != nil {
 		return nil, "", err
 	}
+	uc.resolveMediaFields(ctx, draft.Fields, fields)
 	published, err := uc.repo.FindPublishedByDocumentID(ctx, contentTypeSlug, documentID, locale)
 	if err != nil {
 		if !pkgerrors.Is(err, pkgerrors.ErrNotFound) {
@@ -192,6 +222,7 @@ func (uc *UseCase) GetPublished(ctx context.Context, contentTypeSlug, documentID
 	if err := uc.mergeComponents(ctx, contentTypeSlug, doc, fields); err != nil {
 		return nil, err
 	}
+	uc.resolveMediaFields(ctx, doc.Fields, fields)
 	return doc, nil
 }
 
@@ -200,7 +231,7 @@ func (uc *UseCase) GetPublishedPaginated(ctx context.Context, contentTypeSlug st
 	if err != nil {
 		return nil, 0, err
 	}
-	docs, total, err := uc.repo.FindPublishedByContentTypePaginated(ctx, contentTypeSlug, start, size, locale)
+	docs, total, err := uc.repo.FindPublishedByContentTypePaginated(ctx, contentTypeSlug, start, size, locale, "createdAt", -1)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -208,6 +239,7 @@ func (uc *UseCase) GetPublishedPaginated(ctx context.Context, contentTypeSlug st
 		if err := uc.mergeComponents(ctx, contentTypeSlug, doc, fields); err != nil {
 			return nil, 0, err
 		}
+		uc.resolveMediaFields(ctx, doc.Fields, fields)
 	}
 	return docs, total, nil
 }
@@ -217,7 +249,7 @@ func (uc *UseCase) GetPublishedSingleType(ctx context.Context, contentTypeSlug, 
 	if err != nil {
 		return nil, err
 	}
-	docs, total, err := uc.repo.FindPublishedByContentTypePaginated(ctx, contentTypeSlug, 0, 1, locale)
+	docs, total, err := uc.repo.FindPublishedByContentTypePaginated(ctx, contentTypeSlug, 0, 1, locale, "createdAt", -1)
 	if err != nil {
 		return nil, err
 	}
@@ -228,6 +260,7 @@ func (uc *UseCase) GetPublishedSingleType(ctx context.Context, contentTypeSlug, 
 	if err := uc.mergeComponents(ctx, contentTypeSlug, doc, fields); err != nil {
 		return nil, err
 	}
+	uc.resolveMediaFields(ctx, doc.Fields, fields)
 	return doc, nil
 }
 
@@ -244,17 +277,17 @@ func (uc *UseCase) Publish(ctx context.Context, contentTypeSlug, documentID, loc
 	if err != nil {
 		return err
 	}
+	now := time.Now().UTC()
 	published := &entity.Document{
-		DocumentID:    draft.DocumentID,
-		ContentTypeID: draft.ContentTypeID,
-		Data:          draft.Data,
-		Locale:        draft.Locale,
-		CreatedAt:     draft.CreatedAt,
-		CreatedBy:     draft.CreatedBy,
-		UpdatedAt:     draft.UpdatedAt,
-		UpdatedBy:     draft.UpdatedBy,
-		PublishedAt:   time.Now().UTC(),
-		PublishedBy:   userID,
+		DocumentID:  draft.DocumentID,
+		Fields:      draft.Fields,
+		Locale:      draft.Locale,
+		CreatedAt:   draft.CreatedAt,
+		CreatedBy:   draft.CreatedBy,
+		UpdatedAt:   draft.UpdatedAt,
+		UpdatedBy:   draft.UpdatedBy,
+		PublishedAt: &now,
+		PublishedBy: userID,
 	}
 	if err := uc.repo.UpsertPublished(ctx, contentTypeSlug, published); err != nil {
 		return err
@@ -287,7 +320,7 @@ func (uc *UseCase) GetSingleType(ctx context.Context, contentTypeSlug, locale st
 	if err != nil {
 		return nil, "", err
 	}
-	drafts, total, err := uc.repo.FindDraftsByContentTypePaginated(ctx, contentTypeSlug, 0, 1, locale)
+	drafts, total, err := uc.repo.FindDraftsByContentTypePaginated(ctx, contentTypeSlug, 0, 1, locale, "createdAt", -1)
 	if err != nil {
 		return nil, "", err
 	}
@@ -298,6 +331,7 @@ func (uc *UseCase) GetSingleType(ctx context.Context, contentTypeSlug, locale st
 	if err := uc.mergeComponents(ctx, contentTypeSlug, draft, fields); err != nil {
 		return nil, "", err
 	}
+	uc.resolveMediaFields(ctx, draft.Fields, fields)
 	published, err := uc.repo.FindPublishedByDocumentID(ctx, contentTypeSlug, draft.DocumentID, locale)
 	if err != nil && !pkgerrors.Is(err, pkgerrors.ErrNotFound) {
 		return nil, "", err
@@ -310,11 +344,11 @@ func (uc *UseCase) SaveSingleType(ctx context.Context, contentTypeSlug string, d
 	if err != nil {
 		return nil, err
 	}
-	drafts, _, err := uc.repo.FindDraftsByContentTypePaginated(ctx, contentTypeSlug, 0, 1, resolvedLocale)
+	drafts, _, err := uc.repo.FindDraftsByContentTypePaginated(ctx, contentTypeSlug, 0, 1, resolvedLocale, "createdAt", -1)
 	if err != nil {
 		return nil, err
 	}
-	doc := &entity.Document{Data: data, Locale: resolvedLocale}
+	doc := &entity.Document{Fields: data, Locale: resolvedLocale}
 	if len(drafts) > 0 {
 		doc.DocumentID = drafts[0].DocumentID
 	}
@@ -326,7 +360,7 @@ func (uc *UseCase) PublishSingleType(ctx context.Context, contentTypeSlug, local
 	if err != nil {
 		return err
 	}
-	drafts, total, err := uc.repo.FindDraftsByContentTypePaginated(ctx, contentTypeSlug, 0, 1, locale)
+	drafts, total, err := uc.repo.FindDraftsByContentTypePaginated(ctx, contentTypeSlug, 0, 1, locale, "createdAt", -1)
 	if err != nil {
 		return err
 	}
@@ -341,7 +375,7 @@ func (uc *UseCase) UnpublishSingleType(ctx context.Context, contentTypeSlug, loc
 	if err != nil {
 		return err
 	}
-	drafts, total, err := uc.repo.FindDraftsByContentTypePaginated(ctx, contentTypeSlug, 0, 1, locale)
+	drafts, total, err := uc.repo.FindDraftsByContentTypePaginated(ctx, contentTypeSlug, 0, 1, locale, "createdAt", -1)
 	if err != nil {
 		return err
 	}
@@ -351,12 +385,12 @@ func (uc *UseCase) UnpublishSingleType(ctx context.Context, contentTypeSlug, loc
 	return uc.Unpublish(ctx, contentTypeSlug, drafts[0].DocumentID, locale)
 }
 
-func (uc *UseCase) GetAllPaginated(ctx context.Context, contentTypeSlug string, start, size int, locale string, fields []entity.FieldDefinition) ([]*entity.Document, []string, int64, error) {
+func (uc *UseCase) GetAllPaginated(ctx context.Context, contentTypeSlug string, start, size int, locale string, fields []entity.FieldDefinition, orderBy string, sortDir int) ([]*entity.Document, []string, int64, error) {
 	locale, err := uc.resolveLocale(locale)
 	if err != nil {
 		return nil, nil, 0, err
 	}
-	drafts, total, err := uc.repo.FindDraftsByContentTypePaginated(ctx, contentTypeSlug, start, size, locale)
+	drafts, total, err := uc.repo.FindDraftsByContentTypePaginated(ctx, contentTypeSlug, start, size, locale, orderBy, sortDir)
 	if err != nil {
 		return nil, nil, 0, err
 	}
@@ -368,6 +402,7 @@ func (uc *UseCase) GetAllPaginated(ctx context.Context, contentTypeSlug string, 
 		if err := uc.mergeComponents(ctx, contentTypeSlug, draft, fields); err != nil {
 			return nil, nil, 0, err
 		}
+		uc.resolveMediaFields(ctx, draft.Fields, fields)
 	}
 
 	ids := make([]string, len(drafts))
@@ -398,9 +433,6 @@ func (uc *UseCase) Delete(ctx context.Context, contentTypeSlug, documentID strin
 				}
 			}
 		}
-	}
-	if err := uc.mediaRepo.DeleteByDocumentRef(ctx, documentID); err != nil {
-		return err
 	}
 	for _, locale := range uc.supportedLocales {
 		if err := uc.repo.DeleteByDocumentID(ctx, contentTypeSlug, documentID, locale); err != nil {

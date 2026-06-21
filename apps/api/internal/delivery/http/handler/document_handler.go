@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -23,20 +24,50 @@ type documentUseCase interface {
 	SaveSingleType(ctx context.Context, contentTypeSlug string, data map[string]any, locale string, fields []entity.FieldDefinition, userID string) (*entity.Document, error)
 	PublishSingleType(ctx context.Context, contentTypeSlug, locale string, fields []entity.FieldDefinition, userID string) error
 	UnpublishSingleType(ctx context.Context, contentTypeSlug, locale string) error
-	GetAllPaginated(ctx context.Context, contentTypeSlug string, start, size int, locale string, fields []entity.FieldDefinition) ([]*entity.Document, []string, int64, error)
+	GetAllPaginated(ctx context.Context, contentTypeSlug string, start, size int, locale string, fields []entity.FieldDefinition, orderBy string, sortDir int) ([]*entity.Document, []string, int64, error)
 }
 
 type documentContentTypeUseCase interface {
 	FindBySlug(ctx context.Context, slug string) (*entity.ContentType, error)
 }
 
-type DocumentHandler struct {
-	uc   documentUseCase
-	ctUC documentContentTypeUseCase
+type userDisplayNameResolver interface {
+	FindByIDs(ctx context.Context, ids []string) ([]*entity.User, error)
 }
 
-func NewDocumentHandler(uc documentUseCase, ctUC documentContentTypeUseCase) *DocumentHandler {
-	return &DocumentHandler{uc: uc, ctUC: ctUC}
+type DocumentHandler struct {
+	uc           documentUseCase
+	ctUC         documentContentTypeUseCase
+	userResolver userDisplayNameResolver
+}
+
+func NewDocumentHandler(uc documentUseCase, ctUC documentContentTypeUseCase, userResolver userDisplayNameResolver) *DocumentHandler {
+	return &DocumentHandler{uc: uc, ctUC: ctUC, userResolver: userResolver}
+}
+
+var allowedOrderBy = map[string]bool{
+	"id":        true,
+	"createdAt": true,
+	"updatedAt": true,
+}
+
+func ginSortParams(c *gin.Context) (orderBy string, sortDir int, ok bool) {
+	orderBy = c.DefaultQuery("orderBy", "id")
+	if !allowedOrderBy[orderBy] {
+		ginWriteError(c, http.StatusBadRequest, "invalid orderBy; allowed: id, createdAt, updatedAt")
+		return "", 0, false
+	}
+	sortDirStr := strings.ToLower(c.DefaultQuery("sortDir", "desc"))
+	switch sortDirStr {
+	case "asc":
+		sortDir = 1
+	case "desc":
+		sortDir = -1
+	default:
+		ginWriteError(c, http.StatusBadRequest, "invalid sortDir; allowed: asc, desc")
+		return "", 0, false
+	}
+	return orderBy, sortDir, true
 }
 
 type documentRequest struct {
@@ -65,10 +96,11 @@ type paginatedResponse struct {
 }
 
 func mergeDocData(doc *entity.Document) map[string]any {
-	merged := make(map[string]any, len(doc.Data)+6)
-	for k, v := range doc.Data {
+	merged := make(map[string]any, len(doc.Fields)+7)
+	for k, v := range doc.Fields {
 		merged[k] = v
 	}
+	merged["id"] = doc.GormID
 	merged["documentId"] = doc.DocumentID
 	merged["locale"] = doc.Locale
 	merged["createdAt"] = doc.CreatedAt
@@ -86,14 +118,17 @@ func toDocResponse(doc *entity.Document, status string) documentResponse {
 }
 
 func mergeListItemData(doc *entity.Document, projectedData map[string]any) map[string]any {
-	merged := make(map[string]any, len(projectedData)+4)
+	merged := make(map[string]any, len(projectedData)+7)
 	for k, v := range projectedData {
 		merged[k] = v
 	}
+	merged["id"] = doc.GormID
 	merged["documentId"] = doc.DocumentID
 	merged["locale"] = doc.Locale
 	merged["createdAt"] = doc.CreatedAt
 	merged["updatedAt"] = doc.UpdatedAt
+	merged["createdBy"] = doc.CreatedBy
+	merged["updatedBy"] = doc.UpdatedBy
 	return merged
 }
 
@@ -183,11 +218,39 @@ func (h *DocumentHandler) UnpublishSingleType(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "draft"})
 }
 
+func (h *DocumentHandler) resolveUserDisplayNames(ctx context.Context, userIDs []string) map[string]string {
+	nameMap := make(map[string]string, len(userIDs))
+	if len(userIDs) == 0 || h.userResolver == nil {
+		return nameMap
+	}
+	unique := make(map[string]bool, len(userIDs))
+	var deduped []string
+	for _, id := range userIDs {
+		if id != "" && !unique[id] {
+			unique[id] = true
+			deduped = append(deduped, id)
+		}
+	}
+	users, err := h.userResolver.FindByIDs(ctx, deduped)
+	if err != nil {
+		return nameMap
+	}
+	for _, u := range users {
+		nameMap[u.DocumentID] = u.DisplayName
+	}
+	return nameMap
+}
+
 // --- Collection-type handlers ---
 
 func (h *DocumentHandler) ListCollection(c *gin.Context) {
 	slug := c.Param("slug")
 	start, size := ginPaginationParams(c)
+
+	orderBy, sortDir, ok := ginSortParams(c)
+	if !ok {
+		return
+	}
 
 	ct, err := h.ctUC.FindBySlug(c.Request.Context(), slug)
 	if err != nil {
@@ -206,16 +269,28 @@ func (h *DocumentHandler) ListCollection(c *gin.Context) {
 		}
 	}
 
-	docs, statuses, total, err := h.uc.GetAllPaginated(c.Request.Context(), slug, start, size, c.Query("locale"), ct.Fields)
+	docs, statuses, total, err := h.uc.GetAllPaginated(c.Request.Context(), slug, start, size, c.Query("locale"), ct.Fields, orderBy, sortDir)
 	if err != nil {
 		ginWriteErr(c, err)
 		return
 	}
 
+	updatedByIDs := make([]string, len(docs))
+	for i, doc := range docs {
+		updatedByIDs[i] = doc.UpdatedBy
+	}
+	nameMap := h.resolveUserDisplayNames(c.Request.Context(), updatedByIDs)
+
 	items := make([]paginatedListItem, len(docs))
 	for i, doc := range docs {
+		data := mergeListItemData(doc, projectData(doc.Fields, listFields))
+		if name, ok := nameMap[doc.UpdatedBy]; ok {
+			data["updatedByName"] = name
+		} else {
+			data["updatedByName"] = doc.UpdatedBy
+		}
 		items[i] = paginatedListItem{
-			Data:   mergeListItemData(doc, projectData(doc.Data, listFields)),
+			Data:   data,
 			Status: statuses[i],
 		}
 	}
@@ -236,7 +311,14 @@ func (h *DocumentHandler) GetCollection(c *gin.Context) {
 		ginWriteErr(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, toDocResponse(draft, status))
+	resp := toDocResponse(draft, status)
+	nameMap := h.resolveUserDisplayNames(c.Request.Context(), []string{draft.UpdatedBy})
+	if name, ok := nameMap[draft.UpdatedBy]; ok {
+		resp.Data["updatedByName"] = name
+	} else {
+		resp.Data["updatedByName"] = draft.UpdatedBy
+	}
+	c.JSON(http.StatusOK, resp)
 }
 
 func (h *DocumentHandler) CreateCollection(c *gin.Context) {
@@ -247,7 +329,7 @@ func (h *DocumentHandler) CreateCollection(c *gin.Context) {
 	}
 	slug := c.Param("slug")
 	fields := h.resolveFields(c, slug)
-	doc := &entity.Document{Data: req.Data, Locale: c.Query("locale")}
+	doc := &entity.Document{Fields: req.Data, Locale: c.Query("locale")}
 	saved, err := h.uc.Save(c.Request.Context(), slug, doc, fields, middleware.UserID(c.Request.Context()))
 	if err != nil {
 		ginWriteErr(c, err)
@@ -267,7 +349,7 @@ func (h *DocumentHandler) UpdateCollection(c *gin.Context) {
 	documentID := c.Param("documentId")
 	doc := &entity.Document{
 		DocumentID: documentID,
-		Data:       req.Data,
+		Fields:     req.Data,
 		Locale:     c.Query("locale"),
 	}
 	saved, err := h.uc.Save(c.Request.Context(), slug, doc, fields, middleware.UserID(c.Request.Context()))

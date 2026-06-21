@@ -38,7 +38,7 @@ func IsValidPermission(p string) bool {
 }
 
 type RoleEntity struct {
-	ID          string    `bson:"_id,omitempty"   gorm:"column:id;primaryKey"                json:"-"`
+	ID          uint      `bson:"_id,omitempty"   gorm:"column:gorm_id;primaryKey;autoIncrement"             json:"-"`
 	DocumentID  string    `bson:"documentId"      gorm:"column:document_id;uniqueIndex"      json:"documentId"`
 	Name        string    `bson:"name"            gorm:"column:name"                         json:"name"`
 	Slug        string    `bson:"slug"            gorm:"column:slug;uniqueIndex"             json:"slug"`

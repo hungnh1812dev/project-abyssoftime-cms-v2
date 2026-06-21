@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
@@ -25,9 +24,7 @@ func NewContentTypeRepository(db *mongo.Database) repository.ContentTypeReposito
 }
 
 func (r *contentTypeRepository) Create(ctx context.Context, ct *entity.ContentType) error {
-	if ct.ID == "" {
-		ct.ID = primitive.NewObjectID().Hex()
-	}
+
 	now := time.Now().UTC()
 	if ct.CreatedAt.IsZero() {
 		ct.CreatedAt = now
@@ -74,7 +71,7 @@ func (r *contentTypeRepository) FindAll(ctx context.Context) ([]*entity.ContentT
 
 func (r *contentTypeRepository) Update(ctx context.Context, ct *entity.ContentType) error {
 	ct.UpdatedAt = time.Now().UTC()
-	res, err := r.col.ReplaceOne(ctx, bson.M{"_id": ct.ID}, ct)
+	res, err := r.col.ReplaceOne(ctx, bson.M{"_id": ct.DocumentID}, ct)
 	if err != nil {
 		return err
 	}

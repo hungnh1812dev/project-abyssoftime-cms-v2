@@ -17,7 +17,7 @@ const (
 )
 
 type authUseCase interface {
-	Register(ctx context.Context, email, password string) (*entity.User, error)
+	Register(ctx context.Context, email, password, displayName string) (*entity.User, error)
 	Login(ctx context.Context, email, password string) (accessToken, refreshToken string, err error)
 	RefreshToken(ctx context.Context, refreshToken string) (string, string, error)
 	Logout(ctx context.Context, userID string) error
@@ -36,24 +36,26 @@ func NewAuthHandler(uc authUseCase, cookieSecure bool, cookieSameSite http.SameS
 
 func (h *AuthHandler) Register(c *gin.Context) {
 	var req struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
+		Email       string `json:"email"`
+		Password    string `json:"password"`
+		DisplayName string `json:"displayName"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		ginWriteError(c, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
-	user, err := h.uc.Register(c.Request.Context(), req.Email, req.Password)
+	user, err := h.uc.Register(c.Request.Context(), req.Email, req.Password, req.DisplayName)
 	if err != nil {
 		ginWriteErr(c, err)
 		return
 	}
 
 	c.JSON(http.StatusCreated, gin.H{
-		"id":    user.ID,
-		"email": user.Email,
-		"role":  user.Role,
+		"id":          user.ID,
+		"email":       user.Email,
+		"displayName": user.DisplayName,
+		"role":        user.Role,
 	})
 }
 

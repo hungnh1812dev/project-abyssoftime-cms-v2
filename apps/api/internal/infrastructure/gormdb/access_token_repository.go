@@ -51,7 +51,7 @@ func (r *accessTokenRepository) FindAll(ctx context.Context, page, limit int) ([
 }
 
 func (r *accessTokenRepository) Delete(ctx context.Context, id string) error {
-	result := r.db.WithContext(ctx).Where("id = ?", id).Delete(&entity.AccessToken{})
+	result := r.db.WithContext(ctx).Where("document_id = ?", id).Delete(&entity.AccessToken{})
 	if result.Error != nil {
 		return result.Error
 	}
@@ -62,5 +62,5 @@ func (r *accessTokenRepository) Delete(ctx context.Context, id string) error {
 }
 
 func (r *accessTokenRepository) UpdateLastUsed(ctx context.Context, id string, at time.Time) error {
-	return r.db.WithContext(ctx).Model(&entity.AccessToken{}).Where("id = ?", id).Update("last_used_at", at).Error
+	return r.db.WithContext(ctx).Model(&entity.AccessToken{}).Where("gorm_id = ?", id).Update("last_used_at", at).Error
 }

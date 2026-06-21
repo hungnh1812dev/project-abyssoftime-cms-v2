@@ -1,17 +1,27 @@
-import { useAuth } from '@/hooks/useAuth'
+import { Menu } from 'lucide-react'
+import { useBreadcrumbs } from '@/hooks/useBreadcrumbs'
+import { useSidebar } from '@/components/sidebar'
 import { Button } from '@/components/ui/button'
+import { Breadcrumb } from '@/components/ui/breadcrumb'
 
 export function TopBar() {
-  const { role, logout } = useAuth()
+  const crumbs = useBreadcrumbs()
+  const { isMobile, setMobileOpen } = useSidebar()
 
   return (
-    <header className="h-14 border-b flex items-center justify-between px-6 shrink-0">
-      <div />
+    <header className="h-14 border-b border-border flex items-center px-6 shrink-0">
       <div className="flex items-center gap-3">
-        {role && <span className="text-sm text-muted-foreground capitalize">{role}</span>}
-        <Button variant="outline" size="sm" onClick={logout}>
-          Logout
-        </Button>
+        {isMobile && (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Open menu"
+            onClick={() => setMobileOpen(true)}
+          >
+            <Menu />
+          </Button>
+        )}
+        <Breadcrumb items={crumbs} />
       </div>
     </header>
   )

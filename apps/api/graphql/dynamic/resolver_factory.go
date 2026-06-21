@@ -13,6 +13,7 @@ import (
 
 	"project-abyssoftime-cms-v2/api/internal/delivery/http/middleware"
 	"project-abyssoftime-cms-v2/api/internal/domain/entity"
+	"project-abyssoftime-cms-v2/api/internal/domain/repository"
 	pkgjwt "project-abyssoftime-cms-v2/api/pkg/jwt"
 
 	contenttype "project-abyssoftime-cms-v2/api/internal/usecase/content_type"
@@ -29,7 +30,7 @@ type DocumentUseCase interface {
 	SaveSingleType(ctx context.Context, contentTypeSlug string, data map[string]any, locale string, fields []entity.FieldDefinition, userID string) (*entity.Document, error)
 	PublishSingleType(ctx context.Context, contentTypeSlug, locale string, fields []entity.FieldDefinition, userID string) error
 	UnpublishSingleType(ctx context.Context, contentTypeSlug, locale string) error
-	GetAllPaginated(ctx context.Context, contentTypeSlug string, start, size int, locale string, fields []entity.FieldDefinition) ([]*entity.Document, []string, int64, error)
+	GetAllPaginated(ctx context.Context, contentTypeSlug string, start, size int, locale string, fields []entity.FieldDefinition, orderBy string, sortDir int) ([]*entity.Document, []string, int64, error)
 	GetPublishedPaginated(ctx context.Context, contentTypeSlug string, start, size int, locale string, fields []entity.FieldDefinition) ([]*entity.Document, int64, error)
 	GetPublishedSingleType(ctx context.Context, contentTypeSlug, locale string, fields []entity.FieldDefinition) (*entity.Document, error)
 }
@@ -39,12 +40,13 @@ type ContentTypeUseCase interface {
 }
 
 type ResolverFactory struct {
-	docUC DocumentUseCase
-	ctUC  ContentTypeUseCase
+	docUC     DocumentUseCase
+	ctUC      ContentTypeUseCase
+	mediaRepo repository.MediaAssetRepository
 }
 
-func NewResolverFactory(docUC DocumentUseCase, ctUC ContentTypeUseCase) *ResolverFactory {
-	return &ResolverFactory{docUC: docUC, ctUC: ctUC}
+func NewResolverFactory(docUC DocumentUseCase, ctUC ContentTypeUseCase, mediaRepo repository.MediaAssetRepository) *ResolverFactory {
+	return &ResolverFactory{docUC: docUC, ctUC: ctUC, mediaRepo: mediaRepo}
 }
 
 func (f *ResolverFactory) BuildHandler(defs []contenttype.ContentTypeDefinition) (http.Handler, error) {
@@ -61,6 +63,18 @@ func (f *ResolverFactory) BuildHandler(defs []contenttype.ContentTypeDefinition)
 		},
 	})
 	timeScalar := graphql.DateTime
+
+	mediaAssetType := graphql.NewObject(graphql.ObjectConfig{
+		Name: "MediaAsset",
+		Fields: graphql.Fields{
+			"documentId":   &graphql.Field{Type: graphql.NewNonNull(graphql.ID)},
+			"url":          &graphql.Field{Type: graphql.NewNonNull(graphql.String)},
+			"thumbnailUrl": &graphql.Field{Type: graphql.String},
+			"fileName":     &graphql.Field{Type: graphql.String},
+			"width":        &graphql.Field{Type: graphql.Int},
+			"height":       &graphql.Field{Type: graphql.Int},
+		},
+	})
 
 	contentTypeObj := graphql.NewObject(graphql.ObjectConfig{
 		Name: "ContentType",
@@ -97,7 +111,7 @@ func (f *ResolverFactory) BuildHandler(defs []contenttype.ContentTypeDefinition)
 	mutationFields := graphql.Fields{}
 
 	for _, def := range defs {
-		objType := f.buildObjectType(def, timeScalar, jsonScalar)
+		objType := f.buildObjectType(def, timeScalar, jsonScalar, mediaAssetType)
 		inputType := f.buildInputType(def, jsonScalar)
 
 		if def.Kind == "collection" {
@@ -143,10 +157,14 @@ func (f *ResolverFactory) BuildHandler(defs []contenttype.ContentTypeDefinition)
 	}), nil
 }
 
-func (f *ResolverFactory) buildComponentType(parentType string, fd entity.FieldDefinition, jsonSc *graphql.Scalar) *graphql.Object {
+func (f *ResolverFactory) buildComponentType(parentType string, fd entity.FieldDefinition, jsonSc *graphql.Scalar, mediaType *graphql.Object) *graphql.Object {
 	compFields := graphql.Fields{}
 	for _, sub := range fd.Fields {
-		compFields[sub.Name] = &graphql.Field{Type: gqlScalarFor(sub.Type, jsonSc)}
+		if sub.Type == "media" {
+			compFields[sub.Name] = &graphql.Field{Type: mediaType}
+		} else {
+			compFields[sub.Name] = &graphql.Field{Type: gqlScalarFor(sub.Type, jsonSc)}
+		}
 	}
 	return graphql.NewObject(graphql.ObjectConfig{
 		Name:   parentType + slugToPascalCase(fd.Name),
@@ -154,7 +172,7 @@ func (f *ResolverFactory) buildComponentType(parentType string, fd entity.FieldD
 	})
 }
 
-func (f *ResolverFactory) buildObjectType(def contenttype.ContentTypeDefinition, timeSc, jsonSc *graphql.Scalar) *graphql.Object {
+func (f *ResolverFactory) buildObjectType(def contenttype.ContentTypeDefinition, timeSc, jsonSc *graphql.Scalar, mediaType *graphql.Object) *graphql.Object {
 	typeName := slugToPascalCase(def.Slug)
 	fields := graphql.Fields{
 		"documentId":  &graphql.Field{Type: graphql.NewNonNull(graphql.ID)},
@@ -168,8 +186,12 @@ func (f *ResolverFactory) buildObjectType(def contenttype.ContentTypeDefinition,
 			continue
 		}
 		if fd.Type == "component" {
-			compType := f.buildComponentType(typeName, fd, jsonSc)
+			compType := f.buildComponentType(typeName, fd, jsonSc, mediaType)
 			fields[fd.Name] = &graphql.Field{Type: compType}
+			continue
+		}
+		if fd.Type == "media" {
+			fields[fd.Name] = &graphql.Field{Type: mediaType}
 			continue
 		}
 		fields[fd.Name] = &graphql.Field{Type: gqlScalarFor(fd.Type, jsonSc)}
@@ -206,25 +228,8 @@ func (f *ResolverFactory) addCollectionFields(
 	slug := def.Slug
 	fields := def.Fields
 
-	responseType := graphql.NewObject(graphql.ObjectConfig{
-		Name: pascal + "Response",
-		Fields: graphql.Fields{
-			"data": &graphql.Field{Type: objType},
-		},
-	})
-
-	listResponseType := graphql.NewObject(graphql.ObjectConfig{
-		Name: pascal + "ListResponse",
-		Fields: graphql.Fields{
-			"data":  &graphql.Field{Type: graphql.NewNonNull(graphql.NewList(graphql.NewNonNull(objType)))},
-			"total": &graphql.Field{Type: graphql.NewNonNull(graphql.Int)},
-			"start": &graphql.Field{Type: graphql.NewNonNull(graphql.Int)},
-			"size":  &graphql.Field{Type: graphql.NewNonNull(graphql.Int)},
-		},
-	})
-
 	qf[camel] = &graphql.Field{
-		Type: responseType,
+		Type: objType,
 		Args: graphql.FieldConfigArgument{
 			camel + "Id": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.ID)},
 			"locale":     &graphql.ArgumentConfig{Type: graphql.String},
@@ -239,18 +244,18 @@ func (f *ResolverFactory) addCollectionFields(
 				if err != nil {
 					return nil, err
 				}
-				return map[string]any{"data": docToMap(doc)}, nil
+				return f.docToMap(p.Context, doc, fields), nil
 			}
 			doc, err := f.docUC.GetPublished(p.Context, slug, docID, locale, fields)
 			if err != nil {
 				return nil, err
 			}
-			return map[string]any{"data": docToMap(doc)}, nil
+			return f.docToMap(p.Context, doc, fields), nil
 		},
 	}
 
 	qf[camel+"List"] = &graphql.Field{
-		Type: graphql.NewNonNull(listResponseType),
+		Type: graphql.NewNonNull(graphql.NewList(graphql.NewNonNull(objType))),
 		Args: graphql.FieldConfigArgument{
 			"start":  &graphql.ArgumentConfig{Type: graphql.Int, DefaultValue: 0},
 			"size":   &graphql.ArgumentConfig{Type: graphql.Int, DefaultValue: 20},
@@ -263,25 +268,25 @@ func (f *ResolverFactory) addCollectionFields(
 			locale, _ := p.Args["locale"].(string)
 			statusFilter, _ := p.Args["status"].(string)
 			if statusFilter == "draft" && middleware.UserID(p.Context) != "" {
-				docs, _, total, err := f.docUC.GetAllPaginated(p.Context, slug, start, size, locale, fields)
+				docs, _, _, err := f.docUC.GetAllPaginated(p.Context, slug, start, size, locale, fields, "createdAt", -1)
 				if err != nil {
 					return nil, err
 				}
 				items := make([]map[string]any, len(docs))
 				for i, d := range docs {
-					items[i] = docToMap(d)
+					items[i] = f.docToMap(p.Context, d, fields)
 				}
-				return map[string]any{"data": items, "total": total, "start": start, "size": size}, nil
+				return items, nil
 			}
-			docs, total, err := f.docUC.GetPublishedPaginated(p.Context, slug, start, size, locale, fields)
+			docs, _, err := f.docUC.GetPublishedPaginated(p.Context, slug, start, size, locale, fields)
 			if err != nil {
 				return nil, err
 			}
 			items := make([]map[string]any, len(docs))
 			for i, d := range docs {
-				items[i] = docToMap(d)
+				items[i] = f.docToMap(p.Context, d, fields)
 			}
-			return map[string]any{"data": items, "total": total, "start": start, "size": size}, nil
+			return items, nil
 		},
 	}
 
@@ -292,12 +297,12 @@ func (f *ResolverFactory) addCollectionFields(
 		},
 		Resolve: f.authRequired(func(p graphql.ResolveParams) (any, error) {
 			data := inputToMap(p.Args["data"])
-			doc := &entity.Document{Data: data}
+			doc := &entity.Document{Fields: data}
 			saved, err := f.docUC.Save(p.Context, slug, doc, fields, middleware.UserID(p.Context))
 			if err != nil {
 				return nil, err
 			}
-			return docToMap(saved), nil
+			return f.docToMap(p.Context, saved, fields), nil
 		}),
 	}
 
@@ -310,12 +315,12 @@ func (f *ResolverFactory) addCollectionFields(
 		Resolve: f.authRequired(func(p graphql.ResolveParams) (any, error) {
 			docID := p.Args[camel+"Id"].(string)
 			data := inputToMap(p.Args["data"])
-			doc := &entity.Document{DocumentID: docID, Data: data}
+			doc := &entity.Document{DocumentID: docID, Fields: data}
 			saved, err := f.docUC.Save(p.Context, slug, doc, fields, middleware.UserID(p.Context))
 			if err != nil {
 				return nil, err
 			}
-			return docToMap(saved), nil
+			return f.docToMap(p.Context, saved, fields), nil
 		}),
 	}
 
@@ -346,7 +351,7 @@ func (f *ResolverFactory) addCollectionFields(
 			if err != nil {
 				return nil, err
 			}
-			return docToMap(doc), nil
+			return f.docToMap(p.Context, doc, fields), nil
 		}),
 	}
 
@@ -366,7 +371,7 @@ func (f *ResolverFactory) addCollectionFields(
 			if err != nil {
 				return nil, err
 			}
-			return docToMap(doc), nil
+			return f.docToMap(p.Context, doc, fields), nil
 		}),
 	}
 }
@@ -382,15 +387,8 @@ func (f *ResolverFactory) addSingleFields(
 	slug := def.Slug
 	fields := def.Fields
 
-	responseType := graphql.NewObject(graphql.ObjectConfig{
-		Name: pascal + "Response",
-		Fields: graphql.Fields{
-			"data": &graphql.Field{Type: objType},
-		},
-	})
-
 	qf[camel] = &graphql.Field{
-		Type: responseType,
+		Type: objType,
 		Args: graphql.FieldConfigArgument{
 			"locale": &graphql.ArgumentConfig{Type: graphql.String},
 			"status": &graphql.ArgumentConfig{Type: graphql.String},
@@ -403,13 +401,13 @@ func (f *ResolverFactory) addSingleFields(
 				if err != nil {
 					return nil, nil
 				}
-				return map[string]any{"data": docToMap(doc)}, nil
+				return f.docToMap(p.Context, doc, fields), nil
 			}
 			doc, err := f.docUC.GetPublishedSingleType(p.Context, slug, locale, fields)
 			if err != nil {
 				return nil, nil
 			}
-			return map[string]any{"data": docToMap(doc)}, nil
+			return f.docToMap(p.Context, doc, fields), nil
 		},
 	}
 
@@ -430,7 +428,7 @@ func (f *ResolverFactory) addSingleFields(
 			if err != nil {
 				return nil, err
 			}
-			return docToMap(doc), nil
+			return f.docToMap(p.Context, doc, fields), nil
 		}),
 	}
 
@@ -448,7 +446,7 @@ func (f *ResolverFactory) addSingleFields(
 			if err != nil {
 				return nil, err
 			}
-			return docToMap(doc), nil
+			return f.docToMap(p.Context, doc, fields), nil
 		}),
 	}
 
@@ -466,7 +464,7 @@ func (f *ResolverFactory) addSingleFields(
 			if err != nil {
 				return nil, err
 			}
-			return docToMap(doc), nil
+			return f.docToMap(p.Context, doc, fields), nil
 		}),
 	}
 }
@@ -480,7 +478,7 @@ func (f *ResolverFactory) authRequired(resolve graphql.FieldResolveFn) graphql.F
 	}
 }
 
-func docToMap(d *entity.Document) map[string]any {
+func (f *ResolverFactory) docToMap(ctx context.Context, d *entity.Document, fields []entity.FieldDefinition) map[string]any {
 	m := map[string]any{
 		"documentId":  d.DocumentID,
 		"locale":      d.Locale,
@@ -488,13 +486,77 @@ func docToMap(d *entity.Document) map[string]any {
 		"updatedAt":   d.UpdatedAt,
 		"publishedAt": nil,
 	}
-	if !d.PublishedAt.IsZero() {
-		m["publishedAt"] = d.PublishedAt
+	if d.PublishedAt != nil {
+		m["publishedAt"] = *d.PublishedAt
 	}
-	for k, v := range d.Data {
-		m[k] = v
+	for _, fd := range fields {
+		if fd.Type == "media" {
+			m[fd.Name] = f.resolveMediaField(ctx, d.Fields[fd.Name])
+		} else if fd.Type == "component" {
+			raw := d.Fields[fd.Name]
+			m[fd.Name] = f.resolveComponentMedia(ctx, raw, fd.Fields)
+		} else if fd.Type != "layout" {
+			m[fd.Name] = d.Fields[fd.Name]
+		}
 	}
 	return m
+}
+
+func (f *ResolverFactory) resolveMediaField(ctx context.Context, value any) any {
+	if value == nil {
+		return nil
+	}
+	docID, ok := value.(string)
+	if !ok || docID == "" {
+		return nil
+	}
+	if f.mediaRepo == nil {
+		return nil
+	}
+	asset, err := f.mediaRepo.FindByDocumentID(ctx, docID)
+	if err != nil || asset == nil {
+		return nil
+	}
+	return map[string]any{
+		"documentId":   asset.DocumentID,
+		"url":          asset.URL,
+		"thumbnailUrl": asset.ThumbnailURL,
+		"fileName":     asset.FileName,
+		"width":        asset.Width,
+		"height":       asset.Height,
+	}
+}
+
+func (f *ResolverFactory) resolveComponentMedia(ctx context.Context, raw any, subFields []entity.FieldDefinition) any {
+	if raw == nil {
+		return nil
+	}
+	switch v := raw.(type) {
+	case map[string]any:
+		return f.resolveComponentMap(ctx, v, subFields)
+	case []any:
+		arr := make([]map[string]any, 0, len(v))
+		for _, item := range v {
+			if m, ok := item.(map[string]any); ok {
+				arr = append(arr, f.resolveComponentMap(ctx, m, subFields))
+			}
+		}
+		return arr
+	default:
+		return raw
+	}
+}
+
+func (f *ResolverFactory) resolveComponentMap(ctx context.Context, m map[string]any, subFields []entity.FieldDefinition) map[string]any {
+	result := make(map[string]any, len(m))
+	for _, sf := range subFields {
+		if sf.Type == "media" {
+			result[sf.Name] = f.resolveMediaField(ctx, m[sf.Name])
+		} else {
+			result[sf.Name] = m[sf.Name]
+		}
+	}
+	return result
 }
 
 func inputToMap(v any) map[string]any {
@@ -511,7 +573,9 @@ func inputToMap(v any) map[string]any {
 
 func gqlScalarFor(fieldType string, jsonSc *graphql.Scalar) graphql.Output {
 	switch fieldType {
-	case "text", "richtext", "media":
+	case "text", "richtext":
+		return graphql.String
+	case "media":
 		return graphql.String
 	case "number":
 		return graphql.Float

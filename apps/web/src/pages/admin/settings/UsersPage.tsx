@@ -88,7 +88,7 @@ export function UsersPage() {
   const now = new Date()
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Users</h1>
         <Dialog open={inviteOpen} onOpenChange={(open: boolean) => { setInviteOpen(open); if (!open) setInviteLink(null) }}>
