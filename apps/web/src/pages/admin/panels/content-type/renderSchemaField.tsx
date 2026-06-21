@@ -27,12 +27,6 @@ function primitiveInput(field: FieldDefinition): React.ReactElement<Record<strin
       return <NumberInput aria-label={field.name} />;
     case "boolean":
       return <BooleanInput aria-label={field.name} />;
-    case "richtext":
-      return <Suspense fallback={<div className="h-48 animate-pulse rounded-md bg-muted" />}><RichTextInput aria-label={field.name} /></Suspense>;
-    case "json":
-      return <Suspense fallback={<div className="h-48 animate-pulse rounded-md bg-muted" />}><JsonInput aria-label={field.name} /></Suspense>;
-    case "media":
-      return <MediaInput aria-label={field.name} />;
     default:
       return <TextInput aria-label={field.name} placeholder={field.name} />;
   }
@@ -56,6 +50,37 @@ function renderField(field: FieldDefinition, prefix = ""): React.ReactNode {
         <legend className="px-1 text-sm font-medium">{field.name}</legend>
         {(field.fields ?? []).map((child) => renderField(child, childPrefix))}
       </fieldset>
+    );
+  }
+
+  if (field.type === 'json') {
+    return (
+      <div key={fieldName}>
+        <label className="block text-sm font-medium mb-1">{field.name}</label>
+        <Suspense fallback={<div className="h-48 animate-pulse rounded-md bg-muted" />}>
+          <JsonInput name={fieldName} />
+        </Suspense>
+      </div>
+    );
+  }
+
+  if (field.type === 'richtext') {
+    return (
+      <div key={fieldName}>
+        <label className="block text-sm font-medium mb-1">{field.name}</label>
+        <Suspense fallback={<div className="h-48 animate-pulse rounded-md bg-muted" />}>
+          <RichTextInput name={fieldName} />
+        </Suspense>
+      </div>
+    );
+  }
+
+  if (field.type === 'media') {
+    return (
+      <div key={fieldName}>
+        <label className="block text-sm font-medium mb-1">{field.name}</label>
+        <MediaInput name={fieldName} ext={field.ext} />
+      </div>
     );
   }
 
