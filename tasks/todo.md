@@ -31,6 +31,26 @@ See [bugfix-v1.8.md](bugfix-v1.8.md) for full plan. Spec: [specs/BUGFIX-SPEC.md]
 
 ---
 
+## Phase UI — Design System: Strapi-Inspired UI Overhaul
+
+See [ui-design-system.md](ui-design-system.md) for full plan. Spec: [specs/ui-design-system.md](../specs/ui-design-system.md).
+
+- [x] T1 Color tokens: migrate to indigo primary + add success/warning/sidebar-muted tokens
+- [ ] T2 Button: add `success` variant, `loading` prop, update hover/active states
+- [ ] T3 Badge: add `draft`/`published`/`modified` semantic variants
+- [ ] T4 SidebarContext: collapsed state + localStorage + mobile detection
+- [ ] T5 Sidebar components: Brand, Group, SubGroup, Item, CollapseToggle, rail popover
+- [ ] T6 Sidebar responsive: mobile overlay with backdrop
+- [ ] T7 AdminLayout: wire new sidebar, remove old Sidebar.tsx
+- [ ] ✅ Checkpoint 1: foundation + sidebar complete
+- [ ] T8 Breadcrumbs hook + TopBar rebuild with hamburger
+- [ ] T9 StickyActionBar: glassmorphism sticky header for content pages
+- [ ] T10 Card component + page-level spacing polish
+- [ ] T11 Dark mode verification pass
+- [ ] ✅ Checkpoint 2 (Final): full design system complete
+
+---
+
 ## Archive Index
 
 | Archive | Phases | Status |
