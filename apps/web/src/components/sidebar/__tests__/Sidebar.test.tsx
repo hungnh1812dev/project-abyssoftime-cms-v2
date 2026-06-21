@@ -1,9 +1,10 @@
+import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import { Sidebar } from '../Sidebar'
-import { SidebarProvider } from '../SidebarContext'
+import { SidebarShell } from '../SidebarShell'
+import { SidebarProvider, useSidebar } from '../SidebarContext'
 
 vi.mock('@/hooks/useContentTypes', () => ({
   useContentTypes: () => ({
@@ -22,7 +23,7 @@ function renderSidebar(initialPath = '/admin') {
   return render(
     <MemoryRouter initialEntries={[initialPath]}>
       <SidebarProvider>
-        <Sidebar />
+        <SidebarShell />
       </SidebarProvider>
     </MemoryRouter>,
   )
@@ -93,5 +94,71 @@ describe('Sidebar', () => {
     renderSidebar()
     expect(screen.getByRole('link', { name: 'Media Library' })).toHaveAttribute('href', '/admin/settings/media')
     expect(screen.getByRole('link', { name: 'Users' })).toHaveAttribute('href', '/admin/settings/users')
+  })
+})
+
+function setupMobile() {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches: query === '(max-width: 1023px)',
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  })
+}
+
+function MobileOpenSetter({ open }: { open: boolean }) {
+  const { setMobileOpen } = useSidebar()
+  React.useEffect(() => { setMobileOpen(open) }, [open, setMobileOpen])
+  return null
+}
+
+describe('Sidebar mobile overlay', () => {
+  it('sidebar is hidden when mobile and mobileOpen=false', () => {
+    setupMobile()
+    render(
+      <MemoryRouter>
+        <SidebarProvider>
+          <SidebarShell />
+        </SidebarProvider>
+      </MemoryRouter>,
+    )
+    const sidebar = screen.getByRole('complementary', { hidden: true })
+    expect(sidebar.className).toContain('hidden')
+  })
+
+  it('renders backdrop when mobile and mobileOpen=true', () => {
+    setupMobile()
+    render(
+      <MemoryRouter>
+        <SidebarProvider>
+          <MobileOpenSetter open={true} />
+          <SidebarShell />
+        </SidebarProvider>
+      </MemoryRouter>,
+    )
+    expect(screen.getByTestId('sidebar-backdrop')).toBeInTheDocument()
+  })
+
+  it('clicking backdrop closes mobile sidebar', async () => {
+    setupMobile()
+    render(
+      <MemoryRouter>
+        <SidebarProvider>
+          <MobileOpenSetter open={true} />
+          <SidebarShell />
+        </SidebarProvider>
+      </MemoryRouter>,
+    )
+    const backdrop = screen.getByTestId('sidebar-backdrop')
+    await userEvent.click(backdrop)
+    const sidebar = screen.getByRole('complementary', { hidden: true })
+    expect(sidebar.className).toContain('hidden')
   })
 })
