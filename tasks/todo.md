@@ -56,7 +56,7 @@ See [ui-design-system.md](ui-design-system.md) for full plan. Spec: [specs/ui-de
 See [sync-table-fields.md](sync-table-fields.md) for full plan. Spec: [specs/sync-table-fields.md](../specs/sync-table-fields.md).
 
 - [x] T1 Static table column rename (`id` → `gorm_id`) + UUID standardization
-- [ ] T2 MediaAsset cleanup + add `FindByDocumentID`
+- [x] T2 MediaAsset cleanup + add `FindByDocumentID`
 - [ ] T3 Document & Component entity cleanup (`Data` → `Fields`, `*time.Time`, remove obsolete)
 - [ ] ✅ Checkpoint A: backend compiles + tests pass
 - [ ] T4 Per-field dynamic columns (repository rewrite)

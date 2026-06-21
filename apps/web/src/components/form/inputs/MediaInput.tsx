@@ -6,8 +6,6 @@ import type { MediaAsset } from "@/types/cms";
 interface MediaInputProps {
   name?: string;
   control?: Control;
-  documentRef?: string;
-  contentTypeId?: string;
   ext?: string[];
   "aria-label"?: string;
 }

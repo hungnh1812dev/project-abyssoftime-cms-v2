@@ -410,7 +410,7 @@ func TestGetSingleType_ReturnsDocumentAndStatus(t *testing.T) {
 	draft := &entity.Document{DocumentID: "e1", UpdatedAt: now, Locale: "en"}
 
 	repo := &repomock.DocumentRepository{}
-	repo.FindDraftsByContentTypePaginatedFn = func(_ context.Context, _ string, _, _ int, _ string) ([]*entity.Document, int64, error) {
+	repo.FindDraftsByContentTypePaginatedFn = func(_ context.Context, _ string, _, _ int, _, _ string, _ int) ([]*entity.Document, int64, error) {
 		return []*entity.Document{draft}, 1, nil
 	}
 	repo.FindPublishedByDocumentIDFn = func(_ context.Context, _, _, _ string) (*entity.Document, error) {
@@ -432,7 +432,7 @@ func TestGetSingleType_ReturnsDocumentAndStatus(t *testing.T) {
 
 func TestGetSingleType_NoDocument_ReturnsNotFound(t *testing.T) {
 	repo := &repomock.DocumentRepository{}
-	repo.FindDraftsByContentTypePaginatedFn = func(_ context.Context, _ string, _, _ int, _ string) ([]*entity.Document, int64, error) {
+	repo.FindDraftsByContentTypePaginatedFn = func(_ context.Context, _ string, _, _ int, _, _ string, _ int) ([]*entity.Document, int64, error) {
 		return nil, 0, nil
 	}
 	uc := docuc.New(repo, nil, &repomock.MediaAssetRepository{}, supportedLocales)
@@ -457,7 +457,7 @@ func TestGetSingleType_InvalidLocale(t *testing.T) {
 
 func TestSaveSingleType_FirstSave_CreatesNewDocument(t *testing.T) {
 	repo := &repomock.DocumentRepository{}
-	repo.FindDraftsByContentTypePaginatedFn = func(_ context.Context, _ string, _, _ int, _ string) ([]*entity.Document, int64, error) {
+	repo.FindDraftsByContentTypePaginatedFn = func(_ context.Context, _ string, _, _ int, _, _ string, _ int) ([]*entity.Document, int64, error) {
 		return nil, 0, nil
 	}
 	repo.FindDraftByDocumentIDFn = func(_ context.Context, _, _, _ string) (*entity.Document, error) {
@@ -479,7 +479,7 @@ func TestSaveSingleType_SubsequentSave_ReusesDocumentID(t *testing.T) {
 	existing := &entity.Document{DocumentID: "existing-id", Locale: "en"}
 
 	repo := &repomock.DocumentRepository{}
-	repo.FindDraftsByContentTypePaginatedFn = func(_ context.Context, _ string, _, _ int, _ string) ([]*entity.Document, int64, error) {
+	repo.FindDraftsByContentTypePaginatedFn = func(_ context.Context, _ string, _, _ int, _, _ string, _ int) ([]*entity.Document, int64, error) {
 		return []*entity.Document{existing}, 1, nil
 	}
 	repo.FindDraftByDocumentIDFn = func(_ context.Context, _, docID, _ string) (*entity.Document, error) {
@@ -506,7 +506,7 @@ func TestPublishSingleType_Delegates(t *testing.T) {
 	draft := &entity.Document{DocumentID: "e1", Locale: "en", Data: map[string]any{"title": "v1"}, UpdatedAt: time.Now().UTC()}
 
 	repo := &repomock.DocumentRepository{}
-	repo.FindDraftsByContentTypePaginatedFn = func(_ context.Context, _ string, _, _ int, _ string) ([]*entity.Document, int64, error) {
+	repo.FindDraftsByContentTypePaginatedFn = func(_ context.Context, _ string, _, _ int, _, _ string, _ int) ([]*entity.Document, int64, error) {
 		return []*entity.Document{draft}, 1, nil
 	}
 	repo.FindDraftByDocumentIDFn = func(_ context.Context, _, _, _ string) (*entity.Document, error) {
@@ -529,7 +529,7 @@ func TestPublishSingleType_Delegates(t *testing.T) {
 
 func TestPublishSingleType_NoDocument(t *testing.T) {
 	repo := &repomock.DocumentRepository{}
-	repo.FindDraftsByContentTypePaginatedFn = func(_ context.Context, _ string, _, _ int, _ string) ([]*entity.Document, int64, error) {
+	repo.FindDraftsByContentTypePaginatedFn = func(_ context.Context, _ string, _, _ int, _, _ string, _ int) ([]*entity.Document, int64, error) {
 		return nil, 0, nil
 	}
 	uc := docuc.New(repo, nil, &repomock.MediaAssetRepository{}, supportedLocales)
@@ -545,7 +545,7 @@ func TestUnpublishSingleType_Delegates(t *testing.T) {
 	draft := &entity.Document{DocumentID: "e1", Locale: "en"}
 
 	repo := &repomock.DocumentRepository{}
-	repo.FindDraftsByContentTypePaginatedFn = func(_ context.Context, _ string, _, _ int, _ string) ([]*entity.Document, int64, error) {
+	repo.FindDraftsByContentTypePaginatedFn = func(_ context.Context, _ string, _, _ int, _, _ string, _ int) ([]*entity.Document, int64, error) {
 		return []*entity.Document{draft}, 1, nil
 	}
 	var deletedDocID string
@@ -565,7 +565,7 @@ func TestUnpublishSingleType_Delegates(t *testing.T) {
 
 func TestUnpublishSingleType_NoDocument(t *testing.T) {
 	repo := &repomock.DocumentRepository{}
-	repo.FindDraftsByContentTypePaginatedFn = func(_ context.Context, _ string, _, _ int, _ string) ([]*entity.Document, int64, error) {
+	repo.FindDraftsByContentTypePaginatedFn = func(_ context.Context, _ string, _, _ int, _, _ string, _ int) ([]*entity.Document, int64, error) {
 		return nil, 0, nil
 	}
 	uc := docuc.New(repo, nil, &repomock.MediaAssetRepository{}, supportedLocales)
@@ -586,7 +586,7 @@ func TestGetAllPaginated_ReturnsPageWithStatuses(t *testing.T) {
 	pub := &entity.Document{DocumentID: "d1", UpdatedAt: now, Locale: "en"}
 
 	repo := &repomock.DocumentRepository{}
-	repo.FindDraftsByContentTypePaginatedFn = func(_ context.Context, _ string, start, size int, _ string) ([]*entity.Document, int64, error) {
+	repo.FindDraftsByContentTypePaginatedFn = func(_ context.Context, _ string, start, size int, _, _ string, _ int) ([]*entity.Document, int64, error) {
 		if start != 0 || size != 2 {
 			t.Errorf("unexpected start=%d size=%d", start, size)
 		}
@@ -600,7 +600,7 @@ func TestGetAllPaginated_ReturnsPageWithStatuses(t *testing.T) {
 	}
 	uc := docuc.New(repo, nil, &repomock.MediaAssetRepository{}, supportedLocales)
 
-	docs, statuses, total, err := uc.GetAllPaginated(ctx, testSlug, 0, 2, "en", nil)
+	docs, statuses, total, err := uc.GetAllPaginated(ctx, testSlug, 0, 2, "en", nil, "id", -1)
 	if err != nil {
 		t.Fatalf("GetAllPaginated() error = %v", err)
 	}
@@ -620,12 +620,12 @@ func TestGetAllPaginated_ReturnsPageWithStatuses(t *testing.T) {
 
 func TestGetAllPaginated_EmptyResult(t *testing.T) {
 	repo := &repomock.DocumentRepository{}
-	repo.FindDraftsByContentTypePaginatedFn = func(_ context.Context, _ string, _, _ int, _ string) ([]*entity.Document, int64, error) {
+	repo.FindDraftsByContentTypePaginatedFn = func(_ context.Context, _ string, _, _ int, _, _ string, _ int) ([]*entity.Document, int64, error) {
 		return nil, 0, nil
 	}
 	uc := docuc.New(repo, nil, &repomock.MediaAssetRepository{}, supportedLocales)
 
-	docs, statuses, total, err := uc.GetAllPaginated(ctx, testSlug, 0, 20, "en", nil)
+	docs, statuses, total, err := uc.GetAllPaginated(ctx, testSlug, 0, 20, "en", nil, "id", -1)
 	if err != nil {
 		t.Fatalf("GetAllPaginated() error = %v", err)
 	}
@@ -638,63 +638,35 @@ func TestGetAllPaginated_InvalidLocale(t *testing.T) {
 	repo := &repomock.DocumentRepository{}
 	uc := docuc.New(repo, nil, &repomock.MediaAssetRepository{}, supportedLocales)
 
-	_, _, _, err := uc.GetAllPaginated(ctx, testSlug, 0, 20, "fr", nil)
+	_, _, _, err := uc.GetAllPaginated(ctx, testSlug, 0, 20, "fr", nil, "id", -1)
 	if !pkgerrors.Is(err, pkgerrors.ErrValidation) {
 		t.Errorf("GetAllPaginated() error = %v, want ErrValidation", err)
 	}
 }
 
-// ---- Delete (cascade) ---------------------------------------------------------
+// ---- Delete ---------------------------------------------------------
 
-func TestDelete_CascadeOrder(t *testing.T) {
-	var callOrder []string
-
-	mediaRepo := &repomock.MediaAssetRepository{}
-	mediaRepo.DeleteByDocumentRefFn = func(_ context.Context, ref string) error {
-		callOrder = append(callOrder, "media:"+ref)
-		return nil
-	}
+func TestDelete_DeletesAllLocales(t *testing.T) {
+	var deletedLocales []string
 
 	docRepo := &repomock.DocumentRepository{}
 	docRepo.DeleteByDocumentIDFn = func(_ context.Context, _, documentID, locale string) error {
-		callOrder = append(callOrder, fmt.Sprintf("entry:%s:%s", documentID, locale))
+		deletedLocales = append(deletedLocales, fmt.Sprintf("%s:%s", documentID, locale))
 		return nil
 	}
 
-	uc := docuc.New(docRepo, nil, mediaRepo, supportedLocales)
+	uc := docuc.New(docRepo, nil, nil, supportedLocales)
 	if err := uc.Delete(ctx, testSlug, "e1", nil); err != nil {
 		t.Fatalf("Delete() error = %v", err)
 	}
 
-	want := []string{"media:e1", "entry:e1:en", "entry:e1:vi"}
-	if len(callOrder) != len(want) {
-		t.Fatalf("Delete() called %v, want %v", callOrder, want)
+	want := []string{"e1:en", "e1:vi"}
+	if len(deletedLocales) != len(want) {
+		t.Fatalf("Delete() called %v, want %v", deletedLocales, want)
 	}
 	for i, w := range want {
-		if callOrder[i] != w {
-			t.Errorf("Delete() call[%d] = %q, want %q", i, callOrder[i], w)
+		if deletedLocales[i] != w {
+			t.Errorf("Delete() call[%d] = %q, want %q", i, deletedLocales[i], w)
 		}
-	}
-}
-
-func TestDelete_MediaError_Aborts(t *testing.T) {
-	mediaRepo := &repomock.MediaAssetRepository{}
-	mediaRepo.DeleteByDocumentRefFn = func(_ context.Context, _ string) error {
-		return pkgerrors.ErrNotFound
-	}
-	entryDeleteCalled := false
-	docRepo := &repomock.DocumentRepository{}
-	docRepo.DeleteByDocumentIDFn = func(_ context.Context, _, _, _ string) error {
-		entryDeleteCalled = true
-		return nil
-	}
-
-	uc := docuc.New(docRepo, nil, mediaRepo, supportedLocales)
-	err := uc.Delete(ctx, testSlug, "e1", nil)
-	if err == nil {
-		t.Error("Delete() should have returned error when media delete fails")
-	}
-	if entryDeleteCalled {
-		t.Error("Delete() must not delete the entry when media cascade fails")
 	}
 }

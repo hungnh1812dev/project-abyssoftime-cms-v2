@@ -57,21 +57,25 @@ func TestMediaAssetRepository_FindByID_NotFound(t *testing.T) {
 	}
 }
 
-func TestMediaAssetRepository_FindByDocumentRef(t *testing.T) {
+func TestMediaAssetRepository_FindByDocumentID(t *testing.T) {
 	db := setupMediaDB(t)
 	repo := NewMediaAssetRepository(db)
 	ctx := context.Background()
 
-	_ = repo.Create(ctx, &entity.MediaAsset{ID: "m1", DocumentRef: "doc1", CreatedAt: time.Now().UTC()})
-	_ = repo.Create(ctx, &entity.MediaAsset{ID: "m2", DocumentRef: "doc1", CreatedAt: time.Now().UTC()})
-	_ = repo.Create(ctx, &entity.MediaAsset{ID: "m3", DocumentRef: "doc2", CreatedAt: time.Now().UTC()})
+	_ = repo.Create(ctx, &entity.MediaAsset{ID: "m1", DocumentID: "doc-uuid-1", URL: "https://cdn/a.jpg", CreatedAt: time.Now().UTC()})
+	_ = repo.Create(ctx, &entity.MediaAsset{ID: "m2", DocumentID: "doc-uuid-2", URL: "https://cdn/b.jpg", CreatedAt: time.Now().UTC()})
 
-	found, err := repo.FindByDocumentRef(ctx, "doc1")
+	found, err := repo.FindByDocumentID(ctx, "doc-uuid-1")
 	if err != nil {
-		t.Fatalf("FindByDocumentRef: %v", err)
+		t.Fatalf("FindByDocumentID: %v", err)
 	}
-	if len(found) != 2 {
-		t.Errorf("count = %d, want 2", len(found))
+	if found.URL != "https://cdn/a.jpg" {
+		t.Errorf("URL = %q, want %q", found.URL, "https://cdn/a.jpg")
+	}
+
+	_, err = repo.FindByDocumentID(ctx, "nonexistent")
+	if !pkgerrors.Is(err, pkgerrors.ErrNotFound) {
+		t.Errorf("FindByDocumentID(nonexistent) err = %v, want ErrNotFound", err)
 	}
 }
 
@@ -82,8 +86,9 @@ func TestMediaAssetRepository_FindAll_Paginated(t *testing.T) {
 
 	for i := 0; i < 5; i++ {
 		_ = repo.Create(ctx, &entity.MediaAsset{
-			ID:        "m" + string(rune('0'+i)),
-			CreatedAt: time.Now().UTC().Add(time.Duration(i) * time.Second),
+			ID:         "m" + string(rune('0'+i)),
+			DocumentID: "doc-" + string(rune('0'+i)),
+			CreatedAt:  time.Now().UTC().Add(time.Duration(i) * time.Second),
 		})
 	}
 
@@ -96,24 +101,6 @@ func TestMediaAssetRepository_FindAll_Paginated(t *testing.T) {
 	}
 	if len(items) != 2 {
 		t.Errorf("page size = %d, want 2", len(items))
-	}
-}
-
-func TestMediaAssetRepository_DeleteByDocumentRef(t *testing.T) {
-	db := setupMediaDB(t)
-	repo := NewMediaAssetRepository(db)
-	ctx := context.Background()
-
-	_ = repo.Create(ctx, &entity.MediaAsset{ID: "m1", DocumentRef: "doc1", CreatedAt: time.Now().UTC()})
-	_ = repo.Create(ctx, &entity.MediaAsset{ID: "m2", DocumentRef: "doc1", CreatedAt: time.Now().UTC()})
-
-	if err := repo.DeleteByDocumentRef(ctx, "doc1"); err != nil {
-		t.Fatalf("DeleteByDocumentRef: %v", err)
-	}
-
-	found, _ := repo.FindByDocumentRef(ctx, "doc1")
-	if len(found) != 0 {
-		t.Errorf("count after delete = %d, want 0", len(found))
 	}
 }
 

@@ -33,7 +33,7 @@ export interface Document {
   status: EntryStatus
 }
 
-export const SYSTEM_FIELDS = ['documentId', 'locale', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy'] as const
+export const SYSTEM_FIELDS = ['id', 'documentId', 'locale', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy', 'updatedByName'] as const
 
 export function stripSystemFields(data: Record<string, unknown>): Record<string, unknown> {
   const content: Record<string, unknown> = {}
@@ -47,6 +47,7 @@ export function stripSystemFields(data: Record<string, unknown>): Record<string,
 
 export interface MediaAsset {
   ID: string
+  documentId: string
   url: string
   thumbnailUrl: string
   publicId: string
@@ -55,7 +56,5 @@ export interface MediaAsset {
   hash: string
   width: number
   height: number
-  documentRef: string
-  contentTypeId: string
   createdAt: string
 }

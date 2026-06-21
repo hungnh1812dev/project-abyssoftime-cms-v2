@@ -33,7 +33,7 @@ func TestUpload_CreatesMediaAsset(t *testing.T) {
 	}
 
 	uc := mediauc.New(assetRepo, storage, false)
-	got, err := uc.Upload(ctx, bytes.NewReader([]byte("img")), "photo.jpg", "doc-1", "ct-1")
+	got, err := uc.Upload(ctx, bytes.NewReader([]byte("img")), "photo.jpg")
 	if err != nil {
 		t.Fatalf("Upload() error = %v", err)
 	}
@@ -42,9 +42,6 @@ func TestUpload_CreatesMediaAsset(t *testing.T) {
 	}
 	if capturedAsset == nil {
 		t.Fatal("Upload() did not call repo.Create")
-	}
-	if capturedAsset.DocumentRef != "doc-1" {
-		t.Errorf("Upload() DocumentRef = %v, want doc-1", capturedAsset.DocumentRef)
 	}
 }
 
@@ -65,7 +62,7 @@ func TestUpload_PersistsThumbnailURL(t *testing.T) {
 	}
 
 	uc := mediauc.New(assetRepo, storage, true)
-	_, err := uc.Upload(ctx, bytes.NewReader([]byte("img")), "photo.jpg", "doc-1", "ct-1")
+	_, err := uc.Upload(ctx, bytes.NewReader([]byte("img")), "photo.jpg")
 	if err != nil {
 		t.Fatalf("Upload() error = %v", err)
 	}
@@ -85,7 +82,7 @@ func TestUpload_AutoThumbnailEnabled_PassesGenerateThumbnailTrue(t *testing.T) {
 	assetRepo.CreateFn = func(_ context.Context, _ *entity.MediaAsset) error { return nil }
 
 	uc := mediauc.New(assetRepo, storage, true)
-	_, _ = uc.Upload(ctx, bytes.NewReader([]byte("img")), "photo.jpg", "doc-1", "ct-1")
+	_, _ = uc.Upload(ctx, bytes.NewReader([]byte("img")), "photo.jpg")
 	if !gotGenerateThumbnail {
 		t.Error("Upload() did not pass generateThumbnail=true to storage when MediaAutoThumbnail=true")
 	}
@@ -102,7 +99,7 @@ func TestUpload_AutoThumbnailDisabled_PassesGenerateThumbnailFalse(t *testing.T)
 	assetRepo.CreateFn = func(_ context.Context, _ *entity.MediaAsset) error { return nil }
 
 	uc := mediauc.New(assetRepo, storage, false)
-	_, _ = uc.Upload(ctx, bytes.NewReader([]byte("img")), "photo.jpg", "doc-1", "ct-1")
+	_, _ = uc.Upload(ctx, bytes.NewReader([]byte("img")), "photo.jpg")
 	if gotGenerateThumbnail {
 		t.Error("Upload() passed generateThumbnail=true to storage when MediaAutoThumbnail=false")
 	}
@@ -117,7 +114,7 @@ func TestUpload_StorageError_ReturnsError(t *testing.T) {
 	assetRepo := &repomock.MediaAssetRepository{}
 
 	uc := mediauc.New(assetRepo, storage, false)
-	_, err := uc.Upload(ctx, bytes.NewReader([]byte("img")), "photo.jpg", "doc-1", "ct-1")
+	_, err := uc.Upload(ctx, bytes.NewReader([]byte("img")), "photo.jpg")
 	if !errors.Is(err, storageErr) {
 		t.Errorf("Upload() error = %v, want %v", err, storageErr)
 	}
@@ -161,7 +158,7 @@ func TestUpload_BuildsHashedFilename(t *testing.T) {
 	assetRepo.CreateFn = func(_ context.Context, _ *entity.MediaAsset) error { return nil }
 
 	uc := mediauc.New(assetRepo, storage, false)
-	if _, err := uc.Upload(ctx, bytes.NewReader(content), "photo.jpg", "doc-1", "ct-1"); err != nil {
+	if _, err := uc.Upload(ctx, bytes.NewReader(content), "photo.jpg"); err != nil {
 		t.Fatalf("Upload() error = %v", err)
 	}
 	want := "photo_" + expectedHash + ".jpg"
@@ -183,7 +180,7 @@ func TestUpload_HashedFilenameIsDeterministic(t *testing.T) {
 
 	uc := mediauc.New(assetRepo, storage, false)
 	for i := 0; i < 3; i++ {
-		if _, err := uc.Upload(ctx, bytes.NewReader(content), "photo.jpg", "doc", "ct"); err != nil {
+		if _, err := uc.Upload(ctx, bytes.NewReader(content), "photo.jpg"); err != nil {
 			t.Fatalf("Upload() run %d error = %v", i, err)
 		}
 	}
@@ -206,7 +203,7 @@ func TestUpload_PopulatesFileFields(t *testing.T) {
 	}
 
 	uc := mediauc.New(assetRepo, storage, false)
-	if _, err := uc.Upload(ctx, bytes.NewReader(content), "photo.jpg", "doc", "ct"); err != nil {
+	if _, err := uc.Upload(ctx, bytes.NewReader(content), "photo.jpg"); err != nil {
 		t.Fatalf("Upload() error = %v", err)
 	}
 
@@ -236,7 +233,7 @@ func TestUpload_RepoError_ReturnsError(t *testing.T) {
 	}
 
 	uc := mediauc.New(assetRepo, storage, false)
-	_, err := uc.Upload(ctx, bytes.NewReader([]byte("img")), "photo.jpg", "doc-1", "ct-1")
+	_, err := uc.Upload(ctx, bytes.NewReader([]byte("img")), "photo.jpg")
 	if !errors.Is(err, repoErr) {
 		t.Errorf("Upload() error = %v, want %v", err, repoErr)
 	}

@@ -200,7 +200,7 @@ func (uc *UseCase) GetPublishedPaginated(ctx context.Context, contentTypeSlug st
 	if err != nil {
 		return nil, 0, err
 	}
-	docs, total, err := uc.repo.FindPublishedByContentTypePaginated(ctx, contentTypeSlug, start, size, locale)
+	docs, total, err := uc.repo.FindPublishedByContentTypePaginated(ctx, contentTypeSlug, start, size, locale, "createdAt", -1)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -217,7 +217,7 @@ func (uc *UseCase) GetPublishedSingleType(ctx context.Context, contentTypeSlug, 
 	if err != nil {
 		return nil, err
 	}
-	docs, total, err := uc.repo.FindPublishedByContentTypePaginated(ctx, contentTypeSlug, 0, 1, locale)
+	docs, total, err := uc.repo.FindPublishedByContentTypePaginated(ctx, contentTypeSlug, 0, 1, locale, "createdAt", -1)
 	if err != nil {
 		return nil, err
 	}
@@ -287,7 +287,7 @@ func (uc *UseCase) GetSingleType(ctx context.Context, contentTypeSlug, locale st
 	if err != nil {
 		return nil, "", err
 	}
-	drafts, total, err := uc.repo.FindDraftsByContentTypePaginated(ctx, contentTypeSlug, 0, 1, locale)
+	drafts, total, err := uc.repo.FindDraftsByContentTypePaginated(ctx, contentTypeSlug, 0, 1, locale, "createdAt", -1)
 	if err != nil {
 		return nil, "", err
 	}
@@ -310,7 +310,7 @@ func (uc *UseCase) SaveSingleType(ctx context.Context, contentTypeSlug string, d
 	if err != nil {
 		return nil, err
 	}
-	drafts, _, err := uc.repo.FindDraftsByContentTypePaginated(ctx, contentTypeSlug, 0, 1, resolvedLocale)
+	drafts, _, err := uc.repo.FindDraftsByContentTypePaginated(ctx, contentTypeSlug, 0, 1, resolvedLocale, "createdAt", -1)
 	if err != nil {
 		return nil, err
 	}
@@ -326,7 +326,7 @@ func (uc *UseCase) PublishSingleType(ctx context.Context, contentTypeSlug, local
 	if err != nil {
 		return err
 	}
-	drafts, total, err := uc.repo.FindDraftsByContentTypePaginated(ctx, contentTypeSlug, 0, 1, locale)
+	drafts, total, err := uc.repo.FindDraftsByContentTypePaginated(ctx, contentTypeSlug, 0, 1, locale, "createdAt", -1)
 	if err != nil {
 		return err
 	}
@@ -341,7 +341,7 @@ func (uc *UseCase) UnpublishSingleType(ctx context.Context, contentTypeSlug, loc
 	if err != nil {
 		return err
 	}
-	drafts, total, err := uc.repo.FindDraftsByContentTypePaginated(ctx, contentTypeSlug, 0, 1, locale)
+	drafts, total, err := uc.repo.FindDraftsByContentTypePaginated(ctx, contentTypeSlug, 0, 1, locale, "createdAt", -1)
 	if err != nil {
 		return err
 	}
@@ -351,12 +351,12 @@ func (uc *UseCase) UnpublishSingleType(ctx context.Context, contentTypeSlug, loc
 	return uc.Unpublish(ctx, contentTypeSlug, drafts[0].DocumentID, locale)
 }
 
-func (uc *UseCase) GetAllPaginated(ctx context.Context, contentTypeSlug string, start, size int, locale string, fields []entity.FieldDefinition) ([]*entity.Document, []string, int64, error) {
+func (uc *UseCase) GetAllPaginated(ctx context.Context, contentTypeSlug string, start, size int, locale string, fields []entity.FieldDefinition, orderBy string, sortDir int) ([]*entity.Document, []string, int64, error) {
 	locale, err := uc.resolveLocale(locale)
 	if err != nil {
 		return nil, nil, 0, err
 	}
-	drafts, total, err := uc.repo.FindDraftsByContentTypePaginated(ctx, contentTypeSlug, start, size, locale)
+	drafts, total, err := uc.repo.FindDraftsByContentTypePaginated(ctx, contentTypeSlug, start, size, locale, orderBy, sortDir)
 	if err != nil {
 		return nil, nil, 0, err
 	}
@@ -398,9 +398,6 @@ func (uc *UseCase) Delete(ctx context.Context, contentTypeSlug, documentID strin
 				}
 			}
 		}
-	}
-	if err := uc.mediaRepo.DeleteByDocumentRef(ctx, documentID); err != nil {
-		return err
 	}
 	for _, locale := range uc.supportedLocales {
 		if err := uc.repo.DeleteByDocumentID(ctx, contentTypeSlug, documentID, locale); err != nil {

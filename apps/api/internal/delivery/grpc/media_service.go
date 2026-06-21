@@ -44,16 +44,14 @@ func (s *MediaServiceServer) DeleteMedia(ctx context.Context, req *pb.DeleteMedi
 
 func toProtoMedia(a *entity.MediaAsset) *pb.MediaAsset {
 	return &pb.MediaAsset{
-		Id:            a.ID,
-		DocumentId:    a.DocumentID,
-		Url:           a.URL,
-		ThumbnailUrl:  a.ThumbnailURL,
-		PublicId:      a.PublicID,
-		FileName:      a.FileName,
-		FileExt:       a.FileExt,
-		Hash:          a.Hash,
-		ContentTypeId: a.ContentTypeID,
-		DocumentRef:   a.DocumentRef,
-		CreatedAt:     timestamppb.New(a.CreatedAt),
+		Id:           a.ID,
+		DocumentId:   a.DocumentID,
+		Url:          a.URL,
+		ThumbnailUrl: a.ThumbnailURL,
+		PublicId:     a.PublicID,
+		FileName:     a.FileName,
+		FileExt:      a.FileExt,
+		Hash:         a.Hash,
+		CreatedAt:    timestamppb.New(a.CreatedAt),
 	}
 }

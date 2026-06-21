@@ -12,7 +12,7 @@ import (
 )
 
 type mediaUseCase interface {
-	Upload(ctx context.Context, file io.Reader, filename, documentRef, contentTypeID string) (*entity.MediaAsset, error)
+	Upload(ctx context.Context, file io.Reader, filename string) (*entity.MediaAsset, error)
 	List(ctx context.Context, page, limit int) ([]*entity.MediaAsset, int64, error)
 	Delete(ctx context.Context, id string) error
 }
@@ -70,10 +70,7 @@ func (h *MediaHandler) Upload(c *gin.Context) {
 	}
 	defer file.Close()
 
-	documentRef := c.PostForm("documentRef")
-	contentTypeID := c.PostForm("contentTypeId")
-
-	asset, err := h.uc.Upload(c.Request.Context(), file, fileHeader.Filename, documentRef, contentTypeID)
+	asset, err := h.uc.Upload(c.Request.Context(), file, fileHeader.Filename)
 	if err != nil {
 		ginWriteErr(c, err)
 		return

@@ -73,22 +73,13 @@ func (r *mediaAssetRepository) FindAll(ctx context.Context, page, limit int) ([]
 	return results, total, nil
 }
 
-func (r *mediaAssetRepository) FindByDocumentRef(ctx context.Context, documentRef string) ([]*entity.MediaAsset, error) {
-	cursor, err := r.col.Find(ctx, bson.M{"documentRef": documentRef})
-	if err != nil {
-		return nil, err
+func (r *mediaAssetRepository) FindByDocumentID(ctx context.Context, documentID string) (*entity.MediaAsset, error) {
+	var asset entity.MediaAsset
+	err := r.col.FindOne(ctx, bson.M{"documentId": documentID}).Decode(&asset)
+	if err == mongo.ErrNoDocuments {
+		return nil, pkgerrors.ErrNotFound
 	}
-	defer cursor.Close(ctx)
-	var results []*entity.MediaAsset
-	if err := cursor.All(ctx, &results); err != nil {
-		return nil, err
-	}
-	return results, nil
-}
-
-func (r *mediaAssetRepository) DeleteByDocumentRef(ctx context.Context, documentRef string) error {
-	_, err := r.col.DeleteMany(ctx, bson.M{"documentRef": documentRef})
-	return err
+	return &asset, err
 }
 
 func (r *mediaAssetRepository) Delete(ctx context.Context, id string) error {
