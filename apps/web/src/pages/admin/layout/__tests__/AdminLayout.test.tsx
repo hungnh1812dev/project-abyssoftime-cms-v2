@@ -5,7 +5,7 @@ import MockAdapter from 'axios-mock-adapter'
 import { api, setAccessToken, getAccessToken } from '@/lib/api'
 import { renderWithProviders } from '@/test-utils'
 import { AuthProvider } from '@/context/AuthContext'
-import { Sidebar } from '@/pages/admin/layout/Sidebar'
+import { SidebarShell, SidebarProvider } from '@/components/sidebar'
 import { TopBar } from '@/pages/admin/layout/TopBar'
 import type { ContentType } from '@/types/cms'
 
@@ -39,7 +39,9 @@ function renderSidebar(token = SUPER_ADMIN_TOKEN) {
   mock.onPost('/auth/refresh').reply(200, { accessToken: token })
   return renderWithProviders(
     <AuthProvider>
-      <Sidebar />
+      <SidebarProvider>
+        <SidebarShell />
+      </SidebarProvider>
     </AuthProvider>,
     { initialEntries: ['/admin'] },
   )
