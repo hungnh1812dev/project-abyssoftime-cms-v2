@@ -2,6 +2,7 @@ package gormdb
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -11,27 +12,38 @@ import (
 	pkgerrors "project-abyssoftime-cms-v2/api/pkg/errors"
 )
 
-func setupDocDB(t *testing.T) *gorm.DB {
+func ptrTime(t time.Time) *time.Time { return &t }
+
+var testFields = []entity.FieldDefinition{
+	{Name: "title", Type: "text"},
+	{Name: "body", Type: "richtext"},
+}
+
+func setupDocDB(t *testing.T, slugs ...string) *gorm.DB {
 	t.Helper()
 	db, err := NewClient("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
-	if err := db.AutoMigrate(&entity.Document{}); err != nil {
-		t.Fatalf("AutoMigrate: %v", err)
+	repo := NewDocumentRepository(db)
+	ctx := context.Background()
+	for _, slug := range slugs {
+		if err := repo.EnsureCollection(ctx, slug, testFields); err != nil {
+			t.Fatalf("EnsureCollection(%s): %v", slug, err)
+		}
 	}
 	return db
 }
 
 func TestDocumentRepository_UpsertDraft_And_FindDraft(t *testing.T) {
-	db := setupDocDB(t)
+	db := setupDocDB(t, "blog")
 	repo := NewDocumentRepository(db)
 	ctx := context.Background()
 
 	doc := &entity.Document{
 		DocumentID: "d1",
 		Version:    entity.VersionDraft,
-		Data:       map[string]any{"title": "Hello"},
+		Fields:       map[string]any{"title": "Hello"},
 		Locale:     "en",
 		CreatedAt:  time.Now().UTC(),
 		UpdatedAt:  time.Now().UTC(),
@@ -47,39 +59,39 @@ func TestDocumentRepository_UpsertDraft_And_FindDraft(t *testing.T) {
 	if found.DocumentID != "d1" {
 		t.Errorf("DocumentID = %q, want %q", found.DocumentID, "d1")
 	}
-	title, _ := found.Data["title"].(string)
+	title, _ := found.Fields["title"].(string)
 	if title != "Hello" {
 		t.Errorf("Data.title = %q, want %q", title, "Hello")
 	}
 }
 
 func TestDocumentRepository_UpsertDraft_Updates(t *testing.T) {
-	db := setupDocDB(t)
+	db := setupDocDB(t, "blog")
 	repo := NewDocumentRepository(db)
 	ctx := context.Background()
 
 	doc := &entity.Document{
 		DocumentID: "d1", Version: entity.VersionDraft,
-		Data: map[string]any{"title": "v1"}, Locale: "en",
+		Fields: map[string]any{"title": "v1"}, Locale: "en",
 		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
 	}
 	_ = repo.UpsertDraft(ctx, "blog", doc)
 
-	doc.Data = map[string]any{"title": "v2"}
+	doc.Fields = map[string]any{"title": "v2"}
 	doc.UpdatedAt = time.Now().UTC()
 	if err := repo.UpsertDraft(ctx, "blog", doc); err != nil {
 		t.Fatalf("UpsertDraft update: %v", err)
 	}
 
 	found, _ := repo.FindDraftByDocumentID(ctx, "blog", "d1", "en")
-	title, _ := found.Data["title"].(string)
+	title, _ := found.Fields["title"].(string)
 	if title != "v2" {
 		t.Errorf("Data.title = %q, want %q", title, "v2")
 	}
 }
 
 func TestDocumentRepository_FindDraft_NotFound(t *testing.T) {
-	db := setupDocDB(t)
+	db := setupDocDB(t, "blog")
 	repo := NewDocumentRepository(db)
 
 	_, err := repo.FindDraftByDocumentID(context.Background(), "blog", "nope", "en")
@@ -89,15 +101,15 @@ func TestDocumentRepository_FindDraft_NotFound(t *testing.T) {
 }
 
 func TestDocumentRepository_UpsertPublished_And_FindPublished(t *testing.T) {
-	db := setupDocDB(t)
+	db := setupDocDB(t, "blog")
 	repo := NewDocumentRepository(db)
 	ctx := context.Background()
 
 	doc := &entity.Document{
 		DocumentID: "d1", Version: entity.VersionPublished,
-		Data: map[string]any{"title": "Pub"}, Locale: "en",
+		Fields: map[string]any{"title": "Pub"}, Locale: "en",
 		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
-		PublishedAt: time.Now().UTC(), PublishedBy: "admin",
+		PublishedAt: ptrTime(time.Now().UTC()), PublishedBy: "admin",
 	}
 	if err := repo.UpsertPublished(ctx, "blog", doc); err != nil {
 		t.Fatalf("UpsertPublished: %v", err)
@@ -113,15 +125,15 @@ func TestDocumentRepository_UpsertPublished_And_FindPublished(t *testing.T) {
 }
 
 func TestDocumentRepository_FindDraftsByContentTypePaginated(t *testing.T) {
-	db := setupDocDB(t)
+	db := setupDocDB(t, "blog")
 	repo := NewDocumentRepository(db)
 	ctx := context.Background()
 
 	for i := 0; i < 5; i++ {
 		doc := &entity.Document{
-			DocumentID: "d" + string(rune('0'+i)),
+			DocumentID: fmt.Sprintf("d%d", i),
 			Version:    entity.VersionDraft,
-			Data:       map[string]any{"i": i},
+			Fields:     map[string]any{"title": fmt.Sprintf("Post %d", i)},
 			Locale:     "en",
 			CreatedAt:  time.Now().UTC().Add(time.Duration(i) * time.Second),
 			UpdatedAt:  time.Now().UTC(),
@@ -129,7 +141,7 @@ func TestDocumentRepository_FindDraftsByContentTypePaginated(t *testing.T) {
 		_ = repo.UpsertDraft(ctx, "blog", doc)
 	}
 
-	docs, total, err := repo.FindDraftsByContentTypePaginated(ctx, "blog", 0, 2, "en")
+	docs, total, err := repo.FindDraftsByContentTypePaginated(ctx, "blog", 0, 2, "en", "createdAt", -1)
 	if err != nil {
 		t.Fatalf("FindDraftsByContentTypePaginated: %v", err)
 	}
@@ -142,14 +154,14 @@ func TestDocumentRepository_FindDraftsByContentTypePaginated(t *testing.T) {
 }
 
 func TestDocumentRepository_FindPublishedByDocumentIDs(t *testing.T) {
-	db := setupDocDB(t)
+	db := setupDocDB(t, "blog")
 	repo := NewDocumentRepository(db)
 	ctx := context.Background()
 
 	for _, id := range []string{"d1", "d2", "d3"} {
 		doc := &entity.Document{
 			DocumentID: id, Version: entity.VersionPublished,
-			Data: map[string]any{}, Locale: "en",
+			Fields: map[string]any{}, Locale: "en",
 			CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
 		}
 		_ = repo.UpsertPublished(ctx, "blog", doc)
@@ -165,13 +177,13 @@ func TestDocumentRepository_FindPublishedByDocumentIDs(t *testing.T) {
 }
 
 func TestDocumentRepository_DeleteByDocumentID(t *testing.T) {
-	db := setupDocDB(t)
+	db := setupDocDB(t, "blog")
 	repo := NewDocumentRepository(db)
 	ctx := context.Background()
 
 	doc := &entity.Document{
 		DocumentID: "d1", Version: entity.VersionDraft,
-		Data: map[string]any{}, Locale: "en",
+		Fields: map[string]any{}, Locale: "en",
 		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
 	}
 	_ = repo.UpsertDraft(ctx, "blog", doc)
@@ -187,20 +199,20 @@ func TestDocumentRepository_DeleteByDocumentID(t *testing.T) {
 }
 
 func TestDocumentRepository_DeleteAllByContentType(t *testing.T) {
-	db := setupDocDB(t)
+	db := setupDocDB(t, "blog", "other")
 	repo := NewDocumentRepository(db)
 	ctx := context.Background()
 
 	for _, id := range []string{"d1", "d2"} {
 		_ = repo.UpsertDraft(ctx, "blog", &entity.Document{
 			DocumentID: id, Version: entity.VersionDraft,
-			Data: map[string]any{}, Locale: "en",
+			Fields: map[string]any{}, Locale: "en",
 			CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
 		})
 	}
 	_ = repo.UpsertDraft(ctx, "other", &entity.Document{
 		DocumentID: "d3", Version: entity.VersionDraft,
-		Data: map[string]any{}, Locale: "en",
+		Fields: map[string]any{}, Locale: "en",
 		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
 	})
 
@@ -208,41 +220,65 @@ func TestDocumentRepository_DeleteAllByContentType(t *testing.T) {
 		t.Fatalf("DeleteAllByContentType: %v", err)
 	}
 
-	docs, total, _ := repo.FindDraftsByContentTypePaginated(ctx, "blog", 0, 100, "en")
+	docs, total, _ := repo.FindDraftsByContentTypePaginated(ctx, "blog", 0, 100, "en", "createdAt", -1)
 	if total != 0 || len(docs) != 0 {
 		t.Errorf("blog docs after delete: total=%d, len=%d", total, len(docs))
 	}
 
-	docs, total, _ = repo.FindDraftsByContentTypePaginated(ctx, "other", 0, 100, "en")
+	docs, total, _ = repo.FindDraftsByContentTypePaginated(ctx, "other", 0, 100, "en", "createdAt", -1)
 	if total != 1 {
 		t.Errorf("other docs after delete: total=%d, want 1", total)
 	}
 }
 
-func TestDocumentRepository_EnsureCollection_NoOp(t *testing.T) {
-	db := setupDocDB(t)
+func TestDocumentRepository_EnsureCollection_CreatesTable(t *testing.T) {
+	db, err := NewClient("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
 	repo := NewDocumentRepository(db)
-	if err := repo.EnsureCollection(context.Background(), "anything"); err != nil {
-		t.Errorf("EnsureCollection: %v", err)
+	ctx := context.Background()
+
+	if err := repo.EnsureCollection(ctx, "blog-posts", testFields); err != nil {
+		t.Fatalf("EnsureCollection: %v", err)
+	}
+
+	if !db.Migrator().HasTable(documentTableName("blog-posts")) {
+		t.Error("expected table documents_blog_posts to exist")
+	}
+
+	// idempotent
+	if err := repo.EnsureCollection(ctx, "blog-posts", testFields); err != nil {
+		t.Fatalf("EnsureCollection (2nd call): %v", err)
 	}
 }
 
-func TestDocumentRepository_DropCollection_NoOp(t *testing.T) {
-	db := setupDocDB(t)
+func TestDocumentRepository_DropCollection_DropsTable(t *testing.T) {
+	db, err := NewClient("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
 	repo := NewDocumentRepository(db)
-	if err := repo.DropCollection(context.Background(), "anything"); err != nil {
-		t.Errorf("DropCollection: %v", err)
+	ctx := context.Background()
+
+	_ = repo.EnsureCollection(ctx, "blog-posts", testFields)
+	if err := repo.DropCollection(ctx, "blog-posts"); err != nil {
+		t.Fatalf("DropCollection: %v", err)
+	}
+
+	if db.Migrator().HasTable(documentTableName("blog-posts")) {
+		t.Error("expected table documents_blog_posts to not exist after drop")
 	}
 }
 
 func TestDocumentRepository_FindDraftsByContentType(t *testing.T) {
-	db := setupDocDB(t)
+	db := setupDocDB(t, "blog")
 	repo := NewDocumentRepository(db)
 	ctx := context.Background()
 
 	_ = repo.UpsertDraft(ctx, "blog", &entity.Document{
 		DocumentID: "d1", Version: entity.VersionDraft,
-		Data: map[string]any{}, Locale: "en",
+		Fields: map[string]any{}, Locale: "en",
 		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
 	})
 
@@ -256,13 +292,13 @@ func TestDocumentRepository_FindDraftsByContentType(t *testing.T) {
 }
 
 func TestDocumentRepository_DeletePublishedByDocumentID(t *testing.T) {
-	db := setupDocDB(t)
+	db := setupDocDB(t, "blog")
 	repo := NewDocumentRepository(db)
 	ctx := context.Background()
 
 	_ = repo.UpsertPublished(ctx, "blog", &entity.Document{
 		DocumentID: "d1", Version: entity.VersionPublished,
-		Data: map[string]any{}, Locale: "en",
+		Fields: map[string]any{}, Locale: "en",
 		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
 	})
 

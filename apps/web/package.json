@@ -13,7 +13,6 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",
-    "@ckeditor/ckeditor5-build-classic": "^41.4.2",
     "@ckeditor/ckeditor5-react": "^11.2.0",
     "@codemirror/lang-json": "^6.0.2",
     "@fontsource-variable/geist": "^5.2.9",
@@ -21,6 +20,7 @@
     "@tanstack/react-query": "^5.101.0",
     "@uiw/react-codemirror": "^4.25.10",
     "axios": "^1.17.0",
+    "ckeditor5": "^48.2.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.18.0",

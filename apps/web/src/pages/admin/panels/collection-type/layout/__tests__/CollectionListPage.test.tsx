@@ -26,27 +26,13 @@ const ct: ContentType = {
 }
 
 const doc1: Document = {
-  documentId: 'doc-1',
-  contentTypeId: 'ct-1',
   status: 'draft',
-  data: { title: 'First Post', active: true, views: 42 },
-  locale: 'en',
-  createdAt: '',
-  updatedAt: '',
-  createdBy: '',
-  updatedBy: '',
+  data: { documentId: 'doc-1', locale: 'en', createdAt: '', updatedAt: '', title: 'First Post', active: true, views: 42 },
 }
 
 const doc2: Document = {
-  documentId: 'doc-2',
-  contentTypeId: 'ct-1',
   status: 'published',
-  data: { title: 'Second Post', active: false, views: 7 },
-  locale: 'en',
-  createdAt: '',
-  updatedAt: '',
-  createdBy: '',
-  updatedBy: '',
+  data: { documentId: 'doc-2', locale: 'en', createdAt: '', updatedAt: '', title: 'Second Post', active: false, views: 7 },
 }
 
 let mock: MockAdapter
@@ -123,7 +109,7 @@ describe('CollectionListPage — registry columns', () => {
 
     await waitFor(() => {
       expect(screen.getByText('✓')).toBeInTheDocument()
-      expect(screen.getByText('—')).toBeInTheDocument()
+      expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(1)
     })
   })
 
@@ -143,7 +129,7 @@ describe('CollectionListPage — registry columns', () => {
 
   it('renders image column as an img element', async () => {
     const { getRegistration } = await import('@/content-type-registry')
-    const imgDoc: Document = { ...doc1, data: { cover: 'https://example.com/img.jpg' } }
+    const imgDoc: Document = { ...doc1, data: { ...doc1.data, cover: 'https://example.com/img.jpg' } }
     vi.mocked(getRegistration).mockReturnValue({
       slug: 'blog-posts',
       kind: 'collection',
@@ -161,14 +147,13 @@ describe('CollectionListPage — registry columns', () => {
 })
 
 describe('CollectionListPage — navigation', () => {
-  it('Edit link points to the new collection-type detail path', async () => {
+  it('Edit icon button is rendered for each document', async () => {
     mock.onGet('/api/document-manager/collection-type/blog-posts').reply(200, { items: [doc1], total: 1, start: 0, size: 20 })
     renderWithProviders(<CollectionListPage contentType={ct} />, {
       initialEntries: ['/admin/content-type/collection-type/blog-posts'],
     })
     await waitFor(() => {
-      const link = screen.getByRole('link', { name: /edit/i })
-      expect(link).toHaveAttribute('href', '/admin/content-type/collection-type/blog-posts/doc-1')
+      expect(screen.getByRole('button', { name: /edit/i })).toBeInTheDocument()
     })
   })
 

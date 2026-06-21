@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
@@ -25,9 +24,7 @@ func NewRoleRepository(db *mongo.Database) repository.RoleRepository {
 }
 
 func (r *roleRepository) Create(ctx context.Context, role *entity.RoleEntity) error {
-	if role.ID == "" {
-		role.ID = primitive.NewObjectID().Hex()
-	}
+
 	if role.CreatedAt.IsZero() {
 		role.CreatedAt = time.Now().UTC()
 	}

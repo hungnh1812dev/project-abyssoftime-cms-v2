@@ -113,7 +113,7 @@ type AccessTokenRepository interface {
 |---|---|
 | `Create(ctx, email, roleID, createdBy)` | Create invite with unique token |
 | `List(ctx)` | List all invites |
-| `Accept(ctx, token, password)` | Accept invite — create user with the invited role |
+| `Accept(ctx, token, password, displayName)` | Accept invite — create user with the invited role; `displayName` required |
 | `Revoke(ctx, id)` | Delete/revoke an invite |
 
 ### AccessToken UseCase (`usecase/access_token/`)
@@ -200,3 +200,4 @@ The invite accept route is under `/auth/` (public — no auth required).
 | v1.1 | Invite system (create, accept, revoke) | §1 |
 | v1.2 | Access token management | §1 |
 | v1.3 | Permission-based access (`users:manage`, `access_tokens:manage`) | §12 |
+| v1.4 | Invite accept requires `displayName` parameter; user list includes `displayName` | collection-list-enhancements |

@@ -16,13 +16,18 @@ function serialize(value: unknown): string {
 function InnerJsonInput({ field }: { field: { value: unknown; onChange: (v: unknown) => void } }) {
   const [rawValue, setRawValue] = useState(serialize(field.value));
   const [syntaxError, setSyntaxError] = useState<string | null>(null);
-  const fieldValue = field.value;
+  const [editCount, setEditCount] = useState(0);
+  const [syncedAt, setSyncedAt] = useState(0);
 
-  const [prevFieldValue, setPrevFieldValue] = useState(field.value);
+  const [prevSerialized, setPrevSerialized] = useState(() => serialize(field.value));
+  const currentSerialized = serialize(field.value);
 
-  if (fieldValue !== prevFieldValue) {
-    setPrevFieldValue(fieldValue);
-    setRawValue(serialize(fieldValue));
+  if (currentSerialized !== prevSerialized) {
+    setPrevSerialized(currentSerialized);
+    if (editCount === syncedAt) {
+      setRawValue(currentSerialized);
+    }
+    setSyncedAt(editCount);
   }
 
   return (
@@ -34,6 +39,7 @@ function InnerJsonInput({ field }: { field: { value: unknown; onChange: (v: unkn
           minHeight="15em"
           onChange={(val) => {
             setRawValue(val);
+            setEditCount((c) => c + 1);
             if (val.trim() === '') {
               setSyntaxError(null);
               field.onChange(null);

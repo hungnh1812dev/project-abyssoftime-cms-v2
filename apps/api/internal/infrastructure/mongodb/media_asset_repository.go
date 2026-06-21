@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
@@ -25,9 +24,7 @@ func NewMediaAssetRepository(db *mongo.Database) repository.MediaAssetRepository
 }
 
 func (r *mediaAssetRepository) Create(ctx context.Context, asset *entity.MediaAsset) error {
-	if asset.ID == "" {
-		asset.ID = primitive.NewObjectID().Hex()
-	}
+
 	if asset.CreatedAt.IsZero() {
 		asset.CreatedAt = time.Now().UTC()
 	}
@@ -73,22 +70,13 @@ func (r *mediaAssetRepository) FindAll(ctx context.Context, page, limit int) ([]
 	return results, total, nil
 }
 
-func (r *mediaAssetRepository) FindByDocumentRef(ctx context.Context, documentRef string) ([]*entity.MediaAsset, error) {
-	cursor, err := r.col.Find(ctx, bson.M{"documentRef": documentRef})
-	if err != nil {
-		return nil, err
+func (r *mediaAssetRepository) FindByDocumentID(ctx context.Context, documentID string) (*entity.MediaAsset, error) {
+	var asset entity.MediaAsset
+	err := r.col.FindOne(ctx, bson.M{"documentId": documentID}).Decode(&asset)
+	if err == mongo.ErrNoDocuments {
+		return nil, pkgerrors.ErrNotFound
 	}
-	defer cursor.Close(ctx)
-	var results []*entity.MediaAsset
-	if err := cursor.All(ctx, &results); err != nil {
-		return nil, err
-	}
-	return results, nil
-}
-
-func (r *mediaAssetRepository) DeleteByDocumentRef(ctx context.Context, documentRef string) error {
-	_, err := r.col.DeleteMany(ctx, bson.M{"documentRef": documentRef})
-	return err
+	return &asset, err
 }
 
 func (r *mediaAssetRepository) Delete(ctx context.Context, id string) error {

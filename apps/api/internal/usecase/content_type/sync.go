@@ -14,20 +14,18 @@ import (
 // takes a documentID (not a single record's own Mongo _id).
 type EntryManager interface {
 	GetAll(ctx context.Context, contentTypeSlug string) ([]*entity.Document, error)
-	Delete(ctx context.Context, contentTypeSlug, documentID string) error
+	Delete(ctx context.Context, contentTypeSlug, documentID string, fields []entity.FieldDefinition) error
 }
 
-// Syncer reconciles content-type JSON definitions (the source of truth)
-// against the ContentType records in MongoDB, and manages per-content-type
-// document collections.
 type Syncer struct {
 	*UseCase
-	entries EntryManager
-	docRepo repository.DocumentRepository
+	entries  EntryManager
+	docRepo  repository.DocumentRepository
+	compRepo repository.ComponentRepository
 }
 
-func NewSyncer(uc *UseCase, entries EntryManager, docRepo repository.DocumentRepository) *Syncer {
-	return &Syncer{UseCase: uc, entries: entries, docRepo: docRepo}
+func NewSyncer(uc *UseCase, entries EntryManager, docRepo repository.DocumentRepository, compRepo repository.ComponentRepository) *Syncer {
+	return &Syncer{UseCase: uc, entries: entries, docRepo: docRepo, compRepo: compRepo}
 }
 
 func (s *Syncer) Sync(ctx context.Context, defs []ContentTypeDefinition) error {
@@ -68,10 +66,16 @@ func (s *Syncer) syncOne(ctx context.Context, def ContentTypeDefinition) error {
 		if err := s.Create(ctx, ct); err != nil {
 			return err
 		}
-		return s.docRepo.EnsureCollection(ctx, def.Slug)
+		if err := s.docRepo.EnsureCollection(ctx, def.Slug, def.Fields); err != nil {
+			return err
+		}
+		return s.ensureComponentTables(ctx, def.Slug, def.Fields)
 	}
 
-	if err := s.docRepo.EnsureCollection(ctx, current.Slug); err != nil {
+	if err := s.docRepo.EnsureCollection(ctx, current.Slug, def.Fields); err != nil {
+		return err
+	}
+	if err := s.ensureComponentTables(ctx, current.Slug, def.Fields); err != nil {
 		return err
 	}
 
@@ -83,6 +87,20 @@ func (s *Syncer) syncOne(ctx context.Context, def ContentTypeDefinition) error {
 	current.Fields = def.Fields
 	current.ListFields = def.ListFields
 	return s.Update(ctx, current)
+}
+
+func (s *Syncer) ensureComponentTables(ctx context.Context, slug string, fields []entity.FieldDefinition) error {
+	if s.compRepo == nil {
+		return nil
+	}
+	for _, f := range fields {
+		if f.Type == "component" {
+			if err := s.compRepo.EnsureCollection(ctx, slug, f.Name, f.Fields); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func stringSliceEqual(a, b []string) bool {
@@ -118,12 +136,21 @@ func (s *Syncer) removeContentType(ctx context.Context, ct *entity.ContentType) 
 		return err
 	}
 	for _, doc := range docs {
-		if err := s.entries.Delete(ctx, ct.Slug, doc.DocumentID); err != nil {
+		if err := s.entries.Delete(ctx, ct.Slug, doc.DocumentID, ct.Fields); err != nil {
 			return err
+		}
+	}
+	if s.compRepo != nil {
+		for _, f := range ct.Fields {
+			if f.Type == "component" {
+				if err := s.compRepo.DropCollection(ctx, ct.Slug, f.Name); err != nil {
+					return err
+				}
+			}
 		}
 	}
 	if err := s.docRepo.DropCollection(ctx, ct.Slug); err != nil {
 		return err
 	}
-	return s.UseCase.Delete(ctx, ct.ID)
+	return s.UseCase.Delete(ctx, ct.DocumentID)
 }

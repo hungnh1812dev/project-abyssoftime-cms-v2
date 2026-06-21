@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -27,6 +28,11 @@ func ginWriteErr(c *gin.Context, err error) {
 	case pkgerrors.Is(err, pkgerrors.ErrValidation):
 		ginWriteError(c, http.StatusUnprocessableEntity, err.Error())
 	default:
+		if c.Request != nil {
+			log.Printf("[ERROR] %s %s: %v", c.Request.Method, c.Request.URL.Path, err)
+		} else {
+			log.Printf("[ERROR] %v", err)
+		}
 		ginWriteError(c, http.StatusInternalServerError, "internal server error")
 	}
 }

@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, Navigate, Link } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
 interface RegisterFields {
+  displayName: string
   email: string
   password: string
 }
@@ -52,6 +53,10 @@ export function RegisterPage() {
     )
   }
 
+  if (adminExists) {
+    return <Navigate to="/login" replace />
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center">
       <div className="w-full max-w-sm space-y-6 px-4">
@@ -73,6 +78,21 @@ export function RegisterPage() {
         )}
 
         <form onSubmit={handleSubmit((data) => mutation.mutate(data))} className="space-y-4" noValidate>
+          <div className="space-y-1">
+            <Label htmlFor="displayName">Display Name</Label>
+            <Input
+              id="displayName"
+              type="text"
+              autoComplete="name"
+              aria-invalid={!!errors.displayName}
+              {...register('displayName', {
+                required: 'Display name is required',
+                maxLength: { value: 100, message: 'Display name must be at most 100 characters' },
+              })}
+            />
+            {errors.displayName && <p className="text-destructive text-xs">{errors.displayName.message}</p>}
+          </div>
+
           <div className="space-y-1">
             <Label htmlFor="email">Email</Label>
             <Input

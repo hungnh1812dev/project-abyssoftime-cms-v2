@@ -26,41 +26,47 @@ type mockDocumentUC struct {
 	saveSingleTypeFn      func(ctx context.Context, contentTypeSlug string, data map[string]any, locale, userID string) (*entity.Document, error)
 	publishSingleTypeFn   func(ctx context.Context, contentTypeSlug, locale, userID string) error
 	unpublishSingleTypeFn func(ctx context.Context, contentTypeSlug, locale string) error
-	getAllPaginatedFn      func(ctx context.Context, contentTypeSlug string, start, size int, locale string) ([]*entity.Document, []string, int64, error)
+	getAllPaginatedFn      func(ctx context.Context, contentTypeSlug string, start, size int, locale string, orderBy string, sortDir int) ([]*entity.Document, []string, int64, error)
 }
 
-func (m *mockDocumentUC) Save(ctx context.Context, s string, d *entity.Document, u string) (*entity.Document, error) {
+func (m *mockDocumentUC) Save(ctx context.Context, s string, d *entity.Document, _ []entity.FieldDefinition, u string) (*entity.Document, error) {
 	return m.saveFn(ctx, s, d, u)
 }
-func (m *mockDocumentUC) GetForEdit(ctx context.Context, s, d, l string) (*entity.Document, string, error) {
+func (m *mockDocumentUC) GetForEdit(ctx context.Context, s, d, l string, _ []entity.FieldDefinition) (*entity.Document, string, error) {
 	return m.getForEditFn(ctx, s, d, l)
 }
-func (m *mockDocumentUC) GetPublished(ctx context.Context, s, d, l string) (*entity.Document, error) {
+func (m *mockDocumentUC) GetPublished(ctx context.Context, s, d, l string, _ []entity.FieldDefinition) (*entity.Document, error) {
 	return m.getPublishedFn(ctx, s, d, l)
 }
-func (m *mockDocumentUC) Publish(ctx context.Context, s, d, l, u string) error {
+func (m *mockDocumentUC) Publish(ctx context.Context, s, d, l string, _ []entity.FieldDefinition, u string) error {
 	return m.publishFn(ctx, s, d, l, u)
 }
 func (m *mockDocumentUC) Unpublish(ctx context.Context, s, d, l string) error {
 	return m.unpublishFn(ctx, s, d, l)
 }
-func (m *mockDocumentUC) Delete(ctx context.Context, s, d string) error {
+func (m *mockDocumentUC) Delete(ctx context.Context, s, d string, _ []entity.FieldDefinition) error {
 	return m.deleteFn(ctx, s, d)
 }
-func (m *mockDocumentUC) GetSingleType(ctx context.Context, s, l string) (*entity.Document, string, error) {
+func (m *mockDocumentUC) GetSingleType(ctx context.Context, s, l string, _ []entity.FieldDefinition) (*entity.Document, string, error) {
 	return m.getSingleTypeFn(ctx, s, l)
 }
-func (m *mockDocumentUC) SaveSingleType(ctx context.Context, s string, data map[string]any, l, u string) (*entity.Document, error) {
+func (m *mockDocumentUC) SaveSingleType(ctx context.Context, s string, data map[string]any, l string, _ []entity.FieldDefinition, u string) (*entity.Document, error) {
 	return m.saveSingleTypeFn(ctx, s, data, l, u)
 }
-func (m *mockDocumentUC) PublishSingleType(ctx context.Context, s, l, u string) error {
+func (m *mockDocumentUC) PublishSingleType(ctx context.Context, s, l string, _ []entity.FieldDefinition, u string) error {
 	return m.publishSingleTypeFn(ctx, s, l, u)
 }
 func (m *mockDocumentUC) UnpublishSingleType(ctx context.Context, s, l string) error {
 	return m.unpublishSingleTypeFn(ctx, s, l)
 }
-func (m *mockDocumentUC) GetAllPaginated(ctx context.Context, s string, start, size int, l string) ([]*entity.Document, []string, int64, error) {
-	return m.getAllPaginatedFn(ctx, s, start, size, l)
+func (m *mockDocumentUC) GetAllPaginated(ctx context.Context, s string, start, size int, l string, _ []entity.FieldDefinition, orderBy string, sortDir int) ([]*entity.Document, []string, int64, error) {
+	return m.getAllPaginatedFn(ctx, s, start, size, l, orderBy, sortDir)
+}
+
+type mockUserResolver struct{}
+
+func (m *mockUserResolver) FindByIDs(_ context.Context, _ []string) ([]*entity.User, error) {
+	return nil, nil
 }
 
 type mockCTUC struct {
@@ -75,7 +81,7 @@ func newHandler(uc *mockDocumentUC) *handler.DocumentHandler {
 	ctUC := &mockCTUC{findBySlugFn: func(_ context.Context, _ string) (*entity.ContentType, error) {
 		return &entity.ContentType{ListFields: []string{"title"}}, nil
 	}}
-	return handler.NewDocumentHandler(uc, ctUC)
+	return handler.NewDocumentHandler(uc, ctUC, &mockUserResolver{})
 }
 
 func TestDocumentHandler_GetSingleType(t *testing.T) {
@@ -184,9 +190,9 @@ func TestDocumentHandler_ListCollection(t *testing.T) {
 
 	t.Run("returns paginated response with projected data", func(t *testing.T) {
 		uc := &mockDocumentUC{}
-		uc.getAllPaginatedFn = func(_ context.Context, _ string, _, _ int, _ string) ([]*entity.Document, []string, int64, error) {
+		uc.getAllPaginatedFn = func(_ context.Context, _ string, _, _ int, _, _ string, _ int) ([]*entity.Document, []string, int64, error) {
 			return []*entity.Document{
-				{DocumentID: "d1", Data: map[string]any{"title": "Post 1", "body": "full body"}, Locale: "en"},
+				{DocumentID: "d1", Fields: map[string]any{"title": "Post 1", "body": "full body"}, Locale: "en"},
 			}, []string{"draft"}, 5, nil
 		}
 		ctUC := &mockCTUC{findBySlugFn: func(_ context.Context, _ string) (*entity.ContentType, error) {
@@ -195,7 +201,7 @@ func TestDocumentHandler_ListCollection(t *testing.T) {
 				Fields:     []entity.FieldDefinition{{Name: "title", Type: "text"}, {Name: "body", Type: "richtext"}},
 			}, nil
 		}}
-		h := handler.NewDocumentHandler(uc, ctUC)
+		h := handler.NewDocumentHandler(uc, ctUC, &mockUserResolver{})
 
 		w := httptest.NewRecorder()
 		_, r := gin.CreateTestContext(w)
@@ -228,7 +234,7 @@ func TestDocumentHandler_ListCollection(t *testing.T) {
 	t.Run("defaults pagination params", func(t *testing.T) {
 		var gotStart, gotSize int
 		uc := &mockDocumentUC{}
-		uc.getAllPaginatedFn = func(_ context.Context, _ string, start, size int, _ string) ([]*entity.Document, []string, int64, error) {
+		uc.getAllPaginatedFn = func(_ context.Context, _ string, start, size int, _, _ string, _ int) ([]*entity.Document, []string, int64, error) {
 			gotStart = start
 			gotSize = size
 			return nil, nil, 0, nil
@@ -252,7 +258,7 @@ func TestDocumentHandler_ListCollection(t *testing.T) {
 	t.Run("caps size at 100", func(t *testing.T) {
 		var gotSize int
 		uc := &mockDocumentUC{}
-		uc.getAllPaginatedFn = func(_ context.Context, _ string, _, size int, _ string) ([]*entity.Document, []string, int64, error) {
+		uc.getAllPaginatedFn = func(_ context.Context, _ string, _, size int, _, _ string, _ int) ([]*entity.Document, []string, int64, error) {
 			gotSize = size
 			return nil, nil, 0, nil
 		}

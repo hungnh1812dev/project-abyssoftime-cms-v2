@@ -26,14 +26,15 @@ func NewUserHandler(uc userUseCase) *UserHandler {
 }
 
 type userResponse struct {
-	ID     string `json:"id"`
-	Email  string `json:"email"`
-	Role   string `json:"role"`
-	RoleID string `json:"roleId"`
+	ID          string `json:"id"`
+	Email       string `json:"email"`
+	DisplayName string `json:"displayName"`
+	Role        string `json:"role"`
+	RoleID      string `json:"roleId"`
 }
 
 func toUserResponse(u *entity.User) userResponse {
-	return userResponse{ID: u.ID, Email: u.Email, Role: string(u.Role), RoleID: u.RoleID}
+	return userResponse{ID: u.DocumentID, Email: u.Email, DisplayName: u.DisplayName, Role: string(u.Role), RoleID: u.RoleID}
 }
 
 func (h *UserHandler) List(c *gin.Context) {

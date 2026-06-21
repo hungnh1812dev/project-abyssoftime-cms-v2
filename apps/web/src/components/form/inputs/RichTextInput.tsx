@@ -1,6 +1,21 @@
 import { Controller, type Control } from 'react-hook-form'
 import { CKEditor } from '@ckeditor/ckeditor5-react'
-import ClassicEditor from '@ckeditor/ckeditor5-build-classic'
+import {
+  ClassicEditor,
+  Essentials,
+  Paragraph,
+  Bold,
+  Italic,
+  Heading,
+  Link,
+  List,
+  BlockQuote,
+  Indent,
+  MediaEmbed,
+  Table,
+  TableToolbar,
+} from 'ckeditor5'
+import 'ckeditor5/ckeditor5.css'
 
 interface RichTextInputProps {
   name?: string
@@ -8,10 +23,19 @@ interface RichTextInputProps {
   toolbar?: string[]
 }
 
-// @ckeditor/ckeditor5-build-classic v41 types predate the react-wrapper v11
-// expectation of v42+. The runtime API is compatible; cast to satisfy tsc.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const Editor = ClassicEditor as any
+const DEFAULT_TOOLBAR = [
+  'heading', '|',
+  'bold', 'italic', 'link', '|',
+  'bulletedList', 'numberedList', '|',
+  'outdent', 'indent', '|',
+  'blockQuote', 'insertTable', 'mediaEmbed', '|',
+  'undo', 'redo',
+]
+
+const PLUGINS = [
+  Essentials, Paragraph, Bold, Italic, Heading, Link,
+  List, BlockQuote, Indent, MediaEmbed, Table, TableToolbar,
+]
 
 const minHeightStyle = '.ck-editor__editable_inline { min-height: 12em; }'
 
@@ -25,9 +49,13 @@ export function RichTextInput({ name, control, toolbar }: RichTextInputProps) {
         <>
           <style>{minHeightStyle}</style>
           <CKEditor
-            editor={Editor}
-            data={field.value as string}
-            config={toolbar ? { toolbar } : undefined}
+            editor={ClassicEditor}
+            data={(field.value as string) ?? ''}
+            config={{
+              licenseKey: 'GPL',
+              plugins: PLUGINS,
+              toolbar: toolbar ?? DEFAULT_TOOLBAR,
+            }}
             onChange={(_event, editor) => {
               field.onChange(editor.getData())
             }}

@@ -36,8 +36,8 @@ func TestContentTypeHandler_ListSummary(t *testing.T) {
 	uc := &mockContentTypeUC{}
 	uc.findAllFn = func(_ context.Context) ([]*entity.ContentType, error) {
 		return []*entity.ContentType{
-			{ID: "1", Name: "Blog", Slug: "blog", Kind: "collection"},
-			{ID: "2", Name: "Homepage", Slug: "homepage", Kind: "single"},
+			{DocumentID: "1", Name: "Blog", Slug: "blog", Kind: "collection"},
+			{DocumentID: "2", Name: "Homepage", Slug: "homepage", Kind: "single"},
 		}, nil
 	}
 	h := handler.NewContentTypeHandler(uc)
@@ -68,7 +68,7 @@ func TestContentTypeHandler_ListSummary_ExcludesFieldsAndTimestamps(t *testing.T
 	uc.findAllFn = func(_ context.Context) ([]*entity.ContentType, error) {
 		return []*entity.ContentType{
 			{
-				ID:   "1",
+				DocumentID: "1",
 				Name: "Blog",
 				Slug: "blog",
 				Kind: "collection",
@@ -123,7 +123,7 @@ func TestContentTypeHandler_Get(t *testing.T) {
 			identifier: "aabbccddeeff00112233aabb",
 			setupUC: func(m *mockContentTypeUC) {
 				m.findByIDFn = func(_ context.Context, id string) (*entity.ContentType, error) {
-					return &entity.ContentType{ID: id, Slug: "blog"}, nil
+					return &entity.ContentType{DocumentID: id, Slug: "blog"}, nil
 				}
 			},
 			wantStatus: http.StatusOK,
@@ -133,7 +133,7 @@ func TestContentTypeHandler_Get(t *testing.T) {
 			identifier: "blog",
 			setupUC: func(m *mockContentTypeUC) {
 				m.findBySlugFn = func(_ context.Context, slug string) (*entity.ContentType, error) {
-					return &entity.ContentType{ID: "abc", Slug: slug}, nil
+					return &entity.ContentType{DocumentID: "abc", Slug: slug}, nil
 				}
 			},
 			wantStatus: http.StatusOK,

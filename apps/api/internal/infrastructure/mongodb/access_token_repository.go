@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
@@ -25,9 +24,7 @@ func NewAccessTokenRepository(db *mongo.Database) repository.AccessTokenReposito
 }
 
 func (r *accessTokenRepository) Create(ctx context.Context, token *entity.AccessToken) error {
-	if token.ID == "" {
-		token.ID = primitive.NewObjectID().Hex()
-	}
+
 	if token.CreatedAt.IsZero() {
 		token.CreatedAt = time.Now().UTC()
 	}

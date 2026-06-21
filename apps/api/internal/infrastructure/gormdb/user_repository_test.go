@@ -28,8 +28,7 @@ func TestUserRepository_Create_And_FindByID(t *testing.T) {
 	ctx := context.Background()
 
 	user := &entity.User{
-		ID:           "u1",
-		DocumentID:   "doc1",
+		DocumentID: "doc1",
 		Email:        "test@example.com",
 		PasswordHash: "hash",
 		Role:         entity.RoleAdmin,
@@ -38,7 +37,7 @@ func TestUserRepository_Create_And_FindByID(t *testing.T) {
 		t.Fatalf("Create: %v", err)
 	}
 
-	found, err := repo.FindByID(ctx, "u1")
+	found, err := repo.FindByID(ctx, "doc1")
 	if err != nil {
 		t.Fatalf("FindByID: %v", err)
 	}
@@ -52,15 +51,15 @@ func TestUserRepository_FindByEmail(t *testing.T) {
 	repo := NewUserRepository(db)
 	ctx := context.Background()
 
-	user := &entity.User{ID: "u1", Email: "a@b.com", Role: entity.RoleGuest}
+	user := &entity.User{DocumentID: "u1", Email: "a@b.com", Role: entity.RoleGuest}
 	_ = repo.Create(ctx, user)
 
 	found, err := repo.FindByEmail(ctx, "a@b.com")
 	if err != nil {
 		t.Fatalf("FindByEmail: %v", err)
 	}
-	if found.ID != "u1" {
-		t.Errorf("ID = %q, want %q", found.ID, "u1")
+	if found.DocumentID != "u1" {
+		t.Errorf("DocumentID = %q, want %q", found.DocumentID, "u1")
 	}
 }
 
@@ -97,7 +96,7 @@ func TestUserRepository_HasSuperAdmin(t *testing.T) {
 		t.Error("expected false when no users exist")
 	}
 
-	_ = repo.Create(ctx, &entity.User{ID: "u1", DocumentID: "d1", Email: "admin@x.com", Role: entity.RoleAdmin})
+	_ = repo.Create(ctx, &entity.User{DocumentID: "d1", Email: "admin@x.com", Role: entity.RoleAdmin})
 
 	has, err = repo.HasSuperAdmin(ctx)
 	if err != nil {
@@ -107,7 +106,7 @@ func TestUserRepository_HasSuperAdmin(t *testing.T) {
 		t.Error("expected false when only admin exists (no super_admin)")
 	}
 
-	_ = repo.Create(ctx, &entity.User{ID: "u2", DocumentID: "d2", Email: "sa@x.com", Role: entity.RoleSuperAdmin})
+	_ = repo.Create(ctx, &entity.User{DocumentID: "d2", Email: "sa@x.com", Role: entity.RoleSuperAdmin})
 
 	has, err = repo.HasSuperAdmin(ctx)
 	if err != nil {
@@ -123,9 +122,9 @@ func TestUserRepository_FindAll(t *testing.T) {
 	repo := NewUserRepository(db)
 	ctx := context.Background()
 
-	_ = repo.Create(ctx, &entity.User{ID: "u1", DocumentID: "d1", Email: "a@x.com", Role: entity.RoleGuest})
-	_ = repo.Create(ctx, &entity.User{ID: "u2", DocumentID: "d2", Email: "b@x.com", Role: entity.RoleAdmin})
-	_ = repo.Create(ctx, &entity.User{ID: "u3", DocumentID: "d3", Email: "c@x.com", Role: entity.RoleEditor})
+	_ = repo.Create(ctx, &entity.User{DocumentID: "d1", Email: "a@x.com", Role: entity.RoleGuest})
+	_ = repo.Create(ctx, &entity.User{DocumentID: "d2", Email: "b@x.com", Role: entity.RoleAdmin})
+	_ = repo.Create(ctx, &entity.User{DocumentID: "d3", Email: "c@x.com", Role: entity.RoleEditor})
 
 	users, total, err := repo.FindAll(ctx, 1, 2)
 	if err != nil {
@@ -144,15 +143,15 @@ func TestUserRepository_Update(t *testing.T) {
 	repo := NewUserRepository(db)
 	ctx := context.Background()
 
-	_ = repo.Create(ctx, &entity.User{ID: "u1", DocumentID: "d1", Email: "a@x.com", Role: entity.RoleGuest})
+	_ = repo.Create(ctx, &entity.User{DocumentID: "d1", Email: "a@x.com", Role: entity.RoleGuest})
 
-	user, _ := repo.FindByID(ctx, "u1")
+	user, _ := repo.FindByID(ctx, "d1")
 	user.Role = entity.RoleEditor
 	if err := repo.Update(ctx, user); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
-	updated, _ := repo.FindByID(ctx, "u1")
+	updated, _ := repo.FindByID(ctx, "d1")
 	if updated.Role != entity.RoleEditor {
 		t.Errorf("role = %q, want %q", updated.Role, entity.RoleEditor)
 	}
@@ -163,13 +162,13 @@ func TestUserRepository_Delete(t *testing.T) {
 	repo := NewUserRepository(db)
 	ctx := context.Background()
 
-	_ = repo.Create(ctx, &entity.User{ID: "u1", DocumentID: "d1", Email: "a@x.com", Role: entity.RoleGuest})
+	_ = repo.Create(ctx, &entity.User{DocumentID: "d1", Email: "a@x.com", Role: entity.RoleGuest})
 
-	if err := repo.Delete(ctx, "u1"); err != nil {
+	if err := repo.Delete(ctx, "d1"); err != nil {
 		t.Fatalf("Delete: %v", err)
 	}
 
-	_, err := repo.FindByID(ctx, "u1")
+	_, err := repo.FindByID(ctx, "d1")
 	if !pkgerrors.Is(err, pkgerrors.ErrNotFound) {
 		t.Errorf("expected ErrNotFound after delete, got %v", err)
 	}

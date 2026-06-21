@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
@@ -25,9 +24,7 @@ func NewUserRepository(db *mongo.Database) repository.UserRepository {
 }
 
 func (r *userRepository) Create(ctx context.Context, user *entity.User) error {
-	if user.ID == "" {
-		user.ID = primitive.NewObjectID().Hex()
-	}
+
 	if user.CreatedAt.IsZero() {
 		user.CreatedAt = time.Now().UTC()
 	}
@@ -60,6 +57,23 @@ func (r *userRepository) FindByID(ctx context.Context, id string) (*entity.User,
 		return nil, err
 	}
 	return &user, nil
+}
+
+func (r *userRepository) FindByIDs(ctx context.Context, ids []string) ([]*entity.User, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	cursor, err := r.col.Find(ctx, bson.M{"_id": bson.M{"$in": ids}})
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var users []*entity.User
+	if err := cursor.All(ctx, &users); err != nil {
+		return nil, err
+	}
+	return users, nil
 }
 
 func (r *userRepository) HasSuperAdmin(ctx context.Context) (bool, error) {

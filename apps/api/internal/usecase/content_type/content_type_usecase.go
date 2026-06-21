@@ -36,8 +36,8 @@ func (uc *UseCase) Create(ctx context.Context, ct *entity.ContentType) error {
 	if existing != nil {
 		return pkgerrors.ErrConflict
 	}
-	if ct.ID == "" {
-		ct.ID = uuid.New().String()
+	if ct.DocumentID == "" {
+		ct.DocumentID = uuid.New().String()
 	}
 	return uc.repo.Create(ctx, ct)
 }

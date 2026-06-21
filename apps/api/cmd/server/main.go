@@ -158,9 +158,15 @@ func main() {
 		accessTokenRepo = mongodb.NewAccessTokenRepository(mongoDB)
 	}
 
+	// --- component repository (PostgreSQL only) ---
+	var compRepo repository.ComponentRepository
+	if isPostgres(cfg.DB.EntityDB.Document) {
+		compRepo = gormdb.NewComponentRepository(sqlDB)
+	}
+
 	authUC := auth.New(userRepo, roleRepo)
 	ctUC := contenttype.New(ctRepo)
-	documentUC := docuc.New(docRepo, mediaRepo, cfg.SupportedLocales)
+	documentUC := docuc.New(docRepo, compRepo, mediaRepo, cfg.SupportedLocales)
 	mediaUC := mediauc.New(mediaRepo, storage, cfg.Media.GenerateThumbnail)
 	userUC := useruc.New(userRepo, roleRepo)
 	inviteUC := inviteuc.New(inviteRepo, userRepo, roleRepo)
@@ -183,13 +189,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("load content-type definitions: %v", err)
 	}
-	if err := contenttype.NewSyncer(ctUC, documentUC, docRepo).Sync(ctx, defs); err != nil {
+	if err := contenttype.NewSyncer(ctUC, documentUC, docRepo, compRepo).Sync(ctx, defs); err != nil {
 		log.Fatalf("sync content types: %v", err)
 	}
 	log.Printf("synced %d content-type definitions from %s", len(defs), defsDir)
 
 	// Dynamic GraphQL — schema generated from content-type definitions
-	gqlFactory := dynamic.NewResolverFactory(documentUC, ctUC)
+	gqlFactory := dynamic.NewResolverFactory(documentUC, ctUC, mediaRepo)
 	gqlHandler, err := gqlFactory.BuildHandler(defs)
 	if err != nil {
 		log.Fatalf("graphql schema: %v", err)
@@ -199,7 +205,7 @@ func main() {
 	router := deliveryhttp.SetupRouter(deliveryhttp.RouterConfig{
 		AuthHandler:        deliveryhandler.NewAuthHandler(authUC, cfg.CookieSecure, cfg.CookieSameSite),
 		CTHandler:          deliveryhandler.NewContentTypeHandler(ctUC),
-		DocHandler:         deliveryhandler.NewDocumentHandler(documentUC, ctUC),
+		DocHandler:         deliveryhandler.NewDocumentHandler(documentUC, ctUC, userRepo),
 		MediaHandler:       deliveryhandler.NewMediaHandler(mediaUC),
 		LocaleHandler:      deliveryhandler.NewLocaleHandler(cfg.SupportedLocales),
 		UserHandler:        deliveryhandler.NewUserHandler(userUC),

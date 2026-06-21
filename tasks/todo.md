@@ -4,14 +4,65 @@
 
 ---
 
-## Phase Z — Bug Fixes: Auth Flow & Naming
+## Phase Z — Bug Fixes: Auth Flow & Naming (Complete)
 
-See [bugfix-auth-and-naming.md](bugfix-auth-and-naming.md) for full details.
+- [x] B1 Register → Login redirect
+- [x] B2 Session persistence
+- [x] B3 Component table naming
+- [x] ✅ Checkpoint Z
 
-- [x] B1 Register → Login redirect (invalidate `['auth-setup']` query before navigate)
-- [x] B2 Session persistence: fix cookie defaults (`COOKIE_SECURE=false`, `COOKIE_SAMESITE=lax` for dev) + re-issue refresh token on `/auth/refresh`
-- [x] B3 Component table naming: spec-only fix — no code exists yet; `components_` prefix documented for future implementation
-- [x] ✅ Checkpoint Z: all tests pass (`make test-api` + `make test-web`)
+---
+
+## Phase ZZ — Bug Fixes v1.8 (Response Shape, Auth, Inputs, GraphQL)
+
+See [bugfix-v1.8.md](bugfix-v1.8.md) for full plan. Spec: [specs/BUGFIX-SPEC.md](../specs/BUGFIX-SPEC.md).
+
+- [x] B1 User entity: add UUID generation for `id` + `documentId` in `Register()`
+- [x] B2 Register page: add `adminExists` guard → redirect to `/login`
+- [x] ✅ Checkpoint 1: B1+B2 verified
+- [x] B4+B5a Backend: restructure response shape (merge system+content into `data`, remove `contentTypeId`/`status` from public)
+- [x] B4+B5b Frontend: adapt hooks + panels to new response shape
+- [x] ✅ Checkpoint 2: response shape verified end-to-end
+- [x] B3 JsonInput/RichTextInput: fix data loss on save (deep comparison in JsonInput, fallback in RichTextInput)
+- [x] ✅ Checkpoint 3: input persistence verified
+- [x] B6a Backend: new repo+usecase methods for published document queries
+- [x] B6b GraphQL: default queries to published, add `status` filter with auth
+- [x] ✅ Checkpoint 4 (Final): all tests green (`go test ./...` + `vitest run`)
+
+---
+
+## Phase UI — Design System: Strapi-Inspired UI Overhaul
+
+See [ui-design-system.md](ui-design-system.md) for full plan. Spec: [specs/ui-design-system.md](../specs/ui-design-system.md).
+
+- [x] T1 Color tokens: migrate to indigo primary + add success/warning/sidebar-muted tokens
+- [x] T2 Button: add `success` variant, `loading` prop, update hover/active states
+- [x] T3 Badge: add `draft`/`published`/`modified` semantic variants
+- [x] T4 SidebarContext: collapsed state + localStorage + mobile detection
+- [x] T5 Sidebar components: Brand, Group, SubGroup, Item, CollapseToggle, rail popover
+- [x] T6 Sidebar responsive: mobile overlay with backdrop
+- [x] T7 AdminLayout: wire new sidebar, remove old Sidebar.tsx
+- [x] ✅ Checkpoint 1: foundation + sidebar complete
+- [x] T8 Breadcrumbs hook + TopBar rebuild with hamburger
+- [x] T9 StickyActionBar: glassmorphism sticky header for content pages
+- [x] T10 Card component + page-level spacing polish
+- [x] T11 Dark mode verification pass
+- [x] ✅ Checkpoint 2 (Final): full design system complete
+
+---
+
+## Phase S — Sync Table Fields & Schema Alignment
+
+See [sync-table-fields.md](sync-table-fields.md) for full plan. Spec: [specs/sync-table-fields.md](../specs/sync-table-fields.md).
+
+- [x] T1 Static table column rename (`id` → `gorm_id`) + UUID standardization
+- [x] T2 MediaAsset cleanup + add `FindByDocumentID`
+- [x] T3 Document & Component entity cleanup (`Data` → `Fields`, `*time.Time`, remove obsolete)
+- [x] ✅ Checkpoint A: backend compiles + tests pass
+- [x] T4 Per-field dynamic columns (repository rewrite)
+- [x] T5 GraphQL: media as object + remove response wrappers
+- [x] T6 Frontend: MediaInput stores `documentId` + aspect ratio fix
+- [x] ✅ Checkpoint B (Final): full system verification
 
 ---
 

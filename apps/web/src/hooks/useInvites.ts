@@ -68,8 +68,8 @@ export function useRevokeInvite() {
 
 export function useAcceptInvite() {
   return useMutation({
-    mutationFn: ({ token, password }: { token: string; password: string }) =>
-      api.post(`/auth/invite/${token}`, { password }).then((r) => r.data),
+    mutationFn: ({ token, password, displayName }: { token: string; password: string; displayName: string }) =>
+      api.post(`/auth/invite/${token}`, { password, displayName }).then((r) => r.data),
     onError: (err: unknown) => {
       const msg =
         (err as AxiosError<{ error: string }>).response?.data?.error ?? 'Failed to accept invite'

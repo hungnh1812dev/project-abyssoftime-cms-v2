@@ -6,8 +6,6 @@ A lightweight, code-first Personal Headless CMS. Developers define content panel
 
 ## Module Index
 
-The BE spec is split into standalone module specs. Read the global spec for navigation and shared rules; read the module spec for domain-specific details.
-
 | Module | Spec | Scope |
 |--------|------|-------|
 | **core** | [specs/core.md](specs/core.md) | Shared entities, repository interfaces, config, middleware, DB clients, deployment |
@@ -15,8 +13,6 @@ The BE spec is split into standalone module specs. Read the global spec for navi
 | **content** | [specs/content.md](specs/content.md) | Content types, documents, draft/publish, schema sync, pagination, GraphQL |
 | **media** | [specs/media.md](specs/media.md) | Media assets, upload/delete, S3/Cloudinary storage adapters |
 | **admin** | [specs/admin.md](specs/admin.md) | User management, invites, access tokens |
-
-**Refactoring plan:** [specs/REFACTOR-SPEC.md](specs/REFACTOR-SPEC.md)
 
 ---
 
@@ -163,10 +159,21 @@ The frontend spec is not modularized. Key sections:
 
 ---
 
+## Completed Milestones
+
+| Milestone | Description |
+|-----------|-------------|
+| Schema alignment | PK column `id` → `gorm_id`, per-field dynamic columns, `Fields` replaces JSON `data` blob |
+| GraphQL overhaul | Media fields return `MediaAsset` objects, response wrappers removed, queries return types directly |
+| MediaInput | Stores `documentId` reference (not URL), aspect ratio fix |
+| Collection list | Sortable table, server-side ordering, user display names, icon actions |
+| UI design system | Indigo tokens, sidebar, sticky action bar, dark mode |
+| Bug fixes v1.8 | Auth UUID, register guard, response shape, input persistence, published-by-default GraphQL |
+
 ## Pending Changes
 
-*(Track planned/in-progress work here. Move to module spec changelog after implementation.)*
+*(Track planned/in-progress work here.)*
 
 | Status | Module | Description |
 |--------|--------|-------------|
-| — | — | No pending changes |
+| — | — | No pending specs |

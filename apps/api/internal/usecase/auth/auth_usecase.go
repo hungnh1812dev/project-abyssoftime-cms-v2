@@ -3,7 +3,9 @@ package auth
 import (
 	"context"
 	"fmt"
+	"time"
 
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 
 	"project-abyssoftime-cms-v2/api/internal/domain/entity"
@@ -21,7 +23,11 @@ func New(repo repository.UserRepository, roleRepo repository.RoleRepository) *Us
 	return &UseCase{repo: repo, roleRepo: roleRepo}
 }
 
-func (uc *UseCase) Register(ctx context.Context, email, password string) (*entity.User, error) {
+func (uc *UseCase) Register(ctx context.Context, email, password, displayName string) (*entity.User, error) {
+	if displayName == "" || len(displayName) > 100 {
+		return nil, pkgerrors.ErrValidation
+	}
+
 	hasSA, err := uc.repo.HasSuperAdmin(ctx)
 	if err != nil {
 		return nil, err
@@ -49,10 +55,13 @@ func (uc *UseCase) Register(ctx context.Context, email, password string) (*entit
 	}
 
 	user := &entity.User{
+		DocumentID:   uuid.New().String(),
 		Email:        email,
+		DisplayName:  displayName,
 		PasswordHash: string(hash),
 		Role:         entity.RoleSuperAdmin,
 		RoleID:       saRole.DocumentID,
+		CreatedAt:    time.Now().UTC(),
 	}
 	if err := uc.repo.Create(ctx, user); err != nil {
 		return nil, err
@@ -82,15 +91,15 @@ func (uc *UseCase) Login(ctx context.Context, email, password string) (accessTok
 		return "", "", err
 	}
 
-	access, err := pkgjwt.GenerateAccessToken(user.ID, roleSlug)
+	access, err := pkgjwt.GenerateAccessToken(user.DocumentID, roleSlug)
 	if err != nil {
 		return "", "", err
 	}
-	refresh, err := pkgjwt.GenerateRefreshToken(user.ID)
+	refreshToken, err = pkgjwt.GenerateRefreshToken(user.DocumentID)
 	if err != nil {
 		return "", "", err
 	}
-	return access, refresh, nil
+	return access, refreshToken, nil
 }
 
 func (uc *UseCase) RefreshToken(ctx context.Context, refreshToken string) (string, string, error) {
@@ -109,12 +118,12 @@ func (uc *UseCase) RefreshToken(ctx context.Context, refreshToken string) (strin
 		return "", "", pkgerrors.ErrUnauthorized
 	}
 
-	access, err := pkgjwt.GenerateAccessToken(user.ID, roleSlug)
+	access, err := pkgjwt.GenerateAccessToken(user.DocumentID, roleSlug)
 	if err != nil {
 		return "", "", err
 	}
 
-	newRefresh, err := pkgjwt.GenerateRefreshToken(user.ID)
+	newRefresh, err := pkgjwt.GenerateRefreshToken(user.DocumentID)
 	if err != nil {
 		return "", "", err
 	}

@@ -13,7 +13,7 @@ type inviteUseCase interface {
 	Create(ctx context.Context, actorID, email string, role entity.Role) (*entity.Invite, string, error)
 	List(ctx context.Context) ([]*entity.Invite, error)
 	Revoke(ctx context.Context, id string) error
-	Accept(ctx context.Context, token, password string) (*entity.User, error)
+	Accept(ctx context.Context, token, password, displayName string) (*entity.User, error)
 }
 
 type InviteHandler struct {
@@ -42,7 +42,7 @@ func (h *InviteHandler) Create(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{
-		"id":        inv.ID,
+		"id":        inv.DocumentID,
 		"email":     inv.Email,
 		"role":      inv.Role,
 		"expiresAt": inv.ExpiresAt,
@@ -68,7 +68,7 @@ func (h *InviteHandler) List(c *gin.Context) {
 	items := make([]inviteItem, len(invites))
 	for i, inv := range invites {
 		items[i] = inviteItem{
-			ID:        inv.ID,
+			ID:        inv.DocumentID,
 			Email:     inv.Email,
 			Role:      string(inv.Role),
 			ExpiresAt: inv.ExpiresAt.Format("2006-01-02T15:04:05Z"),
@@ -89,7 +89,8 @@ func (h *InviteHandler) Revoke(c *gin.Context) {
 
 func (h *InviteHandler) Accept(c *gin.Context) {
 	var req struct {
-		Password string `json:"password"`
+		Password    string `json:"password"`
+		DisplayName string `json:"displayName"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		ginWriteError(c, http.StatusBadRequest, "invalid request body")
@@ -97,15 +98,16 @@ func (h *InviteHandler) Accept(c *gin.Context) {
 	}
 
 	token := c.Param("token")
-	user, err := h.uc.Accept(c.Request.Context(), token, req.Password)
+	user, err := h.uc.Accept(c.Request.Context(), token, req.Password, req.DisplayName)
 	if err != nil {
 		ginWriteErr(c, err)
 		return
 	}
 
 	c.JSON(http.StatusCreated, gin.H{
-		"id":    user.ID,
-		"email": user.Email,
-		"role":  user.Role,
+		"id":          user.ID,
+		"email":       user.Email,
+		"displayName": user.DisplayName,
+		"role":        user.Role,
 	})
 }

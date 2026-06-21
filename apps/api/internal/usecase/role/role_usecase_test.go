@@ -254,7 +254,7 @@ func TestDelete_AssignedRole(t *testing.T) {
 	repo := seedRepo()
 	userRepo := &mock.UserRepository{
 		FindAllFn: func(_ context.Context, _, _ int) ([]*entity.User, int64, error) {
-			return []*entity.User{{ID: "u1", RoleID: "custom-doc-id"}}, 1, nil
+			return []*entity.User{{DocumentID: "u1", RoleID: "custom-doc-id"}}, 1, nil
 		},
 	}
 	uc := New(repo, userRepo)
@@ -266,7 +266,7 @@ func TestDelete_AssignedRole(t *testing.T) {
 
 	// Override the userRepo to simulate a user with this role
 	userRepo.FindAllFn = func(_ context.Context, _, _ int) ([]*entity.User, int64, error) {
-		return []*entity.User{{ID: "u1", RoleID: created.DocumentID}}, 1, nil
+		return []*entity.User{{DocumentID: "u1", RoleID: created.DocumentID}}, 1, nil
 	}
 
 	err := uc.Delete(context.Background(), created.DocumentID)

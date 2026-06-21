@@ -29,7 +29,7 @@ func TestRoleRepository_Create_And_FindByID(t *testing.T) {
 	ctx := context.Background()
 
 	role := &entity.RoleEntity{
-		ID:          "r1",
+
 		DocumentID:  "rdoc1",
 		Name:        "Editor",
 		Slug:        "editor",
@@ -74,7 +74,7 @@ func TestRoleRepository_FindBySlug(t *testing.T) {
 	ctx := context.Background()
 
 	_ = repo.Create(ctx, &entity.RoleEntity{
-		ID: "r1", DocumentID: "rdoc1", Name: "Guest", Slug: "guest",
+		DocumentID: "rdoc1", Name: "Guest", Slug: "guest",
 		Permissions: []string{"content:read"}, Level: 20,
 		CreatedAt: time.Now(), UpdatedAt: time.Now(),
 	})
@@ -104,8 +104,8 @@ func TestRoleRepository_FindAll(t *testing.T) {
 	ctx := context.Background()
 
 	now := time.Now()
-	_ = repo.Create(ctx, &entity.RoleEntity{ID: "r1", DocumentID: "d1", Name: "Admin", Slug: "admin", Permissions: []string{"content:read"}, Level: 80, CreatedAt: now, UpdatedAt: now})
-	_ = repo.Create(ctx, &entity.RoleEntity{ID: "r2", DocumentID: "d2", Name: "Guest", Slug: "guest", Permissions: []string{"content:read"}, Level: 20, CreatedAt: now, UpdatedAt: now})
+	_ = repo.Create(ctx, &entity.RoleEntity{DocumentID: "d1", Name: "Admin", Slug: "admin", Permissions: []string{"content:read"}, Level: 80, CreatedAt: now, UpdatedAt: now})
+	_ = repo.Create(ctx, &entity.RoleEntity{DocumentID: "d2", Name: "Guest", Slug: "guest", Permissions: []string{"content:read"}, Level: 20, CreatedAt: now, UpdatedAt: now})
 
 	roles, err := repo.FindAll(ctx)
 	if err != nil {
@@ -125,7 +125,7 @@ func TestRoleRepository_Update(t *testing.T) {
 	ctx := context.Background()
 
 	now := time.Now()
-	_ = repo.Create(ctx, &entity.RoleEntity{ID: "r1", DocumentID: "d1", Name: "Editor", Slug: "editor", Permissions: []string{"content:read"}, Level: 60, CreatedAt: now, UpdatedAt: now})
+	_ = repo.Create(ctx, &entity.RoleEntity{DocumentID: "d1", Name: "Editor", Slug: "editor", Permissions: []string{"content:read"}, Level: 60, CreatedAt: now, UpdatedAt: now})
 
 	role, _ := repo.FindByID(ctx, "d1")
 	role.Permissions = []string{"content:read", "content:create", "content:update"}
@@ -146,7 +146,7 @@ func TestRoleRepository_Delete(t *testing.T) {
 	ctx := context.Background()
 
 	now := time.Now()
-	_ = repo.Create(ctx, &entity.RoleEntity{ID: "r1", DocumentID: "d1", Name: "Custom", Slug: "custom", Permissions: []string{"content:read"}, Level: 50, CreatedAt: now, UpdatedAt: now})
+	_ = repo.Create(ctx, &entity.RoleEntity{DocumentID: "d1", Name: "Custom", Slug: "custom", Permissions: []string{"content:read"}, Level: 50, CreatedAt: now, UpdatedAt: now})
 
 	if err := repo.Delete(ctx, "d1"); err != nil {
 		t.Fatalf("Delete: %v", err)
@@ -182,7 +182,7 @@ func TestRoleRepository_HasAny(t *testing.T) {
 	}
 
 	now := time.Now()
-	_ = repo.Create(ctx, &entity.RoleEntity{ID: "r1", DocumentID: "d1", Name: "Admin", Slug: "admin", Permissions: []string{}, Level: 80, CreatedAt: now, UpdatedAt: now})
+	_ = repo.Create(ctx, &entity.RoleEntity{DocumentID: "rdoc1", Name: "Guest", Slug: "guest", Permissions: []string{}, Level: 20, CreatedAt: now, UpdatedAt: now})
 
 	has, err = repo.HasAny(ctx)
 	if err != nil {

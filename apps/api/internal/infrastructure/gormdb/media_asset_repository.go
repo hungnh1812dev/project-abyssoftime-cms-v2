@@ -27,7 +27,7 @@ func (r *mediaAssetRepository) Create(ctx context.Context, asset *entity.MediaAs
 
 func (r *mediaAssetRepository) FindByID(ctx context.Context, id string) (*entity.MediaAsset, error) {
 	var asset entity.MediaAsset
-	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&asset).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("document_id = ?", id).First(&asset).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, pkgerrors.ErrNotFound
 		}
@@ -36,10 +36,15 @@ func (r *mediaAssetRepository) FindByID(ctx context.Context, id string) (*entity
 	return &asset, nil
 }
 
-func (r *mediaAssetRepository) FindByDocumentRef(ctx context.Context, documentRef string) ([]*entity.MediaAsset, error) {
-	var assets []*entity.MediaAsset
-	err := r.db.WithContext(ctx).Where("document_ref = ?", documentRef).Find(&assets).Error
-	return assets, err
+func (r *mediaAssetRepository) FindByDocumentID(ctx context.Context, documentID string) (*entity.MediaAsset, error) {
+	var asset entity.MediaAsset
+	if err := r.db.WithContext(ctx).Where("document_id = ?", documentID).First(&asset).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, pkgerrors.ErrNotFound
+		}
+		return nil, err
+	}
+	return &asset, nil
 }
 
 func (r *mediaAssetRepository) FindAll(ctx context.Context, page, limit int) ([]*entity.MediaAsset, int64, error) {
@@ -56,10 +61,6 @@ func (r *mediaAssetRepository) FindAll(ctx context.Context, page, limit int) ([]
 	return assets, total, nil
 }
 
-func (r *mediaAssetRepository) DeleteByDocumentRef(ctx context.Context, documentRef string) error {
-	return r.db.WithContext(ctx).Where("document_ref = ?", documentRef).Delete(&entity.MediaAsset{}).Error
-}
-
 func (r *mediaAssetRepository) Delete(ctx context.Context, id string) error {
-	return r.db.WithContext(ctx).Where("id = ?", id).Delete(&entity.MediaAsset{}).Error
+	return r.db.WithContext(ctx).Where("document_id = ?", id).Delete(&entity.MediaAsset{}).Error
 }

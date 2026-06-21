@@ -61,6 +61,7 @@ type User struct {
     ID           string    `bson:"_id,omitempty" gorm:"column:id;primaryKey"           json:"-"`
     DocumentID   string    `bson:"documentId"    gorm:"column:document_id;uniqueIndex" json:"documentId"`
     Email        string    `bson:"email"         gorm:"column:email;uniqueIndex"       json:"email"`
+    DisplayName  string    `bson:"displayName"   gorm:"column:display_name"            json:"displayName"`
     PasswordHash string    `bson:"passwordHash"  gorm:"column:password_hash"           json:"-"`
     RoleID       string    `bson:"roleId"        gorm:"column:role_id;index"           json:"roleId"`
     CreatedAt    time.Time `bson:"createdAt"     gorm:"column:created_at"              json:"createdAt"`
@@ -68,6 +69,8 @@ type User struct {
 ```
 
 - `RoleID` references Role's `DocumentID` (application-level FK, no DB constraint)
+- `DisplayName` is required on register and invite accept
+- `ID` and `DocumentID` are generated at registration time (UUID)
 - Password stored as bcrypt hash
 
 ### Role
@@ -125,6 +128,7 @@ type Role struct {
 type UserRepository interface {
     Create(ctx context.Context, user *entity.User) error
     FindByID(ctx context.Context, id string) (*entity.User, error)
+    FindByIDs(ctx context.Context, ids []string) ([]*entity.User, error)
     FindByEmail(ctx context.Context, email string) (*entity.User, error)
     FindAll(ctx context.Context) ([]*entity.User, error)
     Update(ctx context.Context, user *entity.User) error
@@ -155,7 +159,7 @@ type RoleRepository interface {
 
 | Method | Signature | Description |
 |---|---|---|
-| `Register` | `(ctx, email, password string) → (accessToken, refreshToken string, err)` | Create new user; validates email format, password strength; hashes password; assigns default role |
+| `Register` | `(ctx, email, password, displayName string) → (accessToken, refreshToken string, err)` | Create new user; validates email format, password strength; generates ID+DocumentID; hashes password; assigns default role |
 | `Login` | `(ctx, email, password string) → (accessToken, refreshToken string, err)` | Verify credentials; return JWT pair |
 | `Refresh` | `(ctx, refreshToken string) → (accessToken string, err)` | Validate refresh token; issue new access token |
 | `SetupStatus` | `(ctx) → (hasAdmin bool, err)` | Check if any user exists (for first-time setup) |
@@ -385,3 +389,5 @@ When `roles` table/collection is empty on startup:
 | v1.3 | Gin middleware migration (GinAuth, GinRequirePermission) | §11.4 |
 | v1.4 | Dynamic role system with permission-based access control | §12 |
 | v1.5 | Cross-origin cookie config (SameSite=None) for Render deployment | §13.4.2 |
+| v1.6 | User entity: added `DisplayName` field (required on register/invite); `ID` and `DocumentID` generated at registration | bugfix-v1.8, collection-list-enhancements |
+| v1.7 | Added `FindByIDs` to UserRepository (batch lookup for resolving `updatedByName` in document lists) | collection-list-enhancements |

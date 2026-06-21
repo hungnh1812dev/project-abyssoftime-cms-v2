@@ -30,7 +30,21 @@ vi.mock('@ckeditor/ckeditor5-react', () => ({
   },
 }))
 
-vi.mock('@ckeditor/ckeditor5-build-classic', () => ({ default: class MockEditor {} }))
+vi.mock('ckeditor5', () => ({
+  ClassicEditor: class MockEditor {},
+  Essentials: class {},
+  Paragraph: class {},
+  Bold: class {},
+  Italic: class {},
+  Heading: class {},
+  Link: class {},
+  List: class {},
+  BlockQuote: class {},
+  Indent: class {},
+  MediaEmbed: class {},
+  Table: class {},
+  TableToolbar: class {},
+}))
 
 function createClient() {
   return new QueryClient({
@@ -122,7 +136,7 @@ describe('RichTextInput', () => {
     expect((lastCapturedConfig as { toolbar?: string[] })?.toolbar).toEqual(toolbar)
   })
 
-  it('does not set toolbar config when prop is omitted', () => {
+  it('uses default toolbar when prop is omitted', () => {
     render(
       <Wrapper>
         <FormProvider mutationFn={vi.fn().mockResolvedValue(undefined)}>
@@ -132,7 +146,9 @@ describe('RichTextInput', () => {
         </FormProvider>
       </Wrapper>,
     )
-    expect((lastCapturedConfig as { toolbar?: string[] } | undefined)?.toolbar).toBeUndefined()
+    const config = lastCapturedConfig as { toolbar?: string[] }
+    expect(config?.toolbar).toBeDefined()
+    expect(config.toolbar).toContain('bold')
   })
 
   it('stores HTML string (not DOM nodes) in form state', async () => {
