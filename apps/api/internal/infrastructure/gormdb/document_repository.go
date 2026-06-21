@@ -2,6 +2,7 @@ package gormdb
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -118,9 +119,36 @@ func docToRow(doc *entity.Document) map[string]any {
 		row["published_at"] = *doc.PublishedAt
 	}
 	for k, v := range doc.Fields {
-		row[toSnakeCase(k)] = v
+		row[toSnakeCase(k)] = serializeFieldValue(v)
 	}
 	return row
+}
+
+func serializeFieldValue(v any) any {
+	if v == nil {
+		return nil
+	}
+	switch v.(type) {
+	case map[string]any, []any:
+		b, _ := json.Marshal(v)
+		return string(b)
+	default:
+		return v
+	}
+}
+
+func deserializeFieldValue(v any) any {
+	s, ok := v.(string)
+	if !ok || len(s) == 0 {
+		return v
+	}
+	if (s[0] == '{' && s[len(s)-1] == '}') || (s[0] == '[' && s[len(s)-1] == ']') {
+		var parsed any
+		if json.Unmarshal([]byte(s), &parsed) == nil {
+			return parsed
+		}
+	}
+	return v
 }
 
 func rowToDoc(row map[string]any) *entity.Document {
@@ -167,7 +195,7 @@ func rowToDoc(row map[string]any) *entity.Document {
 	fields := make(map[string]any)
 	for k, v := range row {
 		if !systemCols[k] {
-			fields[toCamelCase(k)] = v
+			fields[toCamelCase(k)] = deserializeFieldValue(v)
 		}
 	}
 	if len(fields) > 0 {

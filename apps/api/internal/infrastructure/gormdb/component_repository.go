@@ -72,7 +72,7 @@ func compToRow(c *entity.Component) map[string]any {
 		"updated_at":   c.UpdatedAt,
 	}
 	for k, v := range c.Fields {
-		row[toSnakeCase(k)] = v
+		row[toSnakeCase(k)] = serializeFieldValue(v)
 	}
 	return row
 }
@@ -108,7 +108,7 @@ func rowToComp(row map[string]any) *entity.Component {
 	fields := make(map[string]any)
 	for k, v := range row {
 		if !systemCols[k] {
-			fields[toCamelCase(k)] = v
+			fields[toCamelCase(k)] = deserializeFieldValue(v)
 		}
 	}
 	if len(fields) > 0 {
