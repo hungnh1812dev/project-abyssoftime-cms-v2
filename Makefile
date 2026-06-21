@@ -1,5 +1,5 @@
 .PHONY: dev dev-api dev-web test-api test-web \
-       mongo-start mongo-stop pg-start pg-stop \
+       mongo-start mongo-stop pg-start pg-stop pg-rm \
        graphql-generate
 
 CONTAINER_CLI ?= docker
@@ -58,6 +58,11 @@ pg-start:
 
 pg-stop:
 	$(CONTAINER_CLI) stop $(PG_CONTAINER)
+
+pg-rm:
+	-$(CONTAINER_CLI) stop $(PG_CONTAINER)
+	-$(CONTAINER_CLI) rm -v $(PG_CONTAINER)
+	-$(CONTAINER_CLI) volume rm $(PG_VOLUME)
 
 # ── Development ──────────────────────────────────────────────────────────────
 
