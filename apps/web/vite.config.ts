@@ -22,8 +22,6 @@ export default defineConfig({
               return 'react'
             if (id.includes('@tanstack/react-query')) return 'query'
             if (id.includes('@radix-ui')) return 'ui'
-            if (id.includes('ckeditor5') || id.includes('@ckeditor'))
-              return 'ckeditor'
           }
         },
       },
