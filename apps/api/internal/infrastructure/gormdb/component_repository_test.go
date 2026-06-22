@@ -164,3 +164,128 @@ func TestComponentRepository_DeleteAllByContentType(t *testing.T) {
 		t.Errorf("d2 count = %d, want 0", len(found))
 	}
 }
+
+func TestComponentRepository_EnsureCollection_PreservesData(t *testing.T) {
+	db, err := NewClient("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	repo := &componentRepository{db: db}
+	ctx := context.Background()
+	now := time.Now().UTC()
+
+	if err := repo.EnsureCollection(ctx, "blog", "seo", compTestFields); err != nil {
+		t.Fatalf("EnsureCollection: %v", err)
+	}
+
+	components := []*entity.Component{
+		{ComponentID: "c1", Fields: map[string]any{"title": "Keep me"}, CreatedAt: now, UpdatedAt: now},
+	}
+	if err := repo.UpsertAll(ctx, "blog", "seo", "d1", "en", entity.VersionDraft, components); err != nil {
+		t.Fatalf("UpsertAll: %v", err)
+	}
+
+	// Re-run EnsureCollection — data must survive
+	if err := repo.EnsureCollection(ctx, "blog", "seo", compTestFields); err != nil {
+		t.Fatalf("EnsureCollection (2nd): %v", err)
+	}
+
+	found, err := repo.FindByDocumentID(ctx, "blog", "seo", "d1", "en", entity.VersionDraft)
+	if err != nil {
+		t.Fatalf("FindByDocumentID: %v", err)
+	}
+	if len(found) != 1 {
+		t.Fatalf("count = %d, want 1", len(found))
+	}
+	title, _ := found[0].Fields["title"].(string)
+	if title != "Keep me" {
+		t.Errorf("title = %q, want %q", title, "Keep me")
+	}
+}
+
+func TestComponentRepository_EnsureCollection_AddsNewColumn(t *testing.T) {
+	db, err := NewClient("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	repo := &componentRepository{db: db}
+	ctx := context.Background()
+	now := time.Now().UTC()
+
+	if err := repo.EnsureCollection(ctx, "blog", "seo", compTestFields); err != nil {
+		t.Fatalf("EnsureCollection: %v", err)
+	}
+
+	components := []*entity.Component{
+		{ComponentID: "c1", Fields: map[string]any{"title": "Hello"}, CreatedAt: now, UpdatedAt: now},
+	}
+	if err := repo.UpsertAll(ctx, "blog", "seo", "d1", "en", entity.VersionDraft, components); err != nil {
+		t.Fatalf("UpsertAll: %v", err)
+	}
+
+	extendedFields := append(compTestFields, entity.FieldDefinition{Name: "keywords", Type: "text"})
+	if err := repo.EnsureCollection(ctx, "blog", "seo", extendedFields); err != nil {
+		t.Fatalf("EnsureCollection (extended): %v", err)
+	}
+
+	// Old data still exists
+	found, err := repo.FindByDocumentID(ctx, "blog", "seo", "d1", "en", entity.VersionDraft)
+	if err != nil {
+		t.Fatalf("FindByDocumentID: %v", err)
+	}
+	if len(found) != 1 {
+		t.Fatalf("count = %d, want 1", len(found))
+	}
+
+	// New column exists
+	cols, err := existingColumns(db, componentTableName("blog", "seo"))
+	if err != nil {
+		t.Fatalf("existingColumns: %v", err)
+	}
+	if !cols["keywords"] {
+		t.Error("expected 'keywords' column to exist after extending fields")
+	}
+}
+
+func TestComponentRepository_EnsureCollection_IgnoresRemovedField(t *testing.T) {
+	db, err := NewClient("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	repo := &componentRepository{db: db}
+	ctx := context.Background()
+	now := time.Now().UTC()
+
+	extendedFields := append(compTestFields, entity.FieldDefinition{Name: "keywords", Type: "text"})
+	if err := repo.EnsureCollection(ctx, "blog", "seo", extendedFields); err != nil {
+		t.Fatalf("EnsureCollection: %v", err)
+	}
+
+	components := []*entity.Component{
+		{ComponentID: "c1", Fields: map[string]any{"title": "Hello", "keywords": "test"}, CreatedAt: now, UpdatedAt: now},
+	}
+	if err := repo.UpsertAll(ctx, "blog", "seo", "d1", "en", entity.VersionDraft, components); err != nil {
+		t.Fatalf("UpsertAll: %v", err)
+	}
+
+	// Re-ensure with fewer fields — keywords column must remain
+	if err := repo.EnsureCollection(ctx, "blog", "seo", compTestFields); err != nil {
+		t.Fatalf("EnsureCollection (reduced): %v", err)
+	}
+
+	found, err := repo.FindByDocumentID(ctx, "blog", "seo", "d1", "en", entity.VersionDraft)
+	if err != nil {
+		t.Fatalf("FindByDocumentID: %v", err)
+	}
+	if len(found) != 1 {
+		t.Fatalf("count = %d, want 1", len(found))
+	}
+
+	cols, err := existingColumns(db, componentTableName("blog", "seo"))
+	if err != nil {
+		t.Fatalf("existingColumns: %v", err)
+	}
+	if !cols["keywords"] {
+		t.Error("expected 'keywords' column to still exist after reducing fields")
+	}
+}

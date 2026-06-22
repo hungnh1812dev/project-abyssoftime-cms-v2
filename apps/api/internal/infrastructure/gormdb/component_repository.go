@@ -31,12 +31,13 @@ func (r *componentRepository) isPostgres() bool {
 
 func (r *componentRepository) EnsureCollection(ctx context.Context, contentTypeSlug, componentName string, fields []entity.FieldDefinition) error {
 	table := componentTableName(contentTypeSlug, componentName)
-	if r.db.Migrator().HasTable(table) {
-		if err := r.db.WithContext(ctx).Migrator().DropTable(table); err != nil {
-			return err
-		}
+	if !r.db.Migrator().HasTable(table) {
+		return r.createComponentTable(ctx, table, fields)
 	}
+	return r.addMissingComponentColumns(ctx, table, fields)
+}
 
+func (r *componentRepository) createComponentTable(ctx context.Context, table string, fields []entity.FieldDefinition) error {
 	var cols []string
 	if r.isPostgres() {
 		cols = append(cols, "gorm_id SERIAL PRIMARY KEY")
@@ -55,6 +56,24 @@ func (r *componentRepository) EnsureCollection(ctx context.Context, contentTypeS
 
 	sql := fmt.Sprintf("CREATE TABLE %s (%s)", table, strings.Join(cols, ", "))
 	return r.db.WithContext(ctx).Exec(sql).Error
+}
+
+func (r *componentRepository) addMissingComponentColumns(ctx context.Context, table string, fields []entity.FieldDefinition) error {
+	cols, err := existingColumns(r.db, table)
+	if err != nil {
+		return err
+	}
+	for _, f := range fields {
+		col := toSnakeCase(f.Name)
+		if cols[col] {
+			continue
+		}
+		sql := fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table, col, fieldColumnType(f.Type))
+		if err := r.db.WithContext(ctx).Exec(sql).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *componentRepository) DropCollection(ctx context.Context, contentTypeSlug, componentName string) error {
