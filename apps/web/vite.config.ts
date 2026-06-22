@@ -10,7 +10,6 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
-    dedupe: ['ckeditor5', '@ckeditor/ckeditor5-react'],
   },
   build: {
     chunkSizeWarningLimit: 1400,
