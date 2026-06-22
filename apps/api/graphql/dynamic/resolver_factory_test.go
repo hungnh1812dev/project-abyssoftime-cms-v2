@@ -82,11 +82,18 @@ func (m *mockCTUC) FindAll(ctx context.Context) ([]*entity.ContentType, error) {
 	return m.findAllFn(ctx)
 }
 
+type mockTokenValidator struct{}
+
+func (m *mockTokenValidator) Validate(_ context.Context, _ string) (*entity.AccessToken, error) {
+	return &entity.AccessToken{}, nil
+}
+
 func gqlQuery(t *testing.T, h http.Handler, query string) map[string]any {
 	t.Helper()
 	body, _ := json.Marshal(map[string]string{"query": query})
 	req := httptest.NewRequest(http.MethodPost, "/graphql", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer test-token")
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, req)
 	if w.Code != http.StatusOK {
@@ -108,7 +115,7 @@ func TestResolverFactory_ContentTypesQuery(t *testing.T) {
 		},
 	}
 
-	factory := NewResolverFactory(&mockDocUC{}, ctUC, nil)
+	factory := NewResolverFactory(&mockDocUC{}, ctUC, nil, &mockTokenValidator{})
 	h, err := factory.BuildHandler(nil)
 	if err != nil {
 		t.Fatalf("BuildHandler: %v", err)
@@ -144,7 +151,7 @@ func TestResolverFactory_SingleTypeQuery(t *testing.T) {
 		{Slug: "about-page", Kind: "single", Fields: []entity.FieldDefinition{{Name: "headline", Type: "text"}}},
 	}
 
-	factory := NewResolverFactory(docUC, &mockCTUC{findAllFn: func(_ context.Context) ([]*entity.ContentType, error) { return nil, nil }}, nil)
+	factory := NewResolverFactory(docUC, &mockCTUC{findAllFn: func(_ context.Context) ([]*entity.ContentType, error) { return nil, nil }}, nil, &mockTokenValidator{})
 	h, err := factory.BuildHandler(defs)
 	if err != nil {
 		t.Fatalf("BuildHandler: %v", err)
@@ -174,7 +181,7 @@ func TestResolverFactory_CollectionListQuery(t *testing.T) {
 		{Slug: "blog-posts", Kind: "collection", Fields: []entity.FieldDefinition{{Name: "title", Type: "text"}}},
 	}
 
-	factory := NewResolverFactory(docUC, &mockCTUC{findAllFn: func(_ context.Context) ([]*entity.ContentType, error) { return nil, nil }}, nil)
+	factory := NewResolverFactory(docUC, &mockCTUC{findAllFn: func(_ context.Context) ([]*entity.ContentType, error) { return nil, nil }}, nil, &mockTokenValidator{})
 	h, err := factory.BuildHandler(defs)
 	if err != nil {
 		t.Fatalf("BuildHandler: %v", err)

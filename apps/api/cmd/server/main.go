@@ -195,7 +195,7 @@ func main() {
 	log.Printf("synced %d content-type definitions from %s", len(defs), defsDir)
 
 	// Dynamic GraphQL — schema generated from content-type definitions
-	gqlFactory := dynamic.NewResolverFactory(documentUC, ctUC, mediaRepo)
+	gqlFactory := dynamic.NewResolverFactory(documentUC, ctUC, mediaRepo, accessTokenUC)
 	gqlHandler, err := gqlFactory.BuildHandler(defs)
 	if err != nil {
 		log.Fatalf("graphql schema: %v", err)
