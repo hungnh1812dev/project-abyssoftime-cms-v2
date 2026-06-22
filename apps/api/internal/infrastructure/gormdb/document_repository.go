@@ -83,12 +83,13 @@ func (r *documentRepository) isPostgres() bool {
 
 func (r *documentRepository) EnsureCollection(ctx context.Context, contentTypeSlug string, fields []entity.FieldDefinition) error {
 	table := documentTableName(contentTypeSlug)
-	if r.db.Migrator().HasTable(table) {
-		if err := r.db.WithContext(ctx).Migrator().DropTable(table); err != nil {
-			return err
-		}
+	if !r.db.Migrator().HasTable(table) {
+		return r.createDocumentTable(ctx, table, fields)
 	}
+	return r.addMissingDocumentColumns(ctx, table, fields)
+}
 
+func (r *documentRepository) createDocumentTable(ctx context.Context, table string, fields []entity.FieldDefinition) error {
 	var cols []string
 	if r.isPostgres() {
 		cols = append(cols, "gorm_id SERIAL PRIMARY KEY")
@@ -113,6 +114,27 @@ func (r *documentRepository) EnsureCollection(ctx context.Context, contentTypeSl
 
 	sql := fmt.Sprintf("CREATE TABLE %s (%s)", table, strings.Join(cols, ", "))
 	return r.db.WithContext(ctx).Exec(sql).Error
+}
+
+func (r *documentRepository) addMissingDocumentColumns(ctx context.Context, table string, fields []entity.FieldDefinition) error {
+	cols, err := existingColumns(r.db, table)
+	if err != nil {
+		return err
+	}
+	for _, f := range fields {
+		if f.Type == "component" || f.Type == "layout" {
+			continue
+		}
+		col := toSnakeCase(f.Name)
+		if cols[col] {
+			continue
+		}
+		sql := fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table, col, fieldColumnType(f.Type))
+		if err := r.db.WithContext(ctx).Exec(sql).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *documentRepository) DropCollection(ctx context.Context, contentTypeSlug string) error {

@@ -339,3 +339,130 @@ func TestExistingColumns(t *testing.T) {
 		t.Error("unexpected column 'nonexistent'")
 	}
 }
+
+func TestDocumentRepository_EnsureCollection_PreservesData(t *testing.T) {
+	db, err := NewClient("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	repo := NewDocumentRepository(db)
+	ctx := context.Background()
+
+	if err := repo.EnsureCollection(ctx, "blog", testFields); err != nil {
+		t.Fatalf("EnsureCollection: %v", err)
+	}
+
+	doc := &entity.Document{
+		DocumentID: "d1", Version: entity.VersionDraft,
+		Fields: map[string]any{"title": "Keep me"}, Locale: "en",
+		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
+	}
+	if err := repo.UpsertDraft(ctx, "blog", doc); err != nil {
+		t.Fatalf("UpsertDraft: %v", err)
+	}
+
+	// Re-run EnsureCollection — data must survive
+	if err := repo.EnsureCollection(ctx, "blog", testFields); err != nil {
+		t.Fatalf("EnsureCollection (2nd): %v", err)
+	}
+
+	found, err := repo.FindDraftByDocumentID(ctx, "blog", "d1", "en")
+	if err != nil {
+		t.Fatalf("FindDraftByDocumentID after re-ensure: %v", err)
+	}
+	title, _ := found.Fields["title"].(string)
+	if title != "Keep me" {
+		t.Errorf("title = %q, want %q", title, "Keep me")
+	}
+}
+
+func TestDocumentRepository_EnsureCollection_AddsNewColumn(t *testing.T) {
+	db, err := NewClient("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	repo := NewDocumentRepository(db)
+	ctx := context.Background()
+
+	if err := repo.EnsureCollection(ctx, "blog", testFields); err != nil {
+		t.Fatalf("EnsureCollection: %v", err)
+	}
+
+	doc := &entity.Document{
+		DocumentID: "d1", Version: entity.VersionDraft,
+		Fields: map[string]any{"title": "Hello"}, Locale: "en",
+		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
+	}
+	if err := repo.UpsertDraft(ctx, "blog", doc); err != nil {
+		t.Fatalf("UpsertDraft: %v", err)
+	}
+
+	extendedFields := append(testFields, entity.FieldDefinition{Name: "summary", Type: "text"})
+	if err := repo.EnsureCollection(ctx, "blog", extendedFields); err != nil {
+		t.Fatalf("EnsureCollection (extended): %v", err)
+	}
+
+	// Old data still exists
+	found, err := repo.FindDraftByDocumentID(ctx, "blog", "d1", "en")
+	if err != nil {
+		t.Fatalf("FindDraftByDocumentID: %v", err)
+	}
+	title, _ := found.Fields["title"].(string)
+	if title != "Hello" {
+		t.Errorf("title = %q, want %q", title, "Hello")
+	}
+
+	// New column exists
+	cols, err := existingColumns(db, documentTableName("blog"))
+	if err != nil {
+		t.Fatalf("existingColumns: %v", err)
+	}
+	if !cols["summary"] {
+		t.Error("expected 'summary' column to exist after extending fields")
+	}
+}
+
+func TestDocumentRepository_EnsureCollection_IgnoresRemovedField(t *testing.T) {
+	db, err := NewClient("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	repo := NewDocumentRepository(db)
+	ctx := context.Background()
+
+	extendedFields := append(testFields, entity.FieldDefinition{Name: "summary", Type: "text"})
+	if err := repo.EnsureCollection(ctx, "blog", extendedFields); err != nil {
+		t.Fatalf("EnsureCollection: %v", err)
+	}
+
+	doc := &entity.Document{
+		DocumentID: "d1", Version: entity.VersionDraft,
+		Fields: map[string]any{"title": "Hello", "summary": "World"}, Locale: "en",
+		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
+	}
+	if err := repo.UpsertDraft(ctx, "blog", doc); err != nil {
+		t.Fatalf("UpsertDraft: %v", err)
+	}
+
+	// Re-ensure with fewer fields — summary column must remain
+	if err := repo.EnsureCollection(ctx, "blog", testFields); err != nil {
+		t.Fatalf("EnsureCollection (reduced): %v", err)
+	}
+
+	found, err := repo.FindDraftByDocumentID(ctx, "blog", "d1", "en")
+	if err != nil {
+		t.Fatalf("FindDraftByDocumentID: %v", err)
+	}
+	title, _ := found.Fields["title"].(string)
+	if title != "Hello" {
+		t.Errorf("title = %q, want %q", title, "Hello")
+	}
+
+	cols, err := existingColumns(db, documentTableName("blog"))
+	if err != nil {
+		t.Fatalf("existingColumns: %v", err)
+	}
+	if !cols["summary"] {
+		t.Error("expected 'summary' column to still exist after reducing fields")
+	}
+}
