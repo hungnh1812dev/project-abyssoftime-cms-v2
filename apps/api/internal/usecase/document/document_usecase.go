@@ -121,6 +121,11 @@ func (uc *UseCase) mergeComponents(ctx context.Context, slug string, doc *entity
 
 func (uc *UseCase) resolveMediaFields(ctx context.Context, data map[string]any, fields []entity.FieldDefinition) {
 	for _, f := range fields {
+		if f.Type == "layout" {
+			uc.resolveMediaFields(ctx, data, f.Fields)
+			continue
+		}
+
 		raw, ok := data[f.Name]
 		if !ok || raw == nil {
 			continue

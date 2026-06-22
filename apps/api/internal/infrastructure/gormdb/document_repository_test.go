@@ -467,6 +467,156 @@ func TestDocumentRepository_EnsureCollection_IgnoresRemovedField(t *testing.T) {
 	}
 }
 
+func TestDocumentRepository_LayoutFieldsRoundTrip(t *testing.T) {
+	db, err := NewClient("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	repo := NewDocumentRepository(db)
+	ctx := context.Background()
+
+	layoutFields := []entity.FieldDefinition{
+		{
+			Name: "layout",
+			Type: "layout",
+			Fields: []entity.FieldDefinition{
+				{Name: "packName", Type: "text"},
+				{Name: "packTitle", Type: "text"},
+			},
+		},
+		{Name: "words", Type: "json"},
+	}
+
+	if err := repo.EnsureCollection(ctx, "en-vocab-pack", layoutFields); err != nil {
+		t.Fatalf("EnsureCollection: %v", err)
+	}
+
+	cols, err := existingColumns(db, documentTableName("en-vocab-pack"))
+	if err != nil {
+		t.Fatalf("existingColumns: %v", err)
+	}
+	if !cols["pack_name"] {
+		t.Error("expected 'pack_name' column to exist")
+	}
+	if !cols["pack_title"] {
+		t.Error("expected 'pack_title' column to exist")
+	}
+
+	doc := &entity.Document{
+		DocumentID: "d1", Version: entity.VersionDraft,
+		Fields:    map[string]any{"packName": "Pack 1", "packTitle": "Title 1", "words": `["hello"]`},
+		Locale:    "en",
+		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
+	}
+	if err := repo.UpsertDraft(ctx, "en-vocab-pack", doc); err != nil {
+		t.Fatalf("UpsertDraft: %v", err)
+	}
+
+	found, err := repo.FindDraftByDocumentID(ctx, "en-vocab-pack", "d1", "en")
+	if err != nil {
+		t.Fatalf("FindDraftByDocumentID: %v", err)
+	}
+	if got := found.Fields["packName"]; got != "Pack 1" {
+		t.Errorf("packName = %v, want %q", got, "Pack 1")
+	}
+	if got := found.Fields["packTitle"]; got != "Title 1" {
+		t.Errorf("packTitle = %v, want %q", got, "Title 1")
+	}
+
+	// Update and verify round-trip
+	doc.Fields["packName"] = "Pack 2"
+	doc.Fields["packTitle"] = "Title 2"
+	if err := repo.UpsertDraft(ctx, "en-vocab-pack", doc); err != nil {
+		t.Fatalf("UpsertDraft (update): %v", err)
+	}
+
+	found, err = repo.FindDraftByDocumentID(ctx, "en-vocab-pack", "d1", "en")
+	if err != nil {
+		t.Fatalf("FindDraftByDocumentID (after update): %v", err)
+	}
+	if got := found.Fields["packName"]; got != "Pack 2" {
+		t.Errorf("packName after update = %v, want %q", got, "Pack 2")
+	}
+	if got := found.Fields["packTitle"]; got != "Title 2" {
+		t.Errorf("packTitle after update = %v, want %q", got, "Title 2")
+	}
+}
+
+func TestDocumentRepository_LayoutFieldsMigrateExistingTable(t *testing.T) {
+	db, err := NewClient("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	repo := NewDocumentRepository(db)
+	ctx := context.Background()
+
+	// Simulate old code: table created with layout field skipped entirely
+	oldSQL := fmt.Sprintf("CREATE TABLE %s (gorm_id INTEGER PRIMARY KEY AUTOINCREMENT, document_id TEXT, version TEXT, locale TEXT, words TEXT, created_at TIMESTAMP, updated_at TIMESTAMP, published_at TIMESTAMP, created_by TEXT, updated_by TEXT, published_by TEXT)",
+		documentTableName("en-vocab-pack"))
+	if err := db.Exec(oldSQL).Error; err != nil {
+		t.Fatalf("create old table: %v", err)
+	}
+
+	// Insert a document using old schema (no pack_name, pack_title columns)
+	insertSQL := fmt.Sprintf("INSERT INTO %s (document_id, version, locale, words, created_at, updated_at, created_by, updated_by) VALUES ('d1', 'draft', 'en', '[\"hello\"]', datetime('now'), datetime('now'), 'u1', 'u1')",
+		documentTableName("en-vocab-pack"))
+	if err := db.Exec(insertSQL).Error; err != nil {
+		t.Fatalf("insert: %v", err)
+	}
+
+	// Now call EnsureCollection with layout fields (simulates restart with fix)
+	layoutFields := []entity.FieldDefinition{
+		{
+			Name: "layout",
+			Type: "layout",
+			Fields: []entity.FieldDefinition{
+				{Name: "packName", Type: "text"},
+				{Name: "packTitle", Type: "text"},
+			},
+		},
+		{Name: "words", Type: "json"},
+	}
+	if err := repo.EnsureCollection(ctx, "en-vocab-pack", layoutFields); err != nil {
+		t.Fatalf("EnsureCollection: %v", err)
+	}
+
+	// Verify columns were added
+	cols, err := existingColumns(db, documentTableName("en-vocab-pack"))
+	if err != nil {
+		t.Fatalf("existingColumns: %v", err)
+	}
+	if !cols["pack_name"] {
+		t.Error("expected 'pack_name' column after migration")
+	}
+	if !cols["pack_title"] {
+		t.Error("expected 'pack_title' column after migration")
+	}
+
+	// Update the existing document with layout field values
+	doc := &entity.Document{
+		DocumentID: "d1", Version: entity.VersionDraft,
+		Fields:    map[string]any{"packName": "New Pack", "packTitle": "New Title", "words": `["hello"]`},
+		Locale:    "en",
+		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
+		CreatedBy: "u1", UpdatedBy: "u1",
+	}
+	if err := repo.UpsertDraft(ctx, "en-vocab-pack", doc); err != nil {
+		t.Fatalf("UpsertDraft: %v", err)
+	}
+
+	// Read back and verify
+	found, err := repo.FindDraftByDocumentID(ctx, "en-vocab-pack", "d1", "en")
+	if err != nil {
+		t.Fatalf("FindDraftByDocumentID: %v", err)
+	}
+	if got := found.Fields["packName"]; got != "New Pack" {
+		t.Errorf("packName = %v, want %q", got, "New Pack")
+	}
+	if got := found.Fields["packTitle"]; got != "New Title" {
+		t.Errorf("packTitle = %v, want %q", got, "New Title")
+	}
+}
+
 func TestDocumentRepository_TableInfo(t *testing.T) {
 	db, err := NewClient("sqlite", ":memory:")
 	if err != nil {

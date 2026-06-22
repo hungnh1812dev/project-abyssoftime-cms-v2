@@ -46,6 +46,18 @@ func NewDocumentHandler(usecase documentUseCase, contentType documentContentType
 	return &DocumentHandler{usecase: usecase, contentType: contentType, userResolver: userResolver}
 }
 
+func flattenLayoutFields(fields []entity.FieldDefinition) []entity.FieldDefinition {
+	var result []entity.FieldDefinition
+	for _, field := range fields {
+		if field.Type == "layout" {
+			result = append(result, field.Fields...)
+		} else {
+			result = append(result, field)
+		}
+	}
+	return result
+}
+
 var allowedOrderBy = map[string]bool{
 	"id":        true,
 	"createdAt": true,
@@ -261,13 +273,14 @@ func (h *DocumentHandler) ListCollection(ginCtx *gin.Context) {
 	}
 	listFields := ct.ListFields
 	if len(listFields) == 0 && len(ct.Fields) > 0 {
+		flat := flattenLayoutFields(ct.Fields)
 		limit := 3
-		if len(ct.Fields) < limit {
-			limit = len(ct.Fields)
+		if len(flat) < limit {
+			limit = len(flat)
 		}
 		listFields = make([]string, limit)
 		for i := 0; i < limit; i++ {
-			listFields[i] = ct.Fields[i].Name
+			listFields[i] = flat[i].Name
 		}
 	}
 

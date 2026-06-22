@@ -173,7 +173,6 @@ describe('CollectionListPage — navigation', () => {
 
   it('Delete button shows confirm dialog and calls DELETE', async () => {
     const user = userEvent.setup()
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
     mock.onGet('/api/document-manager/collection-type/blog-posts').reply(200, { items: [doc1], total: 1, start: 0, size: 20 })
     mock.onDelete('/api/document-manager/collection-type/blog-posts/doc-1').reply(204)
 
@@ -182,7 +181,9 @@ describe('CollectionListPage — navigation', () => {
     await waitFor(() => screen.getByRole('button', { name: /delete/i }))
     await user.click(screen.getByRole('button', { name: /delete/i }))
 
-    expect(window.confirm).toHaveBeenCalled()
+    await waitFor(() => screen.getByText('Delete entry'))
+    await user.click(screen.getByRole('button', { name: /^delete$/i }))
+
     await waitFor(() =>
       expect(mock.history.delete.some((r) => r.url === '/api/document-manager/collection-type/blog-posts/doc-1')).toBe(true),
     )
@@ -190,7 +191,6 @@ describe('CollectionListPage — navigation', () => {
 
   it('Delete button does not call DELETE when user cancels confirm', async () => {
     const user = userEvent.setup()
-    vi.spyOn(window, 'confirm').mockReturnValue(false)
     mock.onGet('/api/document-manager/collection-type/blog-posts').reply(200, { items: [doc1], total: 1, start: 0, size: 20 })
 
     renderWithProviders(<CollectionListPage contentType={ct} />)
@@ -198,6 +198,10 @@ describe('CollectionListPage — navigation', () => {
     await waitFor(() => screen.getByRole('button', { name: /delete/i }))
     await user.click(screen.getByRole('button', { name: /delete/i }))
 
+    await waitFor(() => screen.getByText('Delete entry'))
+    await user.click(screen.getByRole('button', { name: /cancel/i }))
+
+    await waitFor(() => expect(screen.queryByText('Delete entry')).not.toBeInTheDocument())
     expect(mock.history.delete).toHaveLength(0)
   })
 

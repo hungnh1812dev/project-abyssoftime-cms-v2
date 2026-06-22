@@ -4,6 +4,15 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from '@/components/ui/dialog';
+import {
   Table,
   TableHeader,
   TableBody,
@@ -16,7 +25,7 @@ import { useUpdateListFields } from '@/hooks/useContentTypes';
 import { useLocales } from '@/hooks/useLocales';
 import { getRegistration, type CollectionColumnDef } from '@/content-type-registry';
 import { ColumnChooserDialog } from '@/components/collection/ColumnChooserDialog';
-import type { ContentType, Document, FieldDefinition } from '@/types/cms';
+import { flattenFields, type ContentType, type Document, type FieldDefinition } from '@/types/cms';
 import { Pencil, Trash2, Copy, ArrowUpDown, ArrowUp, ArrowDown, Settings2 } from 'lucide-react';
 
 interface Props {
@@ -30,7 +39,7 @@ function deriveColumns(contentType: ContentType): CollectionColumnDef[] {
   if (registration?.columns) return registration.columns;
 
   const listFieldNames = (contentType.listFields ?? []).filter((name) => !SYSTEM_FIELD_KEYS.has(name));
-  const fields = contentType.Fields ?? [];
+  const fields = flattenFields(contentType.Fields ?? []);
   const fieldMap = new Map<string, FieldDefinition>();
   for (const field of fields) fieldMap.set(field.name, field);
 
@@ -130,6 +139,7 @@ export function CollectionListPage({ contentType }: Props) {
   const [orderBy, setOrderBy] = useState<SortField>('id');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [columnChooserOpen, setColumnChooserOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const { data: locales = [] } = useLocales();
   const activeLocale = locales[0] || '';
 
@@ -152,8 +162,13 @@ export function CollectionListPage({ contentType }: Props) {
 
   function handleDelete(event: React.MouseEvent, doc: Document) {
     event.stopPropagation();
-    if (!window.confirm('Delete this entry?')) return;
-    deleteDoc({ contentTypeSlug: contentType.Slug, id: doc.data.documentId as string });
+    setDeleteTarget(doc.data.documentId as string);
+  }
+
+  function confirmDelete() {
+    if (!deleteTarget) return;
+    deleteDoc({ contentTypeSlug: contentType.Slug, id: deleteTarget });
+    setDeleteTarget(null);
   }
 
   function handleDuplicate(event: React.MouseEvent, doc: Document) {
@@ -229,6 +244,19 @@ export function CollectionListPage({ contentType }: Props) {
           isSaving={updateListFields.isPending}
         />
       )}
+
+      <Dialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>Delete entry</DialogTitle>
+            <DialogDescription>Are you sure you want to delete this entry? This action cannot be undone.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
+            <Button variant="destructive" onClick={confirmDelete}>Delete</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {docs.length === 0 ? (
         <p className="text-muted-foreground">No entries yet.</p>

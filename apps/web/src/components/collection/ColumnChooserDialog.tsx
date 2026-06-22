@@ -8,7 +8,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import type { ContentType } from '@/types/cms';
+import { flattenFields, type ContentType } from '@/types/cms';
 
 const SYSTEM_DISPLAY_FIELDS = [
   { key: 'createdAt', label: 'Created At' },
@@ -26,7 +26,7 @@ interface ColumnChooserDialogProps {
 }
 
 function defaultSelection(contentType: ContentType): Set<string> {
-  const fields = (contentType.Fields ?? []).filter((field) => field.type !== 'component');
+  const fields = flattenFields(contentType.Fields ?? []).filter((field) => field.type !== 'component');
   const contentDefaults = fields.slice(0, 3).map((field) => field.name);
   const systemDefaults = SYSTEM_DISPLAY_FIELDS.map((field) => field.key);
   return new Set([...contentDefaults, ...systemDefaults]);
@@ -52,7 +52,7 @@ export function ColumnChooserDialog({
     }
   }, [open, currentListFields, contentType]);
 
-  const contentFields = (contentType.Fields ?? []).filter((field) => field.type !== 'component');
+  const contentFields = flattenFields(contentType.Fields ?? []).filter((field) => field.type !== 'component');
 
   function handleToggle(key: string) {
     setSelected((prev) => {
