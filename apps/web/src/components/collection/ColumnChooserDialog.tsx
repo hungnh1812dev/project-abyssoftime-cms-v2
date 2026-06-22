@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -32,6 +32,12 @@ function defaultSelection(contentType: ContentType): Set<string> {
   return new Set([...contentDefaults, ...systemDefaults]);
 }
 
+function initialSelection(contentType: ContentType, currentListFields: string[]): Set<string> {
+  return currentListFields.length > 0
+    ? new Set(currentListFields)
+    : defaultSelection(contentType);
+}
+
 export function ColumnChooserDialog({
   open,
   onOpenChange,
@@ -40,17 +46,31 @@ export function ColumnChooserDialog({
   onSave,
   isSaving,
 }: ColumnChooserDialogProps) {
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      {open && (
+        <ColumnChooserContent
+          contentType={contentType}
+          currentListFields={currentListFields}
+          onOpenChange={onOpenChange}
+          onSave={onSave}
+          isSaving={isSaving}
+        />
+      )}
+    </Dialog>
+  );
+}
 
-  useEffect(() => {
-    if (open) {
-      const initial =
-        currentListFields.length > 0
-          ? new Set(currentListFields)
-          : defaultSelection(contentType);
-      setSelected(initial);
-    }
-  }, [open, currentListFields, contentType]);
+function ColumnChooserContent({
+  contentType,
+  currentListFields,
+  onOpenChange,
+  onSave,
+  isSaving,
+}: Omit<ColumnChooserDialogProps, 'open'>) {
+  const [selected, setSelected] = useState<Set<string>>(
+    () => initialSelection(contentType, currentListFields),
+  );
 
   const contentFields = flattenFields(contentType.Fields ?? []).filter((field) => field.type !== 'component');
 
@@ -73,58 +93,56 @@ export function ColumnChooserDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Configure columns</DialogTitle>
-          <DialogDescription>Choose which columns to display in the list view.</DialogDescription>
-        </DialogHeader>
+    <DialogContent className="sm:max-w-md">
+      <DialogHeader>
+        <DialogTitle>Configure columns</DialogTitle>
+        <DialogDescription>Choose which columns to display in the list view.</DialogDescription>
+      </DialogHeader>
 
-        <div className="space-y-4 max-h-80 overflow-y-auto">
-          <div>
-            <h4 className="text-sm font-medium mb-2">Content fields</h4>
-            <div className="space-y-2">
-              {contentFields.map((field) => (
-                <label key={field.name} className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selected.has(field.name)}
-                    onChange={() => handleToggle(field.name)}
-                    className="rounded border-input"
-                  />
-                  {field.name}
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <h4 className="text-sm font-medium mb-2">System fields</h4>
-            <div className="space-y-2">
-              {SYSTEM_DISPLAY_FIELDS.map((field) => (
-                <label key={field.key} className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selected.has(field.key)}
-                    onChange={() => handleToggle(field.key)}
-                    className="rounded border-input"
-                  />
-                  {field.label}
-                </label>
-              ))}
-            </div>
+      <div className="space-y-4 max-h-80 overflow-y-auto">
+        <div>
+          <h4 className="text-sm font-medium mb-2">Content fields</h4>
+          <div className="space-y-2">
+            {contentFields.map((field) => (
+              <label key={field.name} className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={selected.has(field.name)}
+                  onChange={() => handleToggle(field.name)}
+                  className="rounded border-input"
+                />
+                {field.name}
+              </label>
+            ))}
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave} disabled={isSaving}>
-            {isSaving ? 'Saving...' : 'Save'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        <div>
+          <h4 className="text-sm font-medium mb-2">System fields</h4>
+          <div className="space-y-2">
+            {SYSTEM_DISPLAY_FIELDS.map((field) => (
+              <label key={field.key} className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={selected.has(field.key)}
+                  onChange={() => handleToggle(field.key)}
+                  className="rounded border-input"
+                />
+                {field.label}
+              </label>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <DialogFooter>
+        <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>
+          Cancel
+        </Button>
+        <Button onClick={handleSave} disabled={isSaving}>
+          {isSaving ? 'Saving...' : 'Save'}
+        </Button>
+      </DialogFooter>
+    </DialogContent>
   );
 }
