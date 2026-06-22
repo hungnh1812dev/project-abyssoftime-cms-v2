@@ -7,7 +7,7 @@ export interface BreadcrumbItem {
 }
 
 function slugToTitle(slug: string): string {
-  return slug.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+  return slug.replace(/[-_]/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())
 }
 
 const SETTINGS_LABELS: Record<string, string> = {

@@ -38,7 +38,7 @@ export function MediaLibraryPage() {
               type="file"
               multiple
               accept="image/*"
-              onChange={(e) => setStagedFiles(Array.from(e.target.files ?? []))}
+              onChange={(event) => setStagedFiles(Array.from(event.target.files ?? []))}
               className="sr-only"
             />
           </label>
@@ -91,10 +91,10 @@ export function MediaLibraryPage() {
       <div className="flex items-center justify-between">
         <span className="text-sm text-muted-foreground">{total} asset{total !== 1 ? 's' : ''}</span>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => setPage((p) => p - 1)} disabled={!hasPrev}>
+          <Button variant="outline" size="sm" onClick={() => setPage((currentPage) => currentPage - 1)} disabled={!hasPrev}>
             Prev
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setPage((p) => p + 1)} disabled={!hasNext}>
+          <Button variant="outline" size="sm" onClick={() => setPage((currentPage) => currentPage + 1)} disabled={!hasNext}>
             Next
           </Button>
         </div>

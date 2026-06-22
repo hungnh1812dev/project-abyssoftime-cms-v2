@@ -66,6 +66,22 @@ See [sync-table-fields.md](sync-table-fields.md) for full plan. Spec: [specs/syn
 
 ---
 
+## Phase DL — Fix Production Data Loss in EnsureCollection
+
+Spec: [fix-data-loss-ensure-collection.md](../specs/fix-data-loss-ensure-collection.md). Plan: [plan.md](plan.md) (Phase DL section).
+
+- [x] T1 Shared `existingColumns` helper (cross-DB column introspection)
+- [x] T2 Document `EnsureCollection` → non-destructive (create-if-missing + add-columns)
+- [x] T3 Document data-preservation tests (3 new tests)
+- [x] ✅ Checkpoint 1a: `go test ./internal/infrastructure/gormdb/ -run TestDocument -v` — 16 pass
+- [x] T4 Component `EnsureCollection` → non-destructive
+- [x] T5 Component data-preservation tests (3 new tests)
+- [x] ✅ Checkpoint 1: `go test ./internal/infrastructure/gormdb/` — all 26 pass + `go test ./...` green
+- [x] T6 Sync startup logging (`TableInfo` + log in `syncOne`)
+- [x] ✅ Checkpoint 2 (Final): full test suite + startup logs verified
+
+---
+
 ## Archive Index
 
 | Archive | Phases | Status |

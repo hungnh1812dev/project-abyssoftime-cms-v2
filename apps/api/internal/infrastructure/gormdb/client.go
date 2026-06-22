@@ -48,5 +48,6 @@ func AutoMigrate(db *gorm.DB) error {
 		&entity.RoleEntity{},
 		&entity.Invite{},
 		&entity.AccessToken{},
+		&entity.Locale{},
 	)
 }

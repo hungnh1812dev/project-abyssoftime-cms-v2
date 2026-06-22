@@ -1,7 +1,17 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from '@/components/ui/dialog';
 import {
   Table,
   TableHeader,
@@ -10,36 +20,54 @@ import {
   TableHead,
   TableCell,
 } from '@/components/ui/table';
-import { useCollectionDocuments, useDeleteCollectionDocument } from '@/hooks/useCollectionDocuments';
+import { useCollectionDocuments, useDeleteCollectionDocument, useDuplicateCollectionDocument } from '@/hooks/useCollectionDocuments';
+import { useUpdateListFields } from '@/hooks/useContentTypes';
 import { useLocales } from '@/hooks/useLocales';
 import { getRegistration, type CollectionColumnDef } from '@/content-type-registry';
-import type { ContentType, Document, FieldDefinition } from '@/types/cms';
-import { Pencil, Trash2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { ColumnChooserDialog } from '@/components/collection/ColumnChooserDialog';
+import { LocaleSelector } from '@/components/locale/LocaleSelector';
+import { flattenFields, type ContentType, type Document, type FieldDefinition } from '@/types/cms';
+import { Pencil, Trash2, Copy, ArrowUpDown, ArrowUp, ArrowDown, Settings2 } from 'lucide-react';
 
 interface Props {
   contentType: ContentType;
 }
 
+const SYSTEM_FIELD_KEYS = new Set(['createdAt', 'updatedAt', 'updatedByName']);
+
 function deriveColumns(contentType: ContentType): CollectionColumnDef[] {
   const registration = getRegistration(contentType.Slug);
   if (registration?.columns) return registration.columns;
 
-  const listFieldNames = contentType.listFields ?? [];
-  const fields = contentType.Fields ?? [];
+  const listFieldNames = (contentType.listFields ?? []).filter((name) => !SYSTEM_FIELD_KEYS.has(name));
+  const fields = flattenFields(contentType.Fields ?? []);
   const fieldMap = new Map<string, FieldDefinition>();
-  for (const f of fields) fieldMap.set(f.name, f);
+  for (const field of fields) fieldMap.set(field.name, field);
 
-  const names = listFieldNames.length > 0 ? listFieldNames : fields.slice(0, 3).map((f) => f.name);
+  const names = listFieldNames.length > 0
+    ? listFieldNames
+    : fields.filter((field) => field.type !== 'component').slice(0, 3).map((field) => field.name);
 
   return names.map((name) => {
-    const f = fieldMap.get(name);
-    const fieldType = f?.type ?? 'text';
+    const field = fieldMap.get(name);
+    const fieldType = field?.type ?? 'text';
     let colType: CollectionColumnDef['type'] = 'text';
     if (fieldType === 'boolean') colType = 'boolean';
     else if (fieldType === 'number') colType = 'number';
     else if (fieldType === 'media') colType = 'image';
     return { key: name, label: name, type: colType };
   });
+}
+
+function deriveSystemVisibility(listFields: string[]): { showCreatedAt: boolean; showUpdatedAt: boolean; showUpdatedBy: boolean } {
+  if (listFields.length === 0) {
+    return { showCreatedAt: true, showUpdatedAt: true, showUpdatedBy: true };
+  }
+  return {
+    showCreatedAt: listFields.includes('createdAt'),
+    showUpdatedAt: listFields.includes('updatedAt'),
+    showUpdatedBy: listFields.includes('updatedByName'),
+  };
 }
 
 function cellValue(doc: Document, col: CollectionColumnDef): React.ReactNode {
@@ -111,14 +139,22 @@ export function CollectionListPage({ contentType }: Props) {
   const [start, setStart] = useState(0);
   const [orderBy, setOrderBy] = useState<SortField>('id');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [columnChooserOpen, setColumnChooserOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const { data: locales = [] } = useLocales();
-  const activeLocale = locales[0] || '';
+  const [selectedLocale, setSelectedLocale] = useState('');
+  const activeLocale = selectedLocale || locales.find((loc) => loc.isDefault)?.code || locales[0]?.code || '';
 
+  const queryClient = useQueryClient();
   const { data: page, isLoading } = useCollectionDocuments(contentType.Slug, start, PAGE_SIZE, activeLocale, orderBy, sortDir);
   const { mutate: deleteDoc } = useDeleteCollectionDocument();
+  const { mutateAsync: duplicateDoc } = useDuplicateCollectionDocument();
+  const updateListFields = useUpdateListFields();
   const navigate = useNavigate();
 
+  const hasRegistryOverride = Boolean(getRegistration(contentType.Slug)?.columns);
   const columns = deriveColumns(contentType);
+  const systemVis = deriveSystemVisibility(contentType.listFields ?? []);
   const docs = page?.items ?? [];
   const total = page?.total ?? 0;
 
@@ -126,22 +162,38 @@ export function CollectionListPage({ contentType }: Props) {
     navigate(`/admin/content-type/collection-type/${contentType.Slug}/new`);
   }
 
-  function handleDelete(e: React.MouseEvent, doc: Document) {
-    e.stopPropagation();
-    if (!window.confirm('Delete this entry?')) return;
-    deleteDoc({ contentTypeSlug: contentType.Slug, id: doc.data.documentId as string });
+  function handleDelete(event: React.MouseEvent, doc: Document) {
+    event.stopPropagation();
+    setDeleteTarget(doc.data.documentId as string);
   }
 
-  function handleEdit(e: React.MouseEvent, doc: Document) {
-    e.stopPropagation();
+  function confirmDelete() {
+    if (!deleteTarget) return;
+    deleteDoc({ contentTypeSlug: contentType.Slug, id: deleteTarget });
+    setDeleteTarget(null);
+  }
+
+  function handleDuplicate(event: React.MouseEvent, doc: Document) {
+    event.stopPropagation();
+    duplicateDoc({
+      contentTypeSlug: contentType.Slug,
+      id: doc.data.documentId as string,
+      locale: activeLocale,
+    }).then((newDoc) => {
+      navigate(`/admin/content-type/collection-type/${contentType.Slug}/${newDoc.data.documentId}`);
+    });
+  }
+
+  function handleEdit(event: React.MouseEvent, doc: Document) {
+    event.stopPropagation();
     navigate(`/admin/content-type/collection-type/${contentType.Slug}/${doc.data.documentId}`);
   }
 
-  function handleSort(field: SortField) {
-    if (orderBy === field) {
-      setSortDir((prev) => (prev === 'desc' ? 'asc' : 'desc'));
+  function handleSort(sortField: SortField) {
+    if (orderBy === sortField) {
+      setSortDir((currentDir) => (currentDir === 'desc' ? 'asc' : 'desc'));
     } else {
-      setOrderBy(field);
+      setOrderBy(sortField);
       setSortDir('desc');
     }
     setStart(0);
@@ -149,6 +201,18 @@ export function CollectionListPage({ contentType }: Props) {
 
   function handleRowClick(doc: Document) {
     navigate(`/admin/content-type/collection-type/${contentType.Slug}/${doc.data.documentId}`);
+  }
+
+  function handleSaveListFields(selectedFields: string[]) {
+    updateListFields.mutate(
+      { slug: contentType.Slug, listFields: selectedFields },
+      {
+        onSuccess: () => {
+          setColumnChooserOpen(false);
+          queryClient.invalidateQueries({ queryKey: ['documents', 'collection-type', contentType.Slug] });
+        },
+      },
+    );
   }
 
   if (isLoading) {
@@ -162,31 +226,69 @@ export function CollectionListPage({ contentType }: Props) {
     <div className="space-y-4 p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">{contentType.Name}</h1>
-        <Button onClick={handleCreate}>Add new item</Button>
+        <div className="flex items-center gap-2">
+          <LocaleSelector value={activeLocale} onChange={(code) => { setSelectedLocale(code); setStart(0); }} />
+          {!hasRegistryOverride && (
+            <Button variant="outline" size="icon" aria-label="Configure columns" onClick={() => setColumnChooserOpen(true)}>
+              <Settings2 className="h-4 w-4" />
+            </Button>
+          )}
+          <Button onClick={handleCreate}>Add new item</Button>
+        </div>
       </div>
+
+      {!hasRegistryOverride && (
+        <ColumnChooserDialog
+          open={columnChooserOpen}
+          onOpenChange={setColumnChooserOpen}
+          contentType={contentType}
+          currentListFields={contentType.listFields ?? []}
+          onSave={handleSaveListFields}
+          isSaving={updateListFields.isPending}
+        />
+      )}
+
+      <Dialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>Delete entry</DialogTitle>
+            <DialogDescription>Are you sure you want to delete this entry? This action cannot be undone.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
+            <Button variant="destructive" onClick={confirmDelete}>Delete</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {docs.length === 0 ? (
         <p className="text-muted-foreground">No entries yet.</p>
       ) : (
         <>
-          <div className="rounded-md border">
+          <div className="rounded-md border overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-16">
                     <SortableHeader label="Id" field="id" activeField={orderBy} activeDir={sortDir} onSort={handleSort} />
                   </TableHead>
-                  {columns.map((col) => (
-                    <TableHead key={col.key}>{col.label}</TableHead>
+                  {columns.map((column) => (
+                    <TableHead key={column.key}>{column.label}</TableHead>
                   ))}
+                  {systemVis.showCreatedAt && (
+                    <TableHead>
+                      <SortableHeader label="Created At" field="createdAt" activeField={orderBy} activeDir={sortDir} onSort={handleSort} />
+                    </TableHead>
+                  )}
+                  {systemVis.showUpdatedAt && (
+                    <TableHead>
+                      <SortableHeader label="Updated At" field="updatedAt" activeField={orderBy} activeDir={sortDir} onSort={handleSort} />
+                    </TableHead>
+                  )}
+                  {systemVis.showUpdatedBy && (
+                    <TableHead>Updated By</TableHead>
+                  )}
                   <TableHead>Status</TableHead>
-                  <TableHead>
-                    <SortableHeader label="Created At" field="createdAt" activeField={orderBy} activeDir={sortDir} onSort={handleSort} />
-                  </TableHead>
-                  <TableHead>
-                    <SortableHeader label="Updated At" field="updatedAt" activeField={orderBy} activeDir={sortDir} onSort={handleSort} />
-                  </TableHead>
-                  <TableHead>Updated By</TableHead>
                   <TableHead className="w-24 text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -198,22 +300,31 @@ export function CollectionListPage({ contentType }: Props) {
                     onClick={() => handleRowClick(doc)}
                   >
                     <TableCell className="font-mono text-sm">{String(doc.data.id ?? '')}</TableCell>
-                    {columns.map((col) => (
-                      <TableCell key={col.key}>{cellValue(doc, col)}</TableCell>
+                    {columns.map((column) => (
+                      <TableCell key={column.key}>{cellValue(doc, column)}</TableCell>
                     ))}
+                    {systemVis.showCreatedAt && (
+                      <TableCell className="text-sm text-muted-foreground">{formatDate(doc.data.createdAt)}</TableCell>
+                    )}
+                    {systemVis.showUpdatedAt && (
+                      <TableCell className="text-sm text-muted-foreground">{formatDate(doc.data.updatedAt)}</TableCell>
+                    )}
+                    {systemVis.showUpdatedBy && (
+                      <TableCell className="text-sm text-muted-foreground">{String(doc.data.updatedByName ?? '')}</TableCell>
+                    )}
                     <TableCell>
                       <Badge variant={statusVariant[doc.status] ?? 'draft'}>{doc.status}</Badge>
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{formatDate(doc.data.createdAt)}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{formatDate(doc.data.updatedAt)}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{String(doc.data.updatedByName ?? '')}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="icon" aria-label="Edit" onClick={(e) => handleEdit(e, doc)}>
-                          <Pencil className="h-4 w-4" />
+                        <Button variant="outline" size="icon-xs" className="hover:bg-accent-foreground/10" aria-label="Edit" onClick={(event) => handleEdit(event, doc)}>
+                          <Pencil className="h-3 w-3" />
                         </Button>
-                        <Button variant="ghost" size="icon" aria-label="Delete" onClick={(e) => handleDelete(e, doc)}>
-                          <Trash2 className="h-4 w-4" />
+                        <Button variant="outline" size="icon-xs" className="hover:bg-accent-foreground/10" aria-label="Duplicate" onClick={(event) => handleDuplicate(event, doc)}>
+                          <Copy className="h-3 w-3" />
+                        </Button>
+                        <Button variant="destructive" size="icon-xs" aria-label="Delete" onClick={(event) => handleDelete(event, doc)}>
+                          <Trash2 className="h-3 w-3" />
                         </Button>
                       </div>
                     </TableCell>

@@ -35,7 +35,7 @@ const ALL_ROLES = ['super_admin', 'admin', 'editor', 'guest'] as const
 
 function rolesBelow(currentRole: string | null): string[] {
   const level = roleLevel(currentRole)
-  return ALL_ROLES.filter((r) => roleLevel(r) < level)
+  return ALL_ROLES.filter((role) => roleLevel(role) < level)
 }
 
 interface InviteFields {
@@ -70,8 +70,8 @@ export function UsersPage() {
     createInvite.mutate(
       { email: data.email, role: inviteRole },
       {
-        onSuccess: (res) => {
-          setInviteLink(`${window.location.origin}/invite/${res.token}`)
+        onSuccess: (response) => {
+          setInviteLink(`${window.location.origin}/invite/${response.token}`)
           inviteForm.reset()
           setInviteRole('')
         },
@@ -123,14 +123,14 @@ export function UsersPage() {
                 </div>
                 <div className="space-y-1">
                   <Label>Role</Label>
-                  <Select value={inviteRole} onValueChange={(v: string | null) => setInviteRole(v ?? '')}>
+                  <Select value={inviteRole} onValueChange={(value: string | null) => setInviteRole(value ?? '')}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select role" />
                     </SelectTrigger>
                     <SelectContent>
-                      {availableRoles.map((r) => (
-                        <SelectItem key={r} value={r}>
-                          {r}
+                      {availableRoles.map((role) => (
+                        <SelectItem key={role} value={role}>
+                          {role}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -157,26 +157,26 @@ export function UsersPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {users.map((u) => {
-              const isMe = u.id === userId
-              const canManage = !isMe && roleLevel(myRole) > roleLevel(u.role)
+            {users.map((user) => {
+              const isMe = user.id === userId
+              const canManage = !isMe && roleLevel(myRole) > roleLevel(user.role)
               return (
-                <TableRow key={u.id} className={isMe ? 'bg-accent/30' : undefined}>
-                  <TableCell>{u.email}{isMe && <span className="text-xs text-muted-foreground ml-2">(you)</span>}</TableCell>
-                  <TableCell><Badge variant="secondary">{u.role}</Badge></TableCell>
+                <TableRow key={user.id} className={isMe ? 'bg-accent/30' : undefined}>
+                  <TableCell>{user.email}{isMe && <span className="text-xs text-muted-foreground ml-2">(you)</span>}</TableCell>
+                  <TableCell><Badge variant="secondary">{user.role}</Badge></TableCell>
                   <TableCell className="text-right">
                     {canManage && (
                       <div className="flex justify-end gap-2">
                         <Select
-                          onValueChange={(role: string | null) => { if (role) updateRole.mutate({ id: u.id, role }) }}
+                          onValueChange={(role: string | null) => { if (role) updateRole.mutate({ id: user.id, role }) }}
                         >
                           <SelectTrigger className="w-32 h-8 text-xs">
                             <SelectValue placeholder="Change role" />
                           </SelectTrigger>
                           <SelectContent>
-                            {availableRoles.map((r) => (
-                              <SelectItem key={r} value={r}>
-                                {r}
+                            {availableRoles.map((role) => (
+                              <SelectItem key={role} value={role}>
+                                {role}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -185,8 +185,8 @@ export function UsersPage() {
                           variant="destructive"
                           size="sm"
                           onClick={() => {
-                            if (confirm(`Delete user ${u.email}?`)) {
-                              deleteUser.mutate(u.id)
+                            if (confirm(`Delete user ${user.email}?`)) {
+                              deleteUser.mutate(user.id)
                             }
                           }}
                         >
@@ -205,10 +205,10 @@ export function UsersPage() {
       <div className="flex items-center justify-between">
         <span className="text-sm text-muted-foreground">{total} user{total !== 1 ? 's' : ''}</span>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => setPage((p) => p - 1)} disabled={!hasPrev}>
+          <Button variant="outline" size="sm" onClick={() => setPage((currentPage) => currentPage - 1)} disabled={!hasPrev}>
             Prev
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setPage((p) => p + 1)} disabled={!hasNext}>
+          <Button variant="outline" size="sm" onClick={() => setPage((currentPage) => currentPage + 1)} disabled={!hasNext}>
             Next
           </Button>
         </div>
@@ -227,24 +227,24 @@ export function UsersPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {invites.map((inv) => {
-                const expired = new Date(inv.expiresAt) < now
+              {invites.map((invite) => {
+                const expired = new Date(invite.expiresAt) < now
                 return (
-                  <TableRow key={inv.id} className={expired ? 'opacity-50' : undefined}>
-                    <TableCell>{inv.email}</TableCell>
-                    <TableCell><Badge variant="secondary">{inv.role}</Badge></TableCell>
+                  <TableRow key={invite.id} className={expired ? 'opacity-50' : undefined}>
+                    <TableCell>{invite.email}</TableCell>
+                    <TableCell><Badge variant="secondary">{invite.role}</Badge></TableCell>
                     <TableCell>
                       {expired ? (
                         <Badge variant="destructive">Expired</Badge>
                       ) : (
-                        new Date(inv.expiresAt).toLocaleDateString()
+                        new Date(invite.expiresAt).toLocaleDateString()
                       )}
                     </TableCell>
                     <TableCell className="text-right">
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => revokeInvite.mutate(inv.id)}
+                        onClick={() => revokeInvite.mutate(invite.id)}
                       >
                         Revoke
                       </Button>

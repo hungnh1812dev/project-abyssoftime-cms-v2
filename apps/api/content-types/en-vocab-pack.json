@@ -2,11 +2,14 @@
   "slug": "en-vocab-pack",
   "name": "English Vocab Pack",
   "kind": "collection",
-  "listFields": ["packName", "packTitle", "wordRange"],
   "fields": [
-    { "name": "packName", "type": "text" },
-    { "name": "packTitle", "type": "text" },
-    { "name": "wordRange", "type": "text" },
+    {
+      "type": "layout",
+      "fields": [
+        { "name": "packName", "type": "text" },
+        { "name": "packTitle", "type": "text" }
+      ]
+    },
     { "name": "words", "type": "json" }
   ]
 }

@@ -17,43 +17,43 @@ type inviteUseCase interface {
 }
 
 type InviteHandler struct {
-	uc inviteUseCase
+	usecase inviteUseCase
 }
 
-func NewInviteHandler(uc inviteUseCase) *InviteHandler {
-	return &InviteHandler{uc: uc}
+func NewInviteHandler(usecase inviteUseCase) *InviteHandler {
+	return &InviteHandler{usecase: usecase}
 }
 
-func (h *InviteHandler) Create(c *gin.Context) {
+func (h *InviteHandler) Create(ginCtx *gin.Context) {
 	var req struct {
 		Email string `json:"email"`
 		Role  string `json:"role"`
 	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		ginWriteError(c, http.StatusBadRequest, "invalid request body")
+	if err := ginCtx.ShouldBindJSON(&req); err != nil {
+		ginWriteError(ginCtx, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
-	actorID := c.GetString("userID")
-	inv, plaintext, err := h.uc.Create(c.Request.Context(), actorID, req.Email, entity.Role(req.Role))
+	actorID := ginCtx.GetString("userID")
+	invite, plaintext, err := h.usecase.Create(ginCtx.Request.Context(), actorID, req.Email, entity.Role(req.Role))
 	if err != nil {
-		ginWriteErr(c, err)
+		ginWriteErr(ginCtx, err)
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{
-		"id":        inv.DocumentID,
-		"email":     inv.Email,
-		"role":      inv.Role,
-		"expiresAt": inv.ExpiresAt,
+	ginCtx.JSON(http.StatusCreated, gin.H{
+		"id":        invite.DocumentID,
+		"email":     invite.Email,
+		"role":      invite.Role,
+		"expiresAt": invite.ExpiresAt,
 		"token":     plaintext,
 	})
 }
 
-func (h *InviteHandler) List(c *gin.Context) {
-	invites, err := h.uc.List(c.Request.Context())
+func (h *InviteHandler) List(ginCtx *gin.Context) {
+	invites, err := h.usecase.List(ginCtx.Request.Context())
 	if err != nil {
-		ginWriteErr(c, err)
+		ginWriteErr(ginCtx, err)
 		return
 	}
 
@@ -66,45 +66,45 @@ func (h *InviteHandler) List(c *gin.Context) {
 		CreatedAt string `json:"createdAt"`
 	}
 	items := make([]inviteItem, len(invites))
-	for i, inv := range invites {
+	for i, invite := range invites {
 		items[i] = inviteItem{
-			ID:        inv.DocumentID,
-			Email:     inv.Email,
-			Role:      string(inv.Role),
-			ExpiresAt: inv.ExpiresAt.Format("2006-01-02T15:04:05Z"),
-			CreatedBy: inv.CreatedBy,
-			CreatedAt: inv.CreatedAt.Format("2006-01-02T15:04:05Z"),
+			ID:        invite.DocumentID,
+			Email:     invite.Email,
+			Role:      string(invite.Role),
+			ExpiresAt: invite.ExpiresAt.Format("2006-01-02T15:04:05Z"),
+			CreatedBy: invite.CreatedBy,
+			CreatedAt: invite.CreatedAt.Format("2006-01-02T15:04:05Z"),
 		}
 	}
-	c.JSON(http.StatusOK, gin.H{"items": items})
+	ginCtx.JSON(http.StatusOK, gin.H{"items": items})
 }
 
-func (h *InviteHandler) Revoke(c *gin.Context) {
-	if err := h.uc.Revoke(c.Request.Context(), c.Param("id")); err != nil {
-		ginWriteErr(c, err)
+func (h *InviteHandler) Revoke(ginCtx *gin.Context) {
+	if err := h.usecase.Revoke(ginCtx.Request.Context(), ginCtx.Param("id")); err != nil {
+		ginWriteErr(ginCtx, err)
 		return
 	}
-	c.Status(http.StatusNoContent)
+	ginCtx.Status(http.StatusNoContent)
 }
 
-func (h *InviteHandler) Accept(c *gin.Context) {
+func (h *InviteHandler) Accept(ginCtx *gin.Context) {
 	var req struct {
 		Password    string `json:"password"`
 		DisplayName string `json:"displayName"`
 	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		ginWriteError(c, http.StatusBadRequest, "invalid request body")
+	if err := ginCtx.ShouldBindJSON(&req); err != nil {
+		ginWriteError(ginCtx, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
-	token := c.Param("token")
-	user, err := h.uc.Accept(c.Request.Context(), token, req.Password, req.DisplayName)
+	token := ginCtx.Param("token")
+	user, err := h.usecase.Accept(ginCtx.Request.Context(), token, req.Password, req.DisplayName)
 	if err != nil {
-		ginWriteErr(c, err)
+		ginWriteErr(ginCtx, err)
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{
+	ginCtx.JSON(http.StatusCreated, gin.H{
 		"id":          user.ID,
 		"email":       user.Email,
 		"displayName": user.DisplayName,

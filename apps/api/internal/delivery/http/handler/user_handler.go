@@ -18,11 +18,11 @@ type userUseCase interface {
 }
 
 type UserHandler struct {
-	uc userUseCase
+	usecase userUseCase
 }
 
-func NewUserHandler(uc userUseCase) *UserHandler {
-	return &UserHandler{uc: uc}
+func NewUserHandler(usecase userUseCase) *UserHandler {
+	return &UserHandler{usecase: usecase}
 }
 
 type userResponse struct {
@@ -33,13 +33,13 @@ type userResponse struct {
 	RoleID      string `json:"roleId"`
 }
 
-func toUserResponse(u *entity.User) userResponse {
-	return userResponse{ID: u.DocumentID, Email: u.Email, DisplayName: u.DisplayName, Role: string(u.Role), RoleID: u.RoleID}
+func toUserResponse(user *entity.User) userResponse {
+	return userResponse{ID: user.DocumentID, Email: user.Email, DisplayName: user.DisplayName, Role: string(user.Role), RoleID: user.RoleID}
 }
 
-func (h *UserHandler) List(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+func (h *UserHandler) List(ginCtx *gin.Context) {
+	page, _ := strconv.Atoi(ginCtx.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(ginCtx.DefaultQuery("limit", "20"))
 	if page < 1 {
 		page = 1
 	}
@@ -47,54 +47,54 @@ func (h *UserHandler) List(c *gin.Context) {
 		limit = 20
 	}
 
-	users, total, err := h.uc.List(c.Request.Context(), page, limit)
+	users, total, err := h.usecase.List(ginCtx.Request.Context(), page, limit)
 	if err != nil {
-		ginWriteErr(c, err)
+		ginWriteErr(ginCtx, err)
 		return
 	}
 
 	items := make([]userResponse, len(users))
-	for i, u := range users {
-		items[i] = toUserResponse(u)
+	for i, user := range users {
+		items[i] = toUserResponse(user)
 	}
-	c.JSON(http.StatusOK, gin.H{"items": items, "total": total, "page": page, "limit": limit})
+	ginCtx.JSON(http.StatusOK, gin.H{"items": items, "total": total, "page": page, "limit": limit})
 }
 
-func (h *UserHandler) Get(c *gin.Context) {
-	user, err := h.uc.GetByID(c.Request.Context(), c.Param("id"))
+func (h *UserHandler) Get(ginCtx *gin.Context) {
+	user, err := h.usecase.GetByID(ginCtx.Request.Context(), ginCtx.Param("id"))
 	if err != nil {
-		ginWriteErr(c, err)
+		ginWriteErr(ginCtx, err)
 		return
 	}
-	c.JSON(http.StatusOK, toUserResponse(user))
+	ginCtx.JSON(http.StatusOK, toUserResponse(user))
 }
 
-func (h *UserHandler) UpdateRole(c *gin.Context) {
+func (h *UserHandler) UpdateRole(ginCtx *gin.Context) {
 	var req struct {
 		RoleID string `json:"roleId"`
 	}
-	if err := c.ShouldBindJSON(&req); err != nil || req.RoleID == "" {
-		ginWriteError(c, http.StatusBadRequest, "invalid request body")
+	if err := ginCtx.ShouldBindJSON(&req); err != nil || req.RoleID == "" {
+		ginWriteError(ginCtx, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
-	actorID := c.GetString("userID")
-	targetID := c.Param("id")
+	actorID := ginCtx.GetString("userID")
+	targetID := ginCtx.Param("id")
 
-	if err := h.uc.UpdateRole(c.Request.Context(), actorID, targetID, req.RoleID); err != nil {
-		ginWriteErr(c, err)
+	if err := h.usecase.UpdateRole(ginCtx.Request.Context(), actorID, targetID, req.RoleID); err != nil {
+		ginWriteErr(ginCtx, err)
 		return
 	}
-	c.Status(http.StatusNoContent)
+	ginCtx.Status(http.StatusNoContent)
 }
 
-func (h *UserHandler) Delete(c *gin.Context) {
-	actorID := c.GetString("userID")
-	targetID := c.Param("id")
+func (h *UserHandler) Delete(ginCtx *gin.Context) {
+	actorID := ginCtx.GetString("userID")
+	targetID := ginCtx.Param("id")
 
-	if err := h.uc.Delete(c.Request.Context(), actorID, targetID); err != nil {
-		ginWriteErr(c, err)
+	if err := h.usecase.Delete(ginCtx.Request.Context(), actorID, targetID); err != nil {
+		ginWriteErr(ginCtx, err)
 		return
 	}
-	c.Status(http.StatusNoContent)
+	ginCtx.Status(http.StatusNoContent)
 }

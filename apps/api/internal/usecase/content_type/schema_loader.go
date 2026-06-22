@@ -52,26 +52,7 @@ func LoadDefinitions(dir string) ([]ContentTypeDefinition, error) {
 }
 
 func validateDefinition(def ContentTypeDefinition, path string) error {
-	if err := validateFields(def.Fields, path, 1); err != nil {
-		return err
-	}
-	return validateListFields(def, path)
-}
-
-func validateListFields(def ContentTypeDefinition, path string) error {
-	if len(def.ListFields) == 0 {
-		return nil
-	}
-	fieldNames := make(map[string]bool, len(def.Fields))
-	for _, f := range def.Fields {
-		fieldNames[f.Name] = true
-	}
-	for _, lf := range def.ListFields {
-		if !fieldNames[lf] {
-			return fmt.Errorf("%q: listFields entry %q does not match any field name", path, lf)
-		}
-	}
-	return nil
+	return validateFields(def.Fields, path, 1)
 }
 
 func validateFields(fields []entity.FieldDefinition, path string, depth int) error {

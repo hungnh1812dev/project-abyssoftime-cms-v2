@@ -24,6 +24,7 @@ export interface PaginatedResponse<T> {
   total: number
   start: number
   size: number
+  listFields?: string[]
 }
 
 export type EntryStatus = 'draft' | 'modified' | 'published'
@@ -43,6 +44,20 @@ export function stripSystemFields(data: Record<string, unknown>): Record<string,
     }
   }
   return content
+}
+
+export function flattenFields(fields: FieldDefinition[]): FieldDefinition[] {
+  return fields.flatMap((field) =>
+    field.type === 'layout' ? (field.fields ?? []) : [field],
+  )
+}
+
+export interface Locale {
+  code: string
+  name: string
+  isDefault: boolean
+  createdAt: string
+  updatedAt: string
 }
 
 export interface MediaAsset {

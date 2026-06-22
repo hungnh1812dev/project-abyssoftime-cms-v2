@@ -102,7 +102,7 @@ export function InviteAcceptPage() {
               aria-invalid={!!errors.confirmPassword}
               {...register('confirmPassword', {
                 required: 'Please confirm your password',
-                validate: (v) => v === password || 'Passwords do not match',
+                validate: (value) => value === password || 'Passwords do not match',
               })}
             />
             {errors.confirmPassword && (

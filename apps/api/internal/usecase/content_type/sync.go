@@ -2,6 +2,7 @@ package content_type
 
 import (
 	"context"
+	"log"
 
 	"project-abyssoftime-cms-v2/api/internal/domain/entity"
 	"project-abyssoftime-cms-v2/api/internal/domain/repository"
@@ -57,12 +58,20 @@ func (s *Syncer) Sync(ctx context.Context, defs []ContentTypeDefinition) error {
 func (s *Syncer) syncOne(ctx context.Context, def ContentTypeDefinition) error {
 	kind := entity.ContentKind(def.Kind)
 
+	if exists, count, err := s.docRepo.TableInfo(ctx, def.Slug); err == nil {
+		if exists {
+			log.Printf("sync: %q — table exists, %d rows", def.Slug, count)
+		} else {
+			log.Printf("sync: %q — table not found, will create", def.Slug)
+		}
+	}
+
 	current, err := s.FindBySlug(ctx, def.Slug)
 	if err != nil {
 		if !pkgerrors.Is(err, pkgerrors.ErrNotFound) {
 			return err
 		}
-		ct := &entity.ContentType{Name: def.Name, Slug: def.Slug, Kind: kind, Fields: def.Fields, ListFields: def.ListFields}
+		ct := &entity.ContentType{Name: def.Name, Slug: def.Slug, Kind: kind, Fields: def.Fields}
 		if err := s.Create(ctx, ct); err != nil {
 			return err
 		}
@@ -79,13 +88,12 @@ func (s *Syncer) syncOne(ctx context.Context, def ContentTypeDefinition) error {
 		return err
 	}
 
-	if current.Name == def.Name && current.Kind == kind && fieldsEqual(current.Fields, def.Fields) && stringSliceEqual(current.ListFields, def.ListFields) {
+	if current.Name == def.Name && current.Kind == kind && fieldsEqual(current.Fields, def.Fields) {
 		return nil
 	}
 	current.Name = def.Name
 	current.Kind = kind
 	current.Fields = def.Fields
-	current.ListFields = def.ListFields
 	return s.Update(ctx, current)
 }
 

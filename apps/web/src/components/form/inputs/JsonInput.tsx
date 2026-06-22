@@ -13,7 +13,7 @@ function serialize(value: unknown): string {
   return JSON.stringify(value, null, 2);
 }
 
-function InnerJsonInput({ field }: { field: { value: unknown; onChange: (v: unknown) => void } }) {
+function InnerJsonInput({ field }: { field: { value: unknown; onChange: (value: unknown) => void } }) {
   const [rawValue, setRawValue] = useState(serialize(field.value));
   const [syntaxError, setSyntaxError] = useState<string | null>(null);
   const [editCount, setEditCount] = useState(0);
@@ -39,7 +39,7 @@ function InnerJsonInput({ field }: { field: { value: unknown; onChange: (v: unkn
           minHeight="15em"
           onChange={(val) => {
             setRawValue(val);
-            setEditCount((c) => c + 1);
+            setEditCount((count) => count + 1);
             if (val.trim() === '') {
               setSyntaxError(null);
               field.onChange(null);
@@ -68,7 +68,7 @@ export function JsonInput({ name, control }: JsonInputProps) {
       control={control}
       defaultValue={null}
       rules={{
-        validate: (v) => v !== undefined || 'Invalid JSON',
+        validate: (value) => value !== undefined || 'Invalid JSON',
       }}
       render={({ field }) => <InnerJsonInput field={field} />}
     />

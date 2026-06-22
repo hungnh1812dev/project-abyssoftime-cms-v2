@@ -14,20 +14,20 @@ import (
 var _ repository.RoleRepository = (*roleRepository)(nil)
 
 type roleRepository struct {
-	db *gorm.DB
+	database *gorm.DB
 }
 
-func NewRoleRepository(db *gorm.DB) repository.RoleRepository {
-	return &roleRepository{db: db}
+func NewRoleRepository(database *gorm.DB) repository.RoleRepository {
+	return &roleRepository{database: database}
 }
 
 func (r *roleRepository) Create(ctx context.Context, role *entity.RoleEntity) error {
-	return r.db.WithContext(ctx).Create(role).Error
+	return r.database.WithContext(ctx).Create(role).Error
 }
 
 func (r *roleRepository) FindByID(ctx context.Context, documentID string) (*entity.RoleEntity, error) {
 	var role entity.RoleEntity
-	if err := r.db.WithContext(ctx).Where("document_id = ?", documentID).First(&role).Error; err != nil {
+	if err := r.database.WithContext(ctx).Where("document_id = ?", documentID).First(&role).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, pkgerrors.ErrNotFound
 		}
@@ -38,7 +38,7 @@ func (r *roleRepository) FindByID(ctx context.Context, documentID string) (*enti
 
 func (r *roleRepository) FindBySlug(ctx context.Context, slug string) (*entity.RoleEntity, error) {
 	var role entity.RoleEntity
-	if err := r.db.WithContext(ctx).Where("slug = ?", slug).First(&role).Error; err != nil {
+	if err := r.database.WithContext(ctx).Where("slug = ?", slug).First(&role).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, pkgerrors.ErrNotFound
 		}
@@ -49,14 +49,14 @@ func (r *roleRepository) FindBySlug(ctx context.Context, slug string) (*entity.R
 
 func (r *roleRepository) FindAll(ctx context.Context) ([]*entity.RoleEntity, error) {
 	var roles []*entity.RoleEntity
-	if err := r.db.WithContext(ctx).Order("level DESC").Find(&roles).Error; err != nil {
+	if err := r.database.WithContext(ctx).Order("level DESC").Find(&roles).Error; err != nil {
 		return nil, err
 	}
 	return roles, nil
 }
 
 func (r *roleRepository) Update(ctx context.Context, role *entity.RoleEntity) error {
-	result := r.db.WithContext(ctx).Save(role)
+	result := r.database.WithContext(ctx).Save(role)
 	if result.Error != nil {
 		return result.Error
 	}
@@ -67,7 +67,7 @@ func (r *roleRepository) Update(ctx context.Context, role *entity.RoleEntity) er
 }
 
 func (r *roleRepository) Delete(ctx context.Context, documentID string) error {
-	result := r.db.WithContext(ctx).Where("document_id = ?", documentID).Delete(&entity.RoleEntity{})
+	result := r.database.WithContext(ctx).Where("document_id = ?", documentID).Delete(&entity.RoleEntity{})
 	if result.Error != nil {
 		return result.Error
 	}
@@ -79,7 +79,7 @@ func (r *roleRepository) Delete(ctx context.Context, documentID string) error {
 
 func (r *roleRepository) HasAny(ctx context.Context) (bool, error) {
 	var count int64
-	if err := r.db.WithContext(ctx).Model(&entity.RoleEntity{}).Count(&count).Error; err != nil {
+	if err := r.database.WithContext(ctx).Model(&entity.RoleEntity{}).Count(&count).Error; err != nil {
 		return false, err
 	}
 	return count > 0, nil

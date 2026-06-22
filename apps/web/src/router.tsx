@@ -7,46 +7,52 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminPage } from "./pages/admin/AdminPage";
 
 const ContentTypePage = lazy(() =>
-  import("@/pages/admin/panels/ContentTypePage").then((m) => ({
-    default: m.ContentTypePage,
+  import("@/pages/admin/panels/ContentTypePage").then((module) => ({
+    default: module.ContentTypePage,
   })),
 );
 
 const CollectionDetailPage = lazy(() =>
   import("@/pages/admin/panels/collection-type/CollectionDetailPage").then(
-    (m) => ({
-      default: m.CollectionDetailPage,
+    (module) => ({
+      default: module.CollectionDetailPage,
     }),
   ),
 );
 
 const MediaLibraryPage = lazy(() =>
-  import("@/pages/admin/settings/MediaLibraryPage").then((m) => ({
-    default: m.MediaLibraryPage,
+  import("@/pages/admin/settings/MediaLibraryPage").then((module) => ({
+    default: module.MediaLibraryPage,
   })),
 );
 
 const UsersPage = lazy(() =>
-  import("@/pages/admin/settings/UsersPage").then((m) => ({
-    default: m.UsersPage,
+  import("@/pages/admin/settings/UsersPage").then((module) => ({
+    default: module.UsersPage,
   })),
 );
 
 const AccessTokensPage = lazy(() =>
-  import("@/pages/admin/settings/AccessTokensPage").then((m) => ({
-    default: m.AccessTokensPage,
+  import("@/pages/admin/settings/AccessTokensPage").then((module) => ({
+    default: module.AccessTokensPage,
   })),
 );
 
 const RolesPage = lazy(() =>
-  import("@/pages/admin/settings/RolesPage").then((m) => ({
-    default: m.RolesPage,
+  import("@/pages/admin/settings/RolesPage").then((module) => ({
+    default: module.RolesPage,
+  })),
+);
+
+const InternationalizePage = lazy(() =>
+  import("@/pages/admin/settings/InternationalizePage").then((module) => ({
+    default: module.InternationalizePage,
   })),
 );
 
 const InviteAcceptPage = lazy(() =>
-  import("@/pages/auth/InviteAcceptPage").then((m) => ({
-    default: m.InviteAcceptPage,
+  import("@/pages/auth/InviteAcceptPage").then((module) => ({
+    default: module.InviteAcceptPage,
   })),
 );
 
@@ -151,6 +157,16 @@ export function AppRouter() {
             <ProtectedRoute minRole="super_admin">
               <Suspense fallback={<PanelFallback />}>
                 <RolesPage />
+              </Suspense>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="settings/internationalize"
+          element={
+            <ProtectedRoute minRole="super_admin">
+              <Suspense fallback={<PanelFallback />}>
+                <InternationalizePage />
               </Suspense>
             </ProtectedRoute>
           }

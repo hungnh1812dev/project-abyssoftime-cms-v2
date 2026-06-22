@@ -44,15 +44,18 @@ func TestLoadDefinitions_Valid(t *testing.T) {
 	if blogPost.Kind != "collection" {
 		t.Errorf("blogPost.Kind = %q, want %q", blogPost.Kind, "collection")
 	}
-	if len(blogPost.ListFields) != 1 || blogPost.ListFields[0] != "title" {
-		t.Errorf("blogPost.ListFields = %v, want [title]", blogPost.ListFields)
+	if len(blogPost.ListFields) != 0 {
+		t.Errorf("blogPost.ListFields = %v, want []", blogPost.ListFields)
 	}
 }
 
-func TestLoadDefinitions_ListFieldsInvalidRef(t *testing.T) {
-	_, err := contenttype.LoadDefinitions("testdata/invalid/listfields-invalid-ref")
-	if err == nil {
-		t.Fatal("LoadDefinitions() error = nil, want error for listFields referencing nonexistent field")
+func TestLoadDefinitions_ListFieldsIgnored(t *testing.T) {
+	defs, err := contenttype.LoadDefinitions("testdata/valid-with-listfields")
+	if err != nil {
+		t.Fatalf("LoadDefinitions() should not error when listFields is present in JSON, got %v", err)
+	}
+	if len(defs) != 1 {
+		t.Fatalf("LoadDefinitions() count = %d, want 1", len(defs))
 	}
 }
 

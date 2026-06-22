@@ -39,32 +39,32 @@ func WithRole(ctx context.Context, role string) context.Context {
 // Auth validates the Bearer token from the Authorization header and
 // injects userID + role into the request context.
 func Auth(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		header := r.Header.Get("Authorization")
+	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		header := request.Header.Get("Authorization")
 		if !strings.HasPrefix(header, "Bearer ") {
-			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			http.Error(writer, `{"error":"unauthorized"}`, http.StatusUnauthorized)
 			return
 		}
 
 		claims, err := pkgjwt.ValidateToken(strings.TrimPrefix(header, "Bearer "))
 		if err != nil {
-			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			http.Error(writer, `{"error":"unauthorized"}`, http.StatusUnauthorized)
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), ContextKeyUserID, claims.UserID)
+		ctx := context.WithValue(request.Context(), ContextKeyUserID, claims.UserID)
 		ctx = context.WithValue(ctx, ContextKeyRole, claims.Role)
-		next.ServeHTTP(w, r.WithContext(ctx))
+		next.ServeHTTP(writer, request.WithContext(ctx))
 	})
 }
 
 // RequireRole returns 403 if the role in context does not match required.
 func RequireRole(role string, next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if Role(r.Context()) != role {
-			http.Error(w, `{"error":"forbidden"}`, http.StatusForbidden)
+	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if Role(request.Context()) != role {
+			http.Error(writer, `{"error":"forbidden"}`, http.StatusForbidden)
 			return
 		}
-		next.ServeHTTP(w, r)
+		next.ServeHTTP(writer, request)
 	})
 }

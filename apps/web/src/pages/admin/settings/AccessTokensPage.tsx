@@ -66,23 +66,23 @@ export function AccessTokensPage() {
   const hasDocumentsAll = selectedScopes.includes('documents:read')
 
   function toggleScope(scope: string) {
-    setSelectedScopes((prev) => {
+    setSelectedScopes((previousScopes) => {
       if (scope === 'documents:read') {
-        if (prev.includes('documents:read')) {
-          return prev.filter((s) => s !== 'documents:read')
+        if (previousScopes.includes('documents:read')) {
+          return previousScopes.filter((item) => item !== 'documents:read')
         }
-        return [...prev.filter((s) => !s.startsWith('documents:read')), 'documents:read']
+        return [...previousScopes.filter((item) => !item.startsWith('documents:read')), 'documents:read']
       }
 
       if (scope.startsWith('documents:read:')) {
-        const without = prev.filter((s) => s !== scope && s !== 'documents:read')
-        if (prev.includes(scope)) {
+        const without = previousScopes.filter((item) => item !== scope && item !== 'documents:read')
+        if (previousScopes.includes(scope)) {
           return without
         }
         return [...without, scope]
       }
 
-      return prev.includes(scope) ? prev.filter((s) => s !== scope) : [...prev, scope]
+      return previousScopes.includes(scope) ? previousScopes.filter((item) => item !== scope) : [...previousScopes, scope]
     })
   }
 
@@ -91,8 +91,8 @@ export function AccessTokensPage() {
     createToken.mutate(
       { name: tokenName, scopes: selectedScopes, expiresIn: expiresIn || undefined },
       {
-        onSuccess: (res) => {
-          setCreatedToken(res.token)
+        onSuccess: (response) => {
+          setCreatedToken(response.token)
           setTokenName('')
           setSelectedScopes([])
           setExpiresIn('')
@@ -143,7 +143,7 @@ export function AccessTokensPage() {
                   <Input
                     id="token-name"
                     value={tokenName}
-                    onChange={(e) => setTokenName(e.target.value)}
+                    onChange={(event) => setTokenName(event.target.value)}
                     placeholder="e.g. Frontend production"
                   />
                 </div>
@@ -210,14 +210,14 @@ export function AccessTokensPage() {
                 </div>
                 <div className="space-y-1">
                   <Label>Expiration</Label>
-                  <Select value={expiresIn} onValueChange={(v: string | null) => setExpiresIn(v ?? '')}>
+                  <Select value={expiresIn} onValueChange={(value: string | null) => setExpiresIn(value ?? '')}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select expiration" />
                     </SelectTrigger>
                     <SelectContent>
-                      {EXPIRY_OPTIONS.map((opt) => (
-                        <SelectItem key={opt.value || 'none'} value={opt.value || 'none'}>
-                          {opt.label}
+                      {EXPIRY_OPTIONS.map((option) => (
+                        <SelectItem key={option.value || 'none'} value={option.value || 'none'}>
+                          {option.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -251,34 +251,34 @@ export function AccessTokensPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {tokens.map((t) => (
-              <TableRow key={t.id}>
-                <TableCell className="font-medium">{t.name}</TableCell>
+            {tokens.map((token) => (
+              <TableRow key={token.id}>
+                <TableCell className="font-medium">{token.name}</TableCell>
                 <TableCell>
-                  <code className="text-xs text-muted-foreground">{t.prefix}••••••</code>
+                  <code className="text-xs text-muted-foreground">{token.prefix}••••••</code>
                 </TableCell>
                 <TableCell>
                   <div className="flex gap-1 flex-wrap">
-                    {t.scopes.map((s) => (
-                      <Badge key={s} variant="secondary" className="text-xs">
-                        {formatScope(s)}
+                    {token.scopes.map((scope) => (
+                      <Badge key={scope} variant="secondary" className="text-xs">
+                        {formatScope(scope)}
                       </Badge>
                     ))}
                   </div>
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
-                  {t.expiresAt ? new Date(t.expiresAt).toLocaleDateString() : 'Never'}
+                  {token.expiresAt ? new Date(token.expiresAt).toLocaleDateString() : 'Never'}
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
-                  {t.lastUsedAt ? new Date(t.lastUsedAt).toLocaleDateString() : 'Never'}
+                  {token.lastUsedAt ? new Date(token.lastUsedAt).toLocaleDateString() : 'Never'}
                 </TableCell>
                 <TableCell className="text-right">
                   <Button
                     variant="destructive"
                     size="sm"
                     onClick={() => {
-                      if (confirm(`Delete token "${t.name}"?`)) {
-                        deleteToken.mutate(t.id)
+                      if (confirm(`Delete token "${token.name}"?`)) {
+                        deleteToken.mutate(token.id)
                       }
                     }}
                   >
@@ -294,10 +294,10 @@ export function AccessTokensPage() {
       <div className="flex items-center justify-between">
         <span className="text-sm text-muted-foreground">{total} token{total !== 1 ? 's' : ''}</span>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => setPage((p) => p - 1)} disabled={!hasPrev}>
+          <Button variant="outline" size="sm" onClick={() => setPage((currentPage) => currentPage - 1)} disabled={!hasPrev}>
             Prev
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setPage((p) => p + 1)} disabled={!hasNext}>
+          <Button variant="outline" size="sm" onClick={() => setPage((currentPage) => currentPage + 1)} disabled={!hasNext}>
             Next
           </Button>
         </div>

@@ -4,8 +4,8 @@ import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import type { Document } from '@/types/cms'
 
-function onMutationError(err: unknown) {
-  const msg = (err as AxiosError<{ error: string }>).response?.data?.error ?? 'Something went wrong'
+function onMutationError(error: unknown) {
+  const msg = (error as AxiosError<{ error: string }>).response?.data?.error ?? 'Something went wrong'
   toast.error(msg)
 }
 
@@ -24,8 +24,8 @@ export function useSingleTypeDocument(slug: string, locale: string) {
           { params: { locale } },
         )
         return res.data
-      } catch (err) {
-        const status = (err as AxiosError).response?.status
+      } catch (error) {
+        const status = (error as AxiosError).response?.status
         if (status === 404) return undefined
         throw err
       }
@@ -39,7 +39,7 @@ export function useSingleTypeDocument(slug: string, locale: string) {
 }
 
 export function useSaveSingleType() {
-  const qc = useQueryClient()
+  const queryClient = useQueryClient()
   return useMutation({
     mutationFn: ({
       contentTypeSlug,
@@ -52,9 +52,9 @@ export function useSaveSingleType() {
     }) =>
       api
         .put<Document>(`/api/document-manager/single-type/${contentTypeSlug}`, { data }, { params: { locale } })
-        .then((r) => r.data),
+        .then((response) => response.data),
     onSuccess: (result) => {
-      qc.invalidateQueries({ queryKey: ['documents', 'single-type'] })
+      queryClient.invalidateQueries({ queryKey: ['documents', 'single-type'] })
       return result
     },
     onError: onMutationError,
@@ -62,7 +62,7 @@ export function useSaveSingleType() {
 }
 
 export function usePublishSingleType() {
-  const qc = useQueryClient()
+  const queryClient = useQueryClient()
   return useMutation({
     mutationFn: ({
       contentTypeSlug,
@@ -77,16 +77,16 @@ export function usePublishSingleType() {
           undefined,
           { params: { locale } },
         )
-        .then((r) => r.data),
+        .then((response) => response.data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['documents', 'single-type'] })
+      queryClient.invalidateQueries({ queryKey: ['documents', 'single-type'] })
     },
     onError: onMutationError,
   })
 }
 
 export function useUnpublishSingleType() {
-  const qc = useQueryClient()
+  const queryClient = useQueryClient()
   return useMutation({
     mutationFn: ({
       contentTypeSlug,
@@ -101,9 +101,9 @@ export function useUnpublishSingleType() {
           undefined,
           { params: { locale } },
         )
-        .then((r) => r.data),
+        .then((response) => response.data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['documents', 'single-type'] })
+      queryClient.invalidateQueries({ queryKey: ['documents', 'single-type'] })
     },
     onError: onMutationError,
   })

@@ -7,6 +7,7 @@ import { api } from '@/lib/api';
 import type { Document as CmsDocument, ContentType } from '@/types/cms';
 import { stripSystemFields } from '@/types/cms';
 import { useState } from 'react';
+import { LocaleSelector } from '@/components/locale/LocaleSelector';
 import { ContentDetailLayout } from './ContentDetailLayout';
 import { ContentTypeBuilder } from './ContentTypeBuilder';
 
@@ -43,8 +44,8 @@ export function ContentTypePanel({ contentType, id, isNew }: Props) {
   const isSingle = contentType.Kind === 'single';
   const navigate = useNavigate();
   const { data: locales = [] } = useLocales();
-  const [locale, setLocale] = useState('');
-  const activeLocale = locale || locales[0] || '';
+  const [selectedLocale, setSelectedLocale] = useState('');
+  const activeLocale = selectedLocale || locales.find((loc) => loc.isDefault)?.code || locales[0]?.code || '';
 
   const singleQuery = useSingleTypeDocument(
     isSingle ? contentType.Slug : '',
@@ -170,15 +171,7 @@ export function ContentTypePanel({ contentType, id, isNew }: Props) {
       ) : undefined}
       renderActions={() => (
         <>
-          {locales.length > 1 && (
-            <select aria-label="Locale" value={activeLocale} onChange={(e) => setLocale(e.target.value)}>
-              {locales.map((l) => (
-                <option key={l} value={l}>
-                  {l}
-                </option>
-              ))}
-            </select>
-          )}
+          <LocaleSelector value={activeLocale} onChange={setSelectedLocale} />
         </>
       )}>
       <ContentTypeBuilder
@@ -188,7 +181,7 @@ export function ContentTypePanel({ contentType, id, isNew }: Props) {
           queryFn: () =>
             api
               .get<CmsDocument>(apiBase, { params: { locale: activeLocale } })
-              .then((r) => stripSystemFields((r.data as CmsDocument).data)),
+              .then((response) => stripSystemFields((response.data as CmsDocument).data)),
         }}
         mutationFn={mutationFn}
         renderActions={({ isDirty, submitting }) => (

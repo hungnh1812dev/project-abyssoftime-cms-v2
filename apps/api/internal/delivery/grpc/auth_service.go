@@ -17,43 +17,43 @@ type authUseCase interface {
 
 type AuthServiceServer struct {
 	pb.UnimplementedAuthServiceServer
-	uc authUseCase
+	usecase authUseCase
 }
 
-func NewAuthServiceServer(uc authUseCase) *AuthServiceServer {
-	return &AuthServiceServer{uc: uc}
+func NewAuthServiceServer(usecase authUseCase) *AuthServiceServer {
+	return &AuthServiceServer{usecase: usecase}
 }
 
-func (s *AuthServiceServer) Login(ctx context.Context, req *pb.LoginRequest) (*pb.LoginResponse, error) {
-	access, refresh, err := s.uc.Login(ctx, req.Email, req.Password)
+func (server *AuthServiceServer) Login(ctx context.Context, req *pb.LoginRequest) (*pb.LoginResponse, error) {
+	access, refresh, err := server.usecase.Login(ctx, req.Email, req.Password)
 	if err != nil {
 		return nil, toGRPCError(err)
 	}
 	return &pb.LoginResponse{AccessToken: access, RefreshToken: refresh}, nil
 }
 
-func (s *AuthServiceServer) Register(ctx context.Context, req *pb.RegisterRequest) (*pb.RegisterResponse, error) {
+func (server *AuthServiceServer) Register(ctx context.Context, req *pb.RegisterRequest) (*pb.RegisterResponse, error) {
 	displayName := req.Email
 	if idx := strings.Index(req.Email, "@"); idx > 0 {
 		displayName = req.Email[:idx]
 	}
-	user, err := s.uc.Register(ctx, req.Email, req.Password, displayName)
+	user, err := server.usecase.Register(ctx, req.Email, req.Password, displayName)
 	if err != nil {
 		return nil, toGRPCError(err)
 	}
 	return &pb.RegisterResponse{Id: user.DocumentID, Email: user.Email, Role: string(user.Role)}, nil
 }
 
-func (s *AuthServiceServer) Refresh(ctx context.Context, req *pb.RefreshRequest) (*pb.RefreshResponse, error) {
-	access, _, err := s.uc.RefreshToken(ctx, req.RefreshToken)
+func (server *AuthServiceServer) Refresh(ctx context.Context, req *pb.RefreshRequest) (*pb.RefreshResponse, error) {
+	access, _, err := server.usecase.RefreshToken(ctx, req.RefreshToken)
 	if err != nil {
 		return nil, toGRPCError(err)
 	}
 	return &pb.RefreshResponse{AccessToken: access}, nil
 }
 
-func (s *AuthServiceServer) SetupStatus(ctx context.Context, _ *pb.SetupStatusRequest) (*pb.SetupStatusResponse, error) {
-	hasAdmin, err := s.uc.SetupStatus(ctx)
+func (server *AuthServiceServer) SetupStatus(ctx context.Context, _ *pb.SetupStatusRequest) (*pb.SetupStatusResponse, error) {
+	hasAdmin, err := server.usecase.SetupStatus(ctx)
 	if err != nil {
 		return nil, toGRPCError(err)
 	}

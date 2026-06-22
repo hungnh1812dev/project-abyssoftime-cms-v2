@@ -14,29 +14,30 @@ import (
 var _ repository.ComponentRepository = (*componentRepository)(nil)
 
 type componentRepository struct {
-	db *gorm.DB
+	database *gorm.DB
 }
 
-func NewComponentRepository(db *gorm.DB) repository.ComponentRepository {
-	return &componentRepository{db: db}
+func NewComponentRepository(database *gorm.DB) repository.ComponentRepository {
+	return &componentRepository{database: database}
 }
 
 func (r *componentRepository) table(slug, component string) *gorm.DB {
-	return r.db.Table(componentTableName(slug, component))
+	return r.database.Table(componentTableName(slug, component))
 }
 
 func (r *componentRepository) isPostgres() bool {
-	return r.db.Dialector.Name() == "postgres"
+	return r.database.Dialector.Name() == "postgres"
 }
 
 func (r *componentRepository) EnsureCollection(ctx context.Context, contentTypeSlug, componentName string, fields []entity.FieldDefinition) error {
 	table := componentTableName(contentTypeSlug, componentName)
-	if r.db.Migrator().HasTable(table) {
-		if err := r.db.WithContext(ctx).Migrator().DropTable(table); err != nil {
-			return err
-		}
+	if !r.database.Migrator().HasTable(table) {
+		return r.createComponentTable(ctx, table, fields)
 	}
+	return r.addMissingComponentColumns(ctx, table, fields)
+}
 
+func (r *componentRepository) createComponentTable(ctx context.Context, table string, fields []entity.FieldDefinition) error {
 	var cols []string
 	if r.isPostgres() {
 		cols = append(cols, "gorm_id SERIAL PRIMARY KEY")
@@ -54,12 +55,30 @@ func (r *componentRepository) EnsureCollection(ctx context.Context, contentTypeS
 	cols = append(cols, "updated_at TIMESTAMP")
 
 	sql := fmt.Sprintf("CREATE TABLE %s (%s)", table, strings.Join(cols, ", "))
-	return r.db.WithContext(ctx).Exec(sql).Error
+	return r.database.WithContext(ctx).Exec(sql).Error
+}
+
+func (r *componentRepository) addMissingComponentColumns(ctx context.Context, table string, fields []entity.FieldDefinition) error {
+	cols, err := existingColumns(r.database, table)
+	if err != nil {
+		return err
+	}
+	for _, f := range fields {
+		col := toSnakeCase(f.Name)
+		if cols[col] {
+			continue
+		}
+		sql := fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table, col, fieldColumnType(f.Type))
+		if err := r.database.WithContext(ctx).Exec(sql).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *componentRepository) DropCollection(ctx context.Context, contentTypeSlug, componentName string) error {
 	table := componentTableName(contentTypeSlug, componentName)
-	return r.db.WithContext(ctx).Migrator().DropTable(table)
+	return r.database.WithContext(ctx).Migrator().DropTable(table)
 }
 
 func compToRow(c *entity.Component) map[string]any {

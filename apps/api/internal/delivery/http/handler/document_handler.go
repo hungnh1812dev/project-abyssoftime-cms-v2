@@ -19,6 +19,7 @@ type documentUseCase interface {
 	Publish(ctx context.Context, contentTypeSlug, documentID, locale string, fields []entity.FieldDefinition, userID string) error
 	Unpublish(ctx context.Context, contentTypeSlug, documentID, locale string) error
 	Delete(ctx context.Context, contentTypeSlug, documentID string, fields []entity.FieldDefinition) error
+	Duplicate(ctx context.Context, contentTypeSlug, sourceDocumentID, locale string, fields []entity.FieldDefinition, userID string) (*entity.Document, error)
 
 	GetSingleType(ctx context.Context, contentTypeSlug, locale string, fields []entity.FieldDefinition) (*entity.Document, string, error)
 	SaveSingleType(ctx context.Context, contentTypeSlug string, data map[string]any, locale string, fields []entity.FieldDefinition, userID string) (*entity.Document, error)
@@ -36,13 +37,25 @@ type userDisplayNameResolver interface {
 }
 
 type DocumentHandler struct {
-	uc           documentUseCase
-	ctUC         documentContentTypeUseCase
+	usecase      documentUseCase
+	contentType  documentContentTypeUseCase
 	userResolver userDisplayNameResolver
 }
 
-func NewDocumentHandler(uc documentUseCase, ctUC documentContentTypeUseCase, userResolver userDisplayNameResolver) *DocumentHandler {
-	return &DocumentHandler{uc: uc, ctUC: ctUC, userResolver: userResolver}
+func NewDocumentHandler(usecase documentUseCase, contentType documentContentTypeUseCase, userResolver userDisplayNameResolver) *DocumentHandler {
+	return &DocumentHandler{usecase: usecase, contentType: contentType, userResolver: userResolver}
+}
+
+func flattenLayoutFields(fields []entity.FieldDefinition) []entity.FieldDefinition {
+	var result []entity.FieldDefinition
+	for _, field := range fields {
+		if field.Type == "layout" {
+			result = append(result, field.Fields...)
+		} else {
+			result = append(result, field)
+		}
+	}
+	return result
 }
 
 var allowedOrderBy = map[string]bool{
@@ -89,10 +102,11 @@ type paginatedListItem struct {
 }
 
 type paginatedResponse struct {
-	Items []paginatedListItem `json:"items"`
-	Total int64               `json:"total"`
-	Start int                 `json:"start"`
-	Size  int                 `json:"size"`
+	Items      []paginatedListItem `json:"items"`
+	Total      int64               `json:"total"`
+	Start      int                 `json:"start"`
+	Size       int                 `json:"size"`
+	ListFields []string            `json:"listFields,omitempty"`
 }
 
 func mergeDocData(doc *entity.Document) map[string]any {
@@ -157,8 +171,8 @@ func ginPaginationParams(c *gin.Context) (start, size int) {
 	return start, size
 }
 
-func (h *DocumentHandler) resolveFields(c *gin.Context, slug string) []entity.FieldDefinition {
-	ct, err := h.ctUC.FindBySlug(c.Request.Context(), slug)
+func (h *DocumentHandler) resolveFields(ginCtx *gin.Context, slug string) []entity.FieldDefinition {
+	ct, err := h.contentType.FindBySlug(ginCtx.Request.Context(), slug)
 	if err != nil {
 		return nil
 	}
@@ -167,55 +181,55 @@ func (h *DocumentHandler) resolveFields(c *gin.Context, slug string) []entity.Fi
 
 // --- Single-type handlers ---
 
-func (h *DocumentHandler) GetSingleType(c *gin.Context) {
-	slug := c.Param("slug")
-	fields := h.resolveFields(c, slug)
-	doc, status, err := h.uc.GetSingleType(c.Request.Context(), slug, c.Query("locale"), fields)
+func (h *DocumentHandler) GetSingleType(ginCtx *gin.Context) {
+	slug := ginCtx.Param("slug")
+	fields := h.resolveFields(ginCtx, slug)
+	doc, status, err := h.usecase.GetSingleType(ginCtx.Request.Context(), slug, ginCtx.Query("locale"), fields)
 	if err != nil {
-		ginWriteErr(c, err)
+		ginWriteErr(ginCtx, err)
 		return
 	}
-	c.JSON(http.StatusOK, toDocResponse(doc, status))
+	ginCtx.JSON(http.StatusOK, toDocResponse(doc, status))
 }
 
-func (h *DocumentHandler) SaveSingleType(c *gin.Context) {
+func (h *DocumentHandler) SaveSingleType(ginCtx *gin.Context) {
 	var req documentRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		ginWriteError(c, http.StatusBadRequest, "invalid request body")
+	if err := ginCtx.ShouldBindJSON(&req); err != nil {
+		ginWriteError(ginCtx, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	slug := c.Param("slug")
-	fields := h.resolveFields(c, slug)
-	saved, err := h.uc.SaveSingleType(c.Request.Context(), slug, req.Data, c.Query("locale"), fields, middleware.UserID(c.Request.Context()))
+	slug := ginCtx.Param("slug")
+	fields := h.resolveFields(ginCtx, slug)
+	saved, err := h.usecase.SaveSingleType(ginCtx.Request.Context(), slug, req.Data, ginCtx.Query("locale"), fields, middleware.UserID(ginCtx.Request.Context()))
 	if err != nil {
-		ginWriteErr(c, err)
+		ginWriteErr(ginCtx, err)
 		return
 	}
-	doc, status, err := h.uc.GetSingleType(c.Request.Context(), slug, saved.Locale, fields)
+	doc, status, err := h.usecase.GetSingleType(ginCtx.Request.Context(), slug, saved.Locale, fields)
 	if err != nil {
-		ginWriteErr(c, err)
+		ginWriteErr(ginCtx, err)
 		return
 	}
-	c.JSON(http.StatusOK, toDocResponse(doc, status))
+	ginCtx.JSON(http.StatusOK, toDocResponse(doc, status))
 }
 
-func (h *DocumentHandler) PublishSingleType(c *gin.Context) {
-	slug := c.Param("slug")
-	fields := h.resolveFields(c, slug)
-	if err := h.uc.PublishSingleType(c.Request.Context(), slug, c.Query("locale"), fields, middleware.UserID(c.Request.Context())); err != nil {
-		ginWriteErr(c, err)
+func (h *DocumentHandler) PublishSingleType(ginCtx *gin.Context) {
+	slug := ginCtx.Param("slug")
+	fields := h.resolveFields(ginCtx, slug)
+	if err := h.usecase.PublishSingleType(ginCtx.Request.Context(), slug, ginCtx.Query("locale"), fields, middleware.UserID(ginCtx.Request.Context())); err != nil {
+		ginWriteErr(ginCtx, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"status": "published"})
+	ginCtx.JSON(http.StatusOK, gin.H{"status": "published"})
 }
 
-func (h *DocumentHandler) UnpublishSingleType(c *gin.Context) {
-	slug := c.Param("slug")
-	if err := h.uc.UnpublishSingleType(c.Request.Context(), slug, c.Query("locale")); err != nil {
-		ginWriteErr(c, err)
+func (h *DocumentHandler) UnpublishSingleType(ginCtx *gin.Context) {
+	slug := ginCtx.Param("slug")
+	if err := h.usecase.UnpublishSingleType(ginCtx.Request.Context(), slug, ginCtx.Query("locale")); err != nil {
+		ginWriteErr(ginCtx, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"status": "draft"})
+	ginCtx.JSON(http.StatusOK, gin.H{"status": "draft"})
 }
 
 func (h *DocumentHandler) resolveUserDisplayNames(ctx context.Context, userIDs []string) map[string]string {
@@ -235,43 +249,44 @@ func (h *DocumentHandler) resolveUserDisplayNames(ctx context.Context, userIDs [
 	if err != nil {
 		return nameMap
 	}
-	for _, u := range users {
-		nameMap[u.DocumentID] = u.DisplayName
+	for _, user := range users {
+		nameMap[user.DocumentID] = user.DisplayName
 	}
 	return nameMap
 }
 
 // --- Collection-type handlers ---
 
-func (h *DocumentHandler) ListCollection(c *gin.Context) {
-	slug := c.Param("slug")
-	start, size := ginPaginationParams(c)
+func (h *DocumentHandler) ListCollection(ginCtx *gin.Context) {
+	slug := ginCtx.Param("slug")
+	start, size := ginPaginationParams(ginCtx)
 
-	orderBy, sortDir, ok := ginSortParams(c)
+	orderBy, sortDir, ok := ginSortParams(ginCtx)
 	if !ok {
 		return
 	}
 
-	ct, err := h.ctUC.FindBySlug(c.Request.Context(), slug)
+	ct, err := h.contentType.FindBySlug(ginCtx.Request.Context(), slug)
 	if err != nil {
-		ginWriteErr(c, err)
+		ginWriteErr(ginCtx, err)
 		return
 	}
 	listFields := ct.ListFields
 	if len(listFields) == 0 && len(ct.Fields) > 0 {
+		flat := flattenLayoutFields(ct.Fields)
 		limit := 3
-		if len(ct.Fields) < limit {
-			limit = len(ct.Fields)
+		if len(flat) < limit {
+			limit = len(flat)
 		}
 		listFields = make([]string, limit)
 		for i := 0; i < limit; i++ {
-			listFields[i] = ct.Fields[i].Name
+			listFields[i] = flat[i].Name
 		}
 	}
 
-	docs, statuses, total, err := h.uc.GetAllPaginated(c.Request.Context(), slug, start, size, c.Query("locale"), ct.Fields, orderBy, sortDir)
+	docs, statuses, total, err := h.usecase.GetAllPaginated(ginCtx.Request.Context(), slug, start, size, ginCtx.Query("locale"), ct.Fields, orderBy, sortDir)
 	if err != nil {
-		ginWriteErr(c, err)
+		ginWriteErr(ginCtx, err)
 		return
 	}
 
@@ -279,7 +294,7 @@ func (h *DocumentHandler) ListCollection(c *gin.Context) {
 	for i, doc := range docs {
 		updatedByIDs[i] = doc.UpdatedBy
 	}
-	nameMap := h.resolveUserDisplayNames(c.Request.Context(), updatedByIDs)
+	nameMap := h.resolveUserDisplayNames(ginCtx.Request.Context(), updatedByIDs)
 
 	items := make([]paginatedListItem, len(docs))
 	for i, doc := range docs {
@@ -294,119 +309,132 @@ func (h *DocumentHandler) ListCollection(c *gin.Context) {
 			Status: statuses[i],
 		}
 	}
-	c.JSON(http.StatusOK, paginatedResponse{
-		Items: items,
-		Total: total,
-		Start: start,
-		Size:  size,
+	ginCtx.JSON(http.StatusOK, paginatedResponse{
+		Items:      items,
+		Total:      total,
+		Start:      start,
+		Size:       size,
+		ListFields: ct.ListFields,
 	})
 }
 
-func (h *DocumentHandler) GetCollection(c *gin.Context) {
-	slug := c.Param("slug")
-	documentID := c.Param("documentId")
-	fields := h.resolveFields(c, slug)
-	draft, status, err := h.uc.GetForEdit(c.Request.Context(), slug, documentID, c.Query("locale"), fields)
+func (h *DocumentHandler) GetCollection(ginCtx *gin.Context) {
+	slug := ginCtx.Param("slug")
+	documentID := ginCtx.Param("documentId")
+	fields := h.resolveFields(ginCtx, slug)
+	draft, status, err := h.usecase.GetForEdit(ginCtx.Request.Context(), slug, documentID, ginCtx.Query("locale"), fields)
 	if err != nil {
-		ginWriteErr(c, err)
+		ginWriteErr(ginCtx, err)
 		return
 	}
 	resp := toDocResponse(draft, status)
-	nameMap := h.resolveUserDisplayNames(c.Request.Context(), []string{draft.UpdatedBy})
+	nameMap := h.resolveUserDisplayNames(ginCtx.Request.Context(), []string{draft.UpdatedBy})
 	if name, ok := nameMap[draft.UpdatedBy]; ok {
 		resp.Data["updatedByName"] = name
 	} else {
 		resp.Data["updatedByName"] = draft.UpdatedBy
 	}
-	c.JSON(http.StatusOK, resp)
+	ginCtx.JSON(http.StatusOK, resp)
 }
 
-func (h *DocumentHandler) CreateCollection(c *gin.Context) {
+func (h *DocumentHandler) CreateCollection(ginCtx *gin.Context) {
 	var req documentRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		ginWriteError(c, http.StatusBadRequest, "invalid request body")
+	if err := ginCtx.ShouldBindJSON(&req); err != nil {
+		ginWriteError(ginCtx, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	slug := c.Param("slug")
-	fields := h.resolveFields(c, slug)
-	doc := &entity.Document{Fields: req.Data, Locale: c.Query("locale")}
-	saved, err := h.uc.Save(c.Request.Context(), slug, doc, fields, middleware.UserID(c.Request.Context()))
+	slug := ginCtx.Param("slug")
+	fields := h.resolveFields(ginCtx, slug)
+	doc := &entity.Document{Fields: req.Data, Locale: ginCtx.Query("locale")}
+	saved, err := h.usecase.Save(ginCtx.Request.Context(), slug, doc, fields, middleware.UserID(ginCtx.Request.Context()))
 	if err != nil {
-		ginWriteErr(c, err)
+		ginWriteErr(ginCtx, err)
 		return
 	}
-	c.JSON(http.StatusCreated, toDocResponse(saved, "draft"))
+	ginCtx.JSON(http.StatusCreated, toDocResponse(saved, "draft"))
 }
 
-func (h *DocumentHandler) UpdateCollection(c *gin.Context) {
+func (h *DocumentHandler) UpdateCollection(ginCtx *gin.Context) {
 	var req documentRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		ginWriteError(c, http.StatusBadRequest, "invalid request body")
+	if err := ginCtx.ShouldBindJSON(&req); err != nil {
+		ginWriteError(ginCtx, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	slug := c.Param("slug")
-	fields := h.resolveFields(c, slug)
-	documentID := c.Param("documentId")
+	slug := ginCtx.Param("slug")
+	fields := h.resolveFields(ginCtx, slug)
+	documentID := ginCtx.Param("documentId")
 	doc := &entity.Document{
 		DocumentID: documentID,
 		Fields:     req.Data,
-		Locale:     c.Query("locale"),
+		Locale:     ginCtx.Query("locale"),
 	}
-	saved, err := h.uc.Save(c.Request.Context(), slug, doc, fields, middleware.UserID(c.Request.Context()))
+	saved, err := h.usecase.Save(ginCtx.Request.Context(), slug, doc, fields, middleware.UserID(ginCtx.Request.Context()))
 	if err != nil {
-		ginWriteErr(c, err)
+		ginWriteErr(ginCtx, err)
 		return
 	}
-	_, status, err := h.uc.GetForEdit(c.Request.Context(), slug, saved.DocumentID, saved.Locale, fields)
+	_, status, err := h.usecase.GetForEdit(ginCtx.Request.Context(), slug, saved.DocumentID, saved.Locale, fields)
 	if err != nil {
-		ginWriteErr(c, err)
+		ginWriteErr(ginCtx, err)
 		return
 	}
-	c.JSON(http.StatusOK, toDocResponse(saved, status))
+	ginCtx.JSON(http.StatusOK, toDocResponse(saved, status))
 }
 
-func (h *DocumentHandler) DeleteCollection(c *gin.Context) {
-	slug := c.Param("slug")
-	documentID := c.Param("documentId")
-	fields := h.resolveFields(c, slug)
-	if err := h.uc.Delete(c.Request.Context(), slug, documentID, fields); err != nil {
-		ginWriteErr(c, err)
+func (h *DocumentHandler) DeleteCollection(ginCtx *gin.Context) {
+	slug := ginCtx.Param("slug")
+	documentID := ginCtx.Param("documentId")
+	fields := h.resolveFields(ginCtx, slug)
+	if err := h.usecase.Delete(ginCtx.Request.Context(), slug, documentID, fields); err != nil {
+		ginWriteErr(ginCtx, err)
 		return
 	}
-	c.Status(http.StatusNoContent)
+	ginCtx.Status(http.StatusNoContent)
 }
 
-func (h *DocumentHandler) PublishCollection(c *gin.Context) {
-	slug := c.Param("slug")
-	documentID := c.Param("documentId")
-	fields := h.resolveFields(c, slug)
-	if err := h.uc.Publish(c.Request.Context(), slug, documentID, c.Query("locale"), fields, middleware.UserID(c.Request.Context())); err != nil {
-		ginWriteErr(c, err)
+func (h *DocumentHandler) PublishCollection(ginCtx *gin.Context) {
+	slug := ginCtx.Param("slug")
+	documentID := ginCtx.Param("documentId")
+	fields := h.resolveFields(ginCtx, slug)
+	if err := h.usecase.Publish(ginCtx.Request.Context(), slug, documentID, ginCtx.Query("locale"), fields, middleware.UserID(ginCtx.Request.Context())); err != nil {
+		ginWriteErr(ginCtx, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"status": "published"})
+	ginCtx.JSON(http.StatusOK, gin.H{"status": "published"})
 }
 
-func (h *DocumentHandler) UnpublishCollection(c *gin.Context) {
-	slug := c.Param("slug")
-	documentID := c.Param("documentId")
-	if err := h.uc.Unpublish(c.Request.Context(), slug, documentID, c.Query("locale")); err != nil {
-		ginWriteErr(c, err)
+func (h *DocumentHandler) UnpublishCollection(ginCtx *gin.Context) {
+	slug := ginCtx.Param("slug")
+	documentID := ginCtx.Param("documentId")
+	if err := h.usecase.Unpublish(ginCtx.Request.Context(), slug, documentID, ginCtx.Query("locale")); err != nil {
+		ginWriteErr(ginCtx, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"status": "draft"})
+	ginCtx.JSON(http.StatusOK, gin.H{"status": "draft"})
+}
+
+func (h *DocumentHandler) DuplicateCollection(ginCtx *gin.Context) {
+	slug := ginCtx.Param("slug")
+	documentID := ginCtx.Param("documentId")
+	fields := h.resolveFields(ginCtx, slug)
+	saved, err := h.usecase.Duplicate(ginCtx.Request.Context(), slug, documentID, ginCtx.Query("locale"), fields, middleware.UserID(ginCtx.Request.Context()))
+	if err != nil {
+		ginWriteErr(ginCtx, err)
+		return
+	}
+	ginCtx.JSON(http.StatusCreated, toDocResponse(saved, "draft"))
 }
 
 // --- Public handler ---
 
-func (h *DocumentHandler) GetPublic(c *gin.Context) {
-	slug := c.Param("slug")
-	documentID := c.Param("documentId")
-	fields := h.resolveFields(c, slug)
-	doc, err := h.uc.GetPublished(c.Request.Context(), slug, documentID, c.Query("locale"), fields)
+func (h *DocumentHandler) GetPublic(ginCtx *gin.Context) {
+	slug := ginCtx.Param("slug")
+	documentID := ginCtx.Param("documentId")
+	fields := h.resolveFields(ginCtx, slug)
+	doc, err := h.usecase.GetPublished(ginCtx.Request.Context(), slug, documentID, ginCtx.Query("locale"), fields)
 	if err != nil {
-		ginWriteErr(c, err)
+		ginWriteErr(ginCtx, err)
 		return
 	}
-	c.JSON(http.StatusOK, publicDocumentResponse{Data: mergeDocData(doc)})
+	ginCtx.JSON(http.StatusOK, publicDocumentResponse{Data: mergeDocData(doc)})
 }

@@ -19,7 +19,7 @@ export function useMediaList(page: number, limit: number) {
   return useQuery<MediaListResponse>({
     queryKey: ['media', 'list', page, limit],
     queryFn: () =>
-      api.get<MediaListResponse>(`/api/media?page=${page}&limit=${limit}`).then((r) => r.data),
+      api.get<MediaListResponse>(`/api/media?page=${page}&limit=${limit}`).then((response) => response.data),
   })
 }
 
@@ -29,14 +29,14 @@ export function useUploadMedia() {
     mutationFn: ({ file }: UploadArgs) => {
       const form = new FormData()
       form.append('file', file, file.name)
-      return api.post<MediaAsset>('/api/media/upload', form).then((r) => r.data)
+      return api.post<MediaAsset>('/api/media/upload', form).then((response) => response.data)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['media', 'list'] })
     },
-    onError: (err: unknown) => {
+    onError: (error: unknown) => {
       const msg =
-        (err as AxiosError<{ error: string }>).response?.data?.error ?? 'Upload failed'
+        (error as AxiosError<{ error: string }>).response?.data?.error ?? 'Upload failed'
       toast.error(msg)
     },
   })
@@ -49,9 +49,9 @@ export function useDeleteMedia() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['media', 'list'] })
     },
-    onError: (err: unknown) => {
+    onError: (error: unknown) => {
       const msg =
-        (err as AxiosError<{ error: string }>).response?.data?.error ?? 'Delete failed'
+        (error as AxiosError<{ error: string }>).response?.data?.error ?? 'Delete failed'
       toast.error(msg)
     },
   })

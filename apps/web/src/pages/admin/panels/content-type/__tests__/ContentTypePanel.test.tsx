@@ -44,7 +44,7 @@ afterEach(() => {
 describe('ContentTypePanel', () => {
   it('renders schema-driven fields from contentType.Fields', async () => {
     mock.onGet('/api/document-manager/single-type/homepage').reply(200, doc)
-    mock.onGet('/api/locales').reply(200, ['en'])
+    mock.onGet('/api/locales').reply(200, [{ code: 'en', name: 'English', isDefault: true, createdAt: '', updatedAt: '' }])
     mock.onGet('/api/document-manager/collection-type/homepage/ct-1').reply(200, doc)
 
     renderWithProviders(<ContentTypePanel contentType={ct} />)
@@ -56,7 +56,7 @@ describe('ContentTypePanel', () => {
 
   it('does not show a Go Back link when no id prop is given', async () => {
     mock.onGet('/api/document-manager/single-type/homepage').reply(200, doc)
-    mock.onGet('/api/locales').reply(200, ['en'])
+    mock.onGet('/api/locales').reply(200, [{ code: 'en', name: 'English', isDefault: true, createdAt: '', updatedAt: '' }])
 
     renderWithProviders(<ContentTypePanel contentType={ct} />)
 
@@ -66,7 +66,7 @@ describe('ContentTypePanel', () => {
   it('shows a Go Back link when id prop is given', async () => {
     const collectionDoc: Document = { ...doc, documentId: 'entry-99' }
     mock.onGet('/api/document-manager/single-type/homepage').reply(200, collectionDoc)
-    mock.onGet('/api/locales').reply(200, ['en'])
+    mock.onGet('/api/locales').reply(200, [{ code: 'en', name: 'English', isDefault: true, createdAt: '', updatedAt: '' }])
     mock.onGet('/api/document-manager/collection-type/homepage/entry-99').reply(200, collectionDoc)
 
     renderWithProviders(<ContentTypePanel contentType={{ ...ct, Kind: 'collection' }} id="entry-99" />)

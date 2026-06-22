@@ -30,5 +30,5 @@ export const contentTypeRegistry: ContentTypeRegistration[] = [
 export function getRegistration(
   slug: string,
 ): ContentTypeRegistration | undefined {
-  return contentTypeRegistry.find((r) => r.slug === slug);
+  return contentTypeRegistry.find((registration) => registration.slug === slug);
 }

@@ -29,7 +29,7 @@ export function MediaLibrary({ isOpen, onClose, onSelect, ext }: MediaLibraryPro
   const hasPrev = page > 1
 
   const filteredItems = ext
-    ? items.filter((a) => ext.includes(a.fileExt))
+    ? items.filter((asset) => ext.includes(asset.fileExt))
     : items
 
   async function handleUpload() {
@@ -45,7 +45,7 @@ export function MediaLibrary({ isOpen, onClose, onSelect, ext }: MediaLibraryPro
       role="dialog"
       aria-modal="true"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+      onClick={(event) => { if (event.target === event.currentTarget) onClose() }}
     >
       <div className="bg-background rounded-lg shadow-lg w-[720px] max-h-[80vh] flex flex-col overflow-hidden">
         <div className="flex items-center justify-between p-4 border-b">
@@ -70,26 +70,26 @@ export function MediaLibrary({ isOpen, onClose, onSelect, ext }: MediaLibraryPro
               <input
                 type="file"
                 multiple
-                accept={ext ? ext.map((e) => `.${e}`).join(',') : 'image/*'}
-                onChange={(e) => setStagedFiles(Array.from(e.target.files ?? []))}
+                accept={ext ? ext.map((extension) => `.${extension}`).join(',') : 'image/*'}
+                onChange={(event) => setStagedFiles(Array.from(event.target.files ?? []))}
                 className="sr-only"
               />
             </label>
             {stagedFiles.length > 0 && (
               <>
                 <div className="grid grid-cols-4 gap-2">
-                  {stagedFiles.map((file, i) => (
-                    <div key={i} className="relative rounded-lg border overflow-hidden aspect-square bg-muted">
+                  {stagedFiles.map((file, fileIndex) => (
+                    <div key={fileIndex} className="relative rounded-lg border overflow-hidden aspect-square bg-muted">
                       <img
                         src={URL.createObjectURL(file)}
                         alt={file.name}
                         className="w-full h-full object-cover"
-                        onLoad={(e) => URL.revokeObjectURL((e.target as HTMLImageElement).src)}
+                        onLoad={(event) => URL.revokeObjectURL((event.target as HTMLImageElement).src)}
                       />
                       <button
                         type="button"
                         className="absolute top-1 right-1 rounded-full bg-background/80 p-0.5 text-muted-foreground hover:text-destructive transition-colors"
-                        onClick={() => setStagedFiles((prev) => prev.filter((_, j) => j !== i))}
+                        onClick={() => setStagedFiles((prevFiles) => prevFiles.filter((_, itemIndex) => itemIndex !== fileIndex))}
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
                       </button>
@@ -139,8 +139,8 @@ export function MediaLibrary({ isOpen, onClose, onSelect, ext }: MediaLibraryPro
                         ? 'text-red-500'
                         : 'text-muted-foreground opacity-0 group-hover:opacity-100'
                     }`}
-                    onClick={(e) => {
-                      e.stopPropagation()
+                    onClick={(event) => {
+                      event.stopPropagation()
                       if (pendingDeleteId === asset.ID) {
                         deleteMedia.mutate(asset.ID)
                         setPendingDeleteId(null)
@@ -166,7 +166,7 @@ export function MediaLibrary({ isOpen, onClose, onSelect, ext }: MediaLibraryPro
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setPage((p) => p - 1)}
+              onClick={() => setPage((currentPage) => currentPage - 1)}
               disabled={!hasPrev}
               aria-label="Previous page"
             >
@@ -175,7 +175,7 @@ export function MediaLibrary({ isOpen, onClose, onSelect, ext }: MediaLibraryPro
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setPage((p) => p + 1)}
+              onClick={() => setPage((currentPage) => currentPage + 1)}
               disabled={!hasNext}
               aria-label="Next page"
             >

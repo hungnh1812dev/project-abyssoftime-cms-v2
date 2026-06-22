@@ -39,14 +39,19 @@ type ContentTypeUseCase interface {
 	FindAll(ctx context.Context) ([]*entity.ContentType, error)
 }
 
-type ResolverFactory struct {
-	docUC     DocumentUseCase
-	ctUC      ContentTypeUseCase
-	mediaRepo repository.MediaAssetRepository
+type AccessTokenValidator interface {
+	Validate(ctx context.Context, rawToken string) (*entity.AccessToken, error)
 }
 
-func NewResolverFactory(docUC DocumentUseCase, ctUC ContentTypeUseCase, mediaRepo repository.MediaAssetRepository) *ResolverFactory {
-	return &ResolverFactory{docUC: docUC, ctUC: ctUC, mediaRepo: mediaRepo}
+type ResolverFactory struct {
+	docUC          DocumentUseCase
+	ctUC           ContentTypeUseCase
+	mediaRepo      repository.MediaAssetRepository
+	tokenValidator AccessTokenValidator
+}
+
+func NewResolverFactory(docUC DocumentUseCase, ctUC ContentTypeUseCase, mediaRepo repository.MediaAssetRepository, tokenValidator AccessTokenValidator) *ResolverFactory {
+	return &ResolverFactory{docUC: docUC, ctUC: ctUC, mediaRepo: mediaRepo, tokenValidator: tokenValidator}
 }
 
 func (f *ResolverFactory) BuildHandler(defs []contenttype.ContentTypeDefinition) (http.Handler, error) {
@@ -152,7 +157,27 @@ func (f *ResolverFactory) BuildHandler(defs []contenttype.ContentTypeDefinition)
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		ctx = injectAuthFromRequest(ctx, r)
+
+		header := r.Header.Get("Authorization")
+		token := strings.TrimPrefix(header, "Bearer ")
+		if token == "" || token == header {
+			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			return
+		}
+
+		if claims, err := pkgjwt.ValidateToken(token); err == nil {
+			ctx = context.WithValue(ctx, middleware.ContextKeyUserID, claims.UserID)
+			ctx = context.WithValue(ctx, middleware.ContextKeyRole, claims.Role)
+		} else if f.tokenValidator != nil {
+			if _, err := f.tokenValidator.Validate(ctx, token); err != nil {
+				http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+				return
+			}
+		} else {
+			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			return
+		}
+
 		h.ContextHandler(ctx, w, r)
 	}), nil
 }
@@ -588,16 +613,3 @@ func gqlScalarFor(fieldType string, jsonSc *graphql.Scalar) graphql.Output {
 	}
 }
 
-func injectAuthFromRequest(ctx context.Context, r *http.Request) context.Context {
-	header := r.Header.Get("Authorization")
-	if !strings.HasPrefix(header, "Bearer ") {
-		return ctx
-	}
-	claims, err := pkgjwt.ValidateToken(strings.TrimPrefix(header, "Bearer "))
-	if err != nil {
-		return ctx
-	}
-	ctx = context.WithValue(ctx, middleware.ContextKeyUserID, claims.UserID)
-	ctx = context.WithValue(ctx, middleware.ContextKeyRole, claims.Role)
-	return ctx
-}
