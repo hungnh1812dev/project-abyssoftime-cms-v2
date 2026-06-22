@@ -27,6 +27,7 @@ type mockDocumentUC struct {
 	publishSingleTypeFn   func(ctx context.Context, contentTypeSlug, locale, userID string) error
 	unpublishSingleTypeFn func(ctx context.Context, contentTypeSlug, locale string) error
 	getAllPaginatedFn      func(ctx context.Context, contentTypeSlug string, start, size int, locale string, orderBy string, sortDir int) ([]*entity.Document, []string, int64, error)
+	duplicateFn            func(ctx context.Context, contentTypeSlug, sourceDocumentID, locale, userID string) (*entity.Document, error)
 }
 
 func (m *mockDocumentUC) Save(ctx context.Context, s string, d *entity.Document, _ []entity.FieldDefinition, u string) (*entity.Document, error) {
@@ -61,6 +62,9 @@ func (m *mockDocumentUC) UnpublishSingleType(ctx context.Context, s, l string) e
 }
 func (m *mockDocumentUC) GetAllPaginated(ctx context.Context, s string, start, size int, l string, _ []entity.FieldDefinition, orderBy string, sortDir int) ([]*entity.Document, []string, int64, error) {
 	return m.getAllPaginatedFn(ctx, s, start, size, l, orderBy, sortDir)
+}
+func (m *mockDocumentUC) Duplicate(ctx context.Context, s, d, l string, _ []entity.FieldDefinition, u string) (*entity.Document, error) {
+	return m.duplicateFn(ctx, s, d, l, u)
 }
 
 type mockUserResolver struct{}
@@ -450,6 +454,55 @@ func TestDocumentHandler_GetPublic(t *testing.T) {
 		_, r := gin.CreateTestContext(w)
 		r.GET("/api/public/document-manager/:slug/:documentId", h.GetPublic)
 		req := httptest.NewRequest(http.MethodGet, "/api/public/document-manager/articles/abc", nil)
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusNotFound {
+			t.Errorf("status = %d, want 404", w.Code)
+		}
+	})
+}
+
+func TestDocumentHandler_DuplicateCollection(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("201 success", func(t *testing.T) {
+		uc := &mockDocumentUC{}
+		uc.duplicateFn = func(_ context.Context, _, _, _, _ string) (*entity.Document, error) {
+			return &entity.Document{DocumentID: "new-dup", Fields: map[string]any{"title": "Copy"}}, nil
+		}
+		h := newHandler(uc)
+
+		w := httptest.NewRecorder()
+		_, r := gin.CreateTestContext(w)
+		r.POST("/api/document-manager/collection-type/:slug/:documentId/duplicate", h.DuplicateCollection)
+		req := httptest.NewRequest(http.MethodPost, "/api/document-manager/collection-type/articles/src-1/duplicate", nil)
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusCreated {
+			t.Fatalf("status = %d, want 201", w.Code)
+		}
+		var resp map[string]any
+		_ = json.NewDecoder(w.Body).Decode(&resp)
+		data := resp["data"].(map[string]any)
+		if data["documentId"] != "new-dup" {
+			t.Errorf("documentId = %v, want new-dup", data["documentId"])
+		}
+		if resp["status"] != "draft" {
+			t.Errorf("status = %v, want draft", resp["status"])
+		}
+	})
+
+	t.Run("404 source not found", func(t *testing.T) {
+		uc := &mockDocumentUC{}
+		uc.duplicateFn = func(_ context.Context, _, _, _, _ string) (*entity.Document, error) {
+			return nil, pkgerrors.ErrNotFound
+		}
+		h := newHandler(uc)
+
+		w := httptest.NewRecorder()
+		_, r := gin.CreateTestContext(w)
+		r.POST("/api/document-manager/collection-type/:slug/:documentId/duplicate", h.DuplicateCollection)
+		req := httptest.NewRequest(http.MethodPost, "/api/document-manager/collection-type/articles/missing/duplicate", nil)
 		r.ServeHTTP(w, req)
 
 		if w.Code != http.StatusNotFound {

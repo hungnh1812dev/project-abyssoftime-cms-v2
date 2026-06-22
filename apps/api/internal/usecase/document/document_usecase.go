@@ -2,6 +2,7 @@ package document
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -422,6 +423,37 @@ func (uc *UseCase) GetAllPaginated(ctx context.Context, contentTypeSlug string, 
 		statuses[i] = Status(d, pubMap[d.DocumentID])
 	}
 	return drafts, statuses, total, nil
+}
+
+func (uc *UseCase) Duplicate(ctx context.Context, contentTypeSlug, sourceDocumentID, locale string, fields []entity.FieldDefinition, userID string) (*entity.Document, error) {
+	locale, err := uc.resolveLocale(locale)
+	if err != nil {
+		return nil, err
+	}
+
+	source, err := uc.repo.FindDraftByDocumentID(ctx, contentTypeSlug, sourceDocumentID, locale)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := uc.mergeComponents(ctx, contentTypeSlug, source, fields); err != nil {
+		return nil, err
+	}
+
+	raw, err := json.Marshal(source.Fields)
+	if err != nil {
+		return nil, fmt.Errorf("duplicate: marshal fields: %w", err)
+	}
+	var copiedFields map[string]any
+	if err := json.Unmarshal(raw, &copiedFields); err != nil {
+		return nil, fmt.Errorf("duplicate: unmarshal fields: %w", err)
+	}
+
+	newDoc := &entity.Document{
+		Fields: copiedFields,
+		Locale: source.Locale,
+	}
+	return uc.Save(ctx, contentTypeSlug, newDoc, fields, userID)
 }
 
 func (uc *UseCase) Delete(ctx context.Context, contentTypeSlug, documentID string, fields []entity.FieldDefinition) error {

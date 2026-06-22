@@ -10,11 +10,11 @@ import {
   TableHead,
   TableCell,
 } from '@/components/ui/table';
-import { useCollectionDocuments, useDeleteCollectionDocument } from '@/hooks/useCollectionDocuments';
+import { useCollectionDocuments, useDeleteCollectionDocument, useDuplicateCollectionDocument } from '@/hooks/useCollectionDocuments';
 import { useLocales } from '@/hooks/useLocales';
 import { getRegistration, type CollectionColumnDef } from '@/content-type-registry';
 import type { ContentType, Document, FieldDefinition } from '@/types/cms';
-import { Pencil, Trash2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Pencil, Trash2, Copy, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 
 interface Props {
   contentType: ContentType;
@@ -116,6 +116,7 @@ export function CollectionListPage({ contentType }: Props) {
 
   const { data: page, isLoading } = useCollectionDocuments(contentType.Slug, start, PAGE_SIZE, activeLocale, orderBy, sortDir);
   const { mutate: deleteDoc } = useDeleteCollectionDocument();
+  const { mutateAsync: duplicateDoc } = useDuplicateCollectionDocument();
   const navigate = useNavigate();
 
   const columns = deriveColumns(contentType);
@@ -130,6 +131,17 @@ export function CollectionListPage({ contentType }: Props) {
     e.stopPropagation();
     if (!window.confirm('Delete this entry?')) return;
     deleteDoc({ contentTypeSlug: contentType.Slug, id: doc.data.documentId as string });
+  }
+
+  function handleDuplicate(e: React.MouseEvent, doc: Document) {
+    e.stopPropagation();
+    duplicateDoc({
+      contentTypeSlug: contentType.Slug,
+      id: doc.data.documentId as string,
+      locale: activeLocale,
+    }).then((newDoc) => {
+      navigate(`/admin/content-type/collection-type/${contentType.Slug}/${newDoc.data.documentId}`);
+    });
   }
 
   function handleEdit(e: React.MouseEvent, doc: Document) {
@@ -211,6 +223,9 @@ export function CollectionListPage({ contentType }: Props) {
                       <div className="flex justify-end gap-1">
                         <Button variant="ghost" size="icon" aria-label="Edit" onClick={(e) => handleEdit(e, doc)}>
                           <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" aria-label="Duplicate" onClick={(e) => handleDuplicate(e, doc)}>
+                          <Copy className="h-4 w-4" />
                         </Button>
                         <Button variant="ghost" size="icon" aria-label="Delete" onClick={(e) => handleDelete(e, doc)}>
                           <Trash2 className="h-4 w-4" />

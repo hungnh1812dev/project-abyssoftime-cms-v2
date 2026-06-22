@@ -109,6 +109,31 @@ export function useDeleteCollectionDocument() {
   })
 }
 
+export function useDuplicateCollectionDocument() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      contentTypeSlug,
+      id,
+      locale,
+    }: {
+      contentTypeSlug: string
+      id: string
+      locale?: string
+    }) =>
+      api
+        .post<Document>(
+          `/api/document-manager/collection-type/${contentTypeSlug}/${id}/duplicate`,
+          undefined,
+          { params: { locale } },
+        )
+        .then((r) => r.data),
+    onSuccess: (_, { contentTypeSlug }) =>
+      qc.invalidateQueries({ queryKey: KEYS.list(contentTypeSlug) }),
+    onError: onMutationError,
+  })
+}
+
 export function usePublishCollectionDocument() {
   const qc = useQueryClient()
   return useMutation({

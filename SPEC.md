@@ -176,4 +176,4 @@ The frontend spec is not modularized. Key sections:
 
 | Status | Module | Description |
 |--------|--------|-------------|
-| — | — | No pending specs |
+| Spec ready | content | [Duplicate Document](specs/duplicate-document.md) — Collection List row action to fully clone a document |

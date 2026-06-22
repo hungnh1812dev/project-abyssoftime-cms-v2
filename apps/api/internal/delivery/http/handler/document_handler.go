@@ -19,6 +19,7 @@ type documentUseCase interface {
 	Publish(ctx context.Context, contentTypeSlug, documentID, locale string, fields []entity.FieldDefinition, userID string) error
 	Unpublish(ctx context.Context, contentTypeSlug, documentID, locale string) error
 	Delete(ctx context.Context, contentTypeSlug, documentID string, fields []entity.FieldDefinition) error
+	Duplicate(ctx context.Context, contentTypeSlug, sourceDocumentID, locale string, fields []entity.FieldDefinition, userID string) (*entity.Document, error)
 
 	GetSingleType(ctx context.Context, contentTypeSlug, locale string, fields []entity.FieldDefinition) (*entity.Document, string, error)
 	SaveSingleType(ctx context.Context, contentTypeSlug string, data map[string]any, locale string, fields []entity.FieldDefinition, userID string) (*entity.Document, error)
@@ -395,6 +396,18 @@ func (h *DocumentHandler) UnpublishCollection(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "draft"})
+}
+
+func (h *DocumentHandler) DuplicateCollection(c *gin.Context) {
+	slug := c.Param("slug")
+	documentID := c.Param("documentId")
+	fields := h.resolveFields(c, slug)
+	saved, err := h.uc.Duplicate(c.Request.Context(), slug, documentID, c.Query("locale"), fields, middleware.UserID(c.Request.Context()))
+	if err != nil {
+		ginWriteErr(c, err)
+		return
+	}
+	c.JSON(http.StatusCreated, toDocResponse(saved, "draft"))
 }
 
 // --- Public handler ---

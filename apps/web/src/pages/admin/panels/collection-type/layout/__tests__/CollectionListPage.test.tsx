@@ -200,4 +200,32 @@ describe('CollectionListPage — navigation', () => {
 
     expect(mock.history.delete).toHaveLength(0)
   })
+
+  it('Duplicate button is rendered for each document', async () => {
+    mock.onGet('/api/document-manager/collection-type/blog-posts').reply(200, { items: [doc1, doc2], total: 2, start: 0, size: 20 })
+    renderWithProviders(<CollectionListPage contentType={ct} />)
+    await waitFor(() => {
+      expect(screen.getAllByRole('button', { name: /duplicate/i })).toHaveLength(2)
+    })
+  })
+
+  it('Duplicate button calls POST duplicate endpoint', async () => {
+    const user = userEvent.setup()
+    mock.onGet('/api/document-manager/collection-type/blog-posts').reply(200, { items: [doc1], total: 1, start: 0, size: 20 })
+    mock.onPost(/\/blog-posts\/doc-1\/duplicate/).reply(201, {
+      data: { documentId: 'new-dup', locale: 'en', title: 'First Post' },
+      status: 'draft',
+    })
+
+    renderWithProviders(<CollectionListPage contentType={ct} />, {
+      initialEntries: ['/admin/content-type/collection-type/blog-posts'],
+    })
+
+    await waitFor(() => screen.getByRole('button', { name: /duplicate/i }))
+    await user.click(screen.getByRole('button', { name: /duplicate/i }))
+
+    await waitFor(() =>
+      expect(mock.history.post.some((r) => r.url?.includes('/duplicate'))).toBe(true),
+    )
+  })
 })

@@ -641,6 +641,159 @@ func TestGetAllPaginated_InvalidLocale(t *testing.T) {
 	}
 }
 
+// ---- Duplicate -------------------------------------------------------
+
+func TestDuplicate_Success(t *testing.T) {
+	source := &entity.Document{
+		DocumentID: "src-1",
+		Fields:     map[string]any{"title": "Original", "count": float64(42)},
+		Locale:     "en",
+	}
+
+	repo := &repomock.DocumentRepository{}
+	repo.FindDraftByDocumentIDFn = func(_ context.Context, _, documentID, _ string) (*entity.Document, error) {
+		if documentID == "src-1" {
+			return source, nil
+		}
+		return nil, pkgerrors.ErrNotFound
+	}
+	var upserted *entity.Document
+	repo.UpsertDraftFn = func(_ context.Context, _ string, doc *entity.Document) error {
+		upserted = doc
+		return nil
+	}
+	uc := docuc.New(repo, nil, &repomock.MediaAssetRepository{}, supportedLocales)
+
+	saved, err := uc.Duplicate(ctx, testSlug, "src-1", "en", nil, "user-2")
+	if err != nil {
+		t.Fatalf("Duplicate() error = %v", err)
+	}
+	if saved.DocumentID == "" || saved.DocumentID == "src-1" {
+		t.Errorf("Duplicate() DocumentID = %q, want new UUID", saved.DocumentID)
+	}
+	if saved.Fields["title"] != "Original" {
+		t.Errorf("Duplicate() title = %v, want Original", saved.Fields["title"])
+	}
+	if saved.Fields["count"] != float64(42) {
+		t.Errorf("Duplicate() count = %v, want 42", saved.Fields["count"])
+	}
+	if saved.Version != entity.VersionDraft {
+		t.Errorf("Duplicate() Version = %q, want draft", saved.Version)
+	}
+	if saved.CreatedBy != "user-2" || saved.UpdatedBy != "user-2" {
+		t.Errorf("Duplicate() CreatedBy/UpdatedBy = %q/%q, want user-2", saved.CreatedBy, saved.UpdatedBy)
+	}
+	if upserted == nil {
+		t.Fatal("Duplicate() did not call UpsertDraft")
+	}
+}
+
+func TestDuplicate_CopiesComponents(t *testing.T) {
+	source := &entity.Document{
+		DocumentID: "src-1",
+		Fields:     map[string]any{"title": "With components"},
+		Locale:     "en",
+	}
+	compFields := []entity.FieldDefinition{
+		{Name: "title", Type: "text"},
+		{Name: "banner", Type: "component"},
+	}
+	bannerData := []*entity.Component{
+		{ComponentID: "comp-1", Fields: map[string]any{"heading": "Hello"}},
+	}
+
+	repo := &repomock.DocumentRepository{}
+	repo.FindDraftByDocumentIDFn = func(_ context.Context, _, documentID, _ string) (*entity.Document, error) {
+		if documentID == "src-1" {
+			return source, nil
+		}
+		return nil, pkgerrors.ErrNotFound
+	}
+	repo.UpsertDraftFn = func(_ context.Context, _ string, _ *entity.Document) error { return nil }
+
+	compRepo := &repomock.ComponentRepository{}
+	compRepo.FindByDocumentIDFn = func(_ context.Context, _, compName, docID, _ string, _ entity.DocumentVersion) ([]*entity.Component, error) {
+		if docID == "src-1" && compName == "banner" {
+			return bannerData, nil
+		}
+		return nil, nil
+	}
+	var savedComponents []*entity.Component
+	compRepo.UpsertAllFn = func(_ context.Context, _, _, _, _ string, _ entity.DocumentVersion, comps []*entity.Component) error {
+		savedComponents = comps
+		return nil
+	}
+
+	uc := docuc.New(repo, compRepo, &repomock.MediaAssetRepository{}, supportedLocales)
+
+	saved, err := uc.Duplicate(ctx, testSlug, "src-1", "en", compFields, "user-2")
+	if err != nil {
+		t.Fatalf("Duplicate() error = %v", err)
+	}
+	if saved == nil {
+		t.Fatal("Duplicate() returned nil")
+	}
+	if len(savedComponents) == 0 {
+		t.Fatal("Duplicate() did not save components")
+	}
+	if savedComponents[0].Fields["heading"] != "Hello" {
+		t.Errorf("Duplicate() component heading = %v, want Hello", savedComponents[0].Fields["heading"])
+	}
+}
+
+func TestDuplicate_SourceNotFound(t *testing.T) {
+	repo := &repomock.DocumentRepository{}
+	repo.FindDraftByDocumentIDFn = func(_ context.Context, _, _, _ string) (*entity.Document, error) {
+		return nil, pkgerrors.ErrNotFound
+	}
+	uc := docuc.New(repo, nil, &repomock.MediaAssetRepository{}, supportedLocales)
+
+	_, err := uc.Duplicate(ctx, testSlug, "missing", "en", nil, "user-1")
+	if !pkgerrors.Is(err, pkgerrors.ErrNotFound) {
+		t.Errorf("Duplicate() error = %v, want ErrNotFound", err)
+	}
+}
+
+func TestDuplicate_SharesMediaRefs(t *testing.T) {
+	source := &entity.Document{
+		DocumentID: "src-1",
+		Fields:     map[string]any{"title": "Post", "cover": "media-doc-id-123"},
+		Locale:     "en",
+	}
+
+	repo := &repomock.DocumentRepository{}
+	repo.FindDraftByDocumentIDFn = func(_ context.Context, _, documentID, _ string) (*entity.Document, error) {
+		if documentID == "src-1" {
+			return source, nil
+		}
+		return nil, pkgerrors.ErrNotFound
+	}
+	var upserted *entity.Document
+	repo.UpsertDraftFn = func(_ context.Context, _ string, doc *entity.Document) error {
+		upserted = doc
+		return nil
+	}
+	uc := docuc.New(repo, nil, &repomock.MediaAssetRepository{}, supportedLocales)
+
+	_, err := uc.Duplicate(ctx, testSlug, "src-1", "en", nil, "user-2")
+	if err != nil {
+		t.Fatalf("Duplicate() error = %v", err)
+	}
+	if upserted.Fields["cover"] != "media-doc-id-123" {
+		t.Errorf("Duplicate() cover = %v, want media-doc-id-123 (shared ref)", upserted.Fields["cover"])
+	}
+}
+
+func TestDuplicate_InvalidLocale(t *testing.T) {
+	repo := &repomock.DocumentRepository{}
+	uc := docuc.New(repo, nil, &repomock.MediaAssetRepository{}, supportedLocales)
+
+	_, err := uc.Duplicate(ctx, testSlug, "src-1", "fr", nil, "user-1")
+	if !pkgerrors.Is(err, pkgerrors.ErrValidation) {
+		t.Errorf("Duplicate() error = %v, want ErrValidation", err)
+	}
+}
+
 // ---- Delete ---------------------------------------------------------
 
 func TestDelete_DeletesAllLocales(t *testing.T) {

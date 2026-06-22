@@ -72,6 +72,7 @@ func SetupRouter(cfg RouterConfig) *gin.Engine {
 		colGroup.DELETE("/:slug/:documentId", middleware.GinRequirePermission(cache, "content:delete"), cfg.DocHandler.DeleteCollection)
 		colGroup.POST("/:slug/:documentId/publish", middleware.GinRequirePermission(cache, "content:publish"), cfg.DocHandler.PublishCollection)
 		colGroup.POST("/:slug/:documentId/unpublish", middleware.GinRequirePermission(cache, "content:unpublish"), cfg.DocHandler.UnpublishCollection)
+		colGroup.POST("/:slug/:documentId/duplicate", middleware.GinRequirePermission(cache, "content:create"), cfg.DocHandler.DuplicateCollection)
 	}
 
 	// Public document route (no auth)
