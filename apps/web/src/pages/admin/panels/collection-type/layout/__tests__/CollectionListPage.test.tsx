@@ -39,7 +39,7 @@ let mock: MockAdapter
 
 beforeEach(() => {
   mock = new MockAdapter(api)
-  mock.onGet('/api/locales').reply(200, ['en'])
+  mock.onGet('/api/locales').reply(200, [{ code: 'en', name: 'English', isDefault: true, createdAt: '', updatedAt: '' }])
 })
 
 afterEach(() => {

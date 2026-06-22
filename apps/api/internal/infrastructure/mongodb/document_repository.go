@@ -225,3 +225,12 @@ func (r *documentRepository) TableInfo(ctx context.Context, contentTypeSlug stri
 	}
 	return count > 0, count, nil
 }
+
+func (r *documentRepository) CountByLocale(ctx context.Context, contentTypeSlug, locale string) (int64, error) {
+	col := r.collection(contentTypeSlug)
+	count, err := col.CountDocuments(ctx, bson.M{"locale": locale})
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}

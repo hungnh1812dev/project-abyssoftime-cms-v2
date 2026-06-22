@@ -25,4 +25,5 @@ type DocumentRepository interface {
 	EnsureCollection(ctx context.Context, contentTypeSlug string, fields []entity.FieldDefinition) error
 	DropCollection(ctx context.Context, contentTypeSlug string) error
 	TableInfo(ctx context.Context, contentTypeSlug string) (exists bool, rowCount int64, err error)
+	CountByLocale(ctx context.Context, contentTypeSlug, locale string) (int64, error)
 }

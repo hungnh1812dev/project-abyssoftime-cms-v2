@@ -25,6 +25,7 @@ import (
 	docuc "project-abyssoftime-cms-v2/api/internal/usecase/document"
 	accesstokenuc "project-abyssoftime-cms-v2/api/internal/usecase/access_token"
 	inviteuc "project-abyssoftime-cms-v2/api/internal/usecase/invite"
+	localeuc "project-abyssoftime-cms-v2/api/internal/usecase/locale"
 	mediauc "project-abyssoftime-cms-v2/api/internal/usecase/media"
 	roleuc "project-abyssoftime-cms-v2/api/internal/usecase/role"
 	useruc "project-abyssoftime-cms-v2/api/internal/usecase/user"
@@ -158,6 +159,14 @@ func main() {
 		accessTokenRepo = mongodb.NewAccessTokenRepository(mongoDB)
 	}
 
+	// --- locale repository ---
+	var localeRepo repository.LocaleRepository
+	if isPostgres(cfg.DB.Driver) {
+		localeRepo = gormdb.NewLocaleRepository(sqlDB)
+	} else {
+		localeRepo = mongodb.NewLocaleRepository(mongoDB)
+	}
+
 	// --- component repository (PostgreSQL only) ---
 	var compRepo repository.ComponentRepository
 	if isPostgres(cfg.DB.EntityDB.Document) {
@@ -172,10 +181,16 @@ func main() {
 	inviteUC := inviteuc.New(inviteRepo, userRepo, roleRepo)
 	accessTokenUC := accesstokenuc.New(accessTokenRepo)
 	roleUC := roleuc.New(roleRepo, userRepo)
+	localeUC := localeuc.New(localeRepo, docRepo, ctRepo)
 
 	// Seed default roles on first startup
 	if err := roleUC.SeedDefaults(ctx); err != nil {
 		log.Fatalf("seed default roles: %v", err)
+	}
+
+	// Seed locales from env var on first startup
+	if err := localeUC.Seed(ctx, cfg.SupportedLocales); err != nil {
+		log.Fatalf("seed locales: %v", err)
 	}
 
 	// Role permission cache
@@ -207,7 +222,7 @@ func main() {
 		CTHandler:          deliveryhandler.NewContentTypeHandler(ctUC),
 		DocHandler:         deliveryhandler.NewDocumentHandler(documentUC, ctUC, userRepo),
 		MediaHandler:       deliveryhandler.NewMediaHandler(mediaUC),
-		LocaleHandler:      deliveryhandler.NewLocaleHandler(cfg.SupportedLocales),
+		LocaleHandler:      deliveryhandler.NewLocaleHandler(localeUC),
 		UserHandler:        deliveryhandler.NewUserHandler(userUC),
 		InviteHandler:      deliveryhandler.NewInviteHandler(inviteUC),
 		AccessTokenHandler: deliveryhandler.NewAccessTokenHandler(accessTokenUC),

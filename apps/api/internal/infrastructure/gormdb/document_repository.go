@@ -167,6 +167,18 @@ func (r *documentRepository) TableInfo(ctx context.Context, contentTypeSlug stri
 	return true, count, nil
 }
 
+func (r *documentRepository) CountByLocale(ctx context.Context, contentTypeSlug, locale string) (int64, error) {
+	table := documentTableName(contentTypeSlug)
+	if !r.database.Migrator().HasTable(table) {
+		return 0, nil
+	}
+	var count int64
+	if err := r.database.WithContext(ctx).Table(table).Where("locale = ?", locale).Count(&count).Error; err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
 func docToRow(doc *entity.Document) map[string]any {
 	row := map[string]any{
 		"document_id":  doc.DocumentID,

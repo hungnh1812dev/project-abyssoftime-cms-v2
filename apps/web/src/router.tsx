@@ -44,6 +44,12 @@ const RolesPage = lazy(() =>
   })),
 );
 
+const InternationalizePage = lazy(() =>
+  import("@/pages/admin/settings/InternationalizePage").then((module) => ({
+    default: module.InternationalizePage,
+  })),
+);
+
 const InviteAcceptPage = lazy(() =>
   import("@/pages/auth/InviteAcceptPage").then((module) => ({
     default: module.InviteAcceptPage,
@@ -151,6 +157,16 @@ export function AppRouter() {
             <ProtectedRoute minRole="super_admin">
               <Suspense fallback={<PanelFallback />}>
                 <RolesPage />
+              </Suspense>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="settings/internationalize"
+          element={
+            <ProtectedRoute minRole="super_admin">
+              <Suspense fallback={<PanelFallback />}>
+                <InternationalizePage />
               </Suspense>
             </ProtectedRoute>
           }

@@ -52,6 +52,14 @@ export function flattenFields(fields: FieldDefinition[]): FieldDefinition[] {
   )
 }
 
+export interface Locale {
+  code: string
+  name: string
+  isDefault: boolean
+  createdAt: string
+  updatedAt: string
+}
+
 export interface MediaAsset {
   ID: string
   documentId: string

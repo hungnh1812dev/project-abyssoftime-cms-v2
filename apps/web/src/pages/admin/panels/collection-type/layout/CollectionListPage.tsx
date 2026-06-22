@@ -25,6 +25,7 @@ import { useUpdateListFields } from '@/hooks/useContentTypes';
 import { useLocales } from '@/hooks/useLocales';
 import { getRegistration, type CollectionColumnDef } from '@/content-type-registry';
 import { ColumnChooserDialog } from '@/components/collection/ColumnChooserDialog';
+import { LocaleSelector } from '@/components/locale/LocaleSelector';
 import { flattenFields, type ContentType, type Document, type FieldDefinition } from '@/types/cms';
 import { Pencil, Trash2, Copy, ArrowUpDown, ArrowUp, ArrowDown, Settings2 } from 'lucide-react';
 
@@ -141,7 +142,8 @@ export function CollectionListPage({ contentType }: Props) {
   const [columnChooserOpen, setColumnChooserOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const { data: locales = [] } = useLocales();
-  const activeLocale = locales[0] || '';
+  const [selectedLocale, setSelectedLocale] = useState('');
+  const activeLocale = selectedLocale || locales.find((loc) => loc.isDefault)?.code || locales[0]?.code || '';
 
   const queryClient = useQueryClient();
   const { data: page, isLoading } = useCollectionDocuments(contentType.Slug, start, PAGE_SIZE, activeLocale, orderBy, sortDir);
@@ -225,6 +227,7 @@ export function CollectionListPage({ contentType }: Props) {
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">{contentType.Name}</h1>
         <div className="flex items-center gap-2">
+          <LocaleSelector value={activeLocale} onChange={(code) => { setSelectedLocale(code); setStart(0); }} />
           {!hasRegistryOverride && (
             <Button variant="outline" size="icon" aria-label="Configure columns" onClick={() => setColumnChooserOpen(true)}>
               <Settings2 className="h-4 w-4" />

@@ -125,8 +125,14 @@ func SetupRouter(cfg RouterConfig) *gin.Engine {
 		tokenGroup.DELETE("/:id", cfg.AccessTokenHandler.Delete)
 	}
 
-	// Locales (public)
-	r.GET("/api/locales", cfg.LocaleHandler.List)
+	// Locale routes
+	localeGroup := r.Group("/api/locales")
+	{
+		localeGroup.GET("", cfg.LocaleHandler.List)
+		localeGroup.POST("", middleware.GinAuth(), middleware.GinRequirePermission(cache, "locales:manage"), cfg.LocaleHandler.Create)
+		localeGroup.PUT("/:code", middleware.GinAuth(), middleware.GinRequirePermission(cache, "locales:manage"), cfg.LocaleHandler.Update)
+		localeGroup.DELETE("/:code", middleware.GinAuth(), middleware.GinRequirePermission(cache, "locales:manage"), cfg.LocaleHandler.Delete)
+	}
 
 	// GraphQL endpoint — wrap the existing gqlgen http.Handler
 	if cfg.GraphQLHandler != nil {

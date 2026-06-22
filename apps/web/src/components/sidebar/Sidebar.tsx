@@ -64,6 +64,9 @@ export function Sidebar() {
           {isSuperAdmin && (
             <SidebarItem to="/admin/settings/roles">Roles</SidebarItem>
           )}
+          {isSuperAdmin && (
+            <SidebarItem to="/admin/settings/internationalize">Internationalize</SidebarItem>
+          )}
         </SidebarGroup>
       </nav>
 

@@ -24,6 +24,7 @@ type DocumentRepository struct {
 	EnsureCollectionFn          func(ctx context.Context, contentTypeSlug string, fields []entity.FieldDefinition) error
 	DropCollectionFn            func(ctx context.Context, contentTypeSlug string) error
 	TableInfoFn                 func(ctx context.Context, contentTypeSlug string) (bool, int64, error)
+	CountByLocaleFn             func(ctx context.Context, contentTypeSlug, locale string) (int64, error)
 }
 
 func (m *DocumentRepository) FindDraftByDocumentID(ctx context.Context, contentTypeSlug, documentID, locale string) (*entity.Document, error) {
@@ -89,4 +90,11 @@ func (m *DocumentRepository) TableInfo(ctx context.Context, contentTypeSlug stri
 		return m.TableInfoFn(ctx, contentTypeSlug)
 	}
 	return false, 0, nil
+}
+
+func (m *DocumentRepository) CountByLocale(ctx context.Context, contentTypeSlug, locale string) (int64, error) {
+	if m.CountByLocaleFn != nil {
+		return m.CountByLocaleFn(ctx, contentTypeSlug, locale)
+	}
+	return 0, nil
 }
