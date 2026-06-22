@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { ContentType, ContentTypeSummary } from "@/types/cms";
 
@@ -31,5 +31,19 @@ export function useContentTypeBySlug(slug: string) {
     queryFn: () =>
       api.get<ContentType>(`/api/content-types/${slug}`).then((response) => response.data),
     enabled: Boolean(slug),
+  });
+}
+
+export function useUpdateListFields() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ slug, listFields }: { slug: string; listFields: string[] }) =>
+      api
+        .patch<{ listFields: string[] }>(`/api/content-types/${slug}/list-fields`, { listFields })
+        .then((response) => response.data),
+    onSuccess: (_, { slug }) => {
+      queryClient.invalidateQueries({ queryKey: KEYS.bySlug(slug) });
+      queryClient.invalidateQueries({ queryKey: KEYS.all });
+    },
   });
 }

@@ -5,7 +5,7 @@ import MockAdapter from 'axios-mock-adapter'
 import type { ReactNode } from 'react'
 import { createElement } from 'react'
 import { api } from '@/lib/api'
-import { useContentTypes, useContentType, useContentTypeBySlug } from '@/hooks/useContentTypes'
+import { useContentTypes, useContentType, useContentTypeBySlug, useUpdateListFields } from '@/hooks/useContentTypes'
 import type { ContentType } from '@/types/cms'
 
 let mock: MockAdapter
@@ -71,5 +71,18 @@ describe('useContentTypeBySlug', () => {
   it('is disabled when slug is empty', () => {
     const { result } = renderHook(() => useContentTypeBySlug(''), { wrapper: createWrapper() })
     expect(result.current.fetchStatus).toBe('idle')
+  })
+})
+
+describe('useUpdateListFields', () => {
+  it('sends PATCH to /api/content-types/{slug}/list-fields', async () => {
+    mock.onPatch('/api/content-types/blog/list-fields').reply(200, { listFields: ['title', 'slug'] })
+    const { result } = renderHook(() => useUpdateListFields(), { wrapper: createWrapper() })
+
+    result.current.mutate({ slug: 'blog', listFields: ['title', 'slug'] })
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(mock.history.patch).toHaveLength(1)
+    expect(JSON.parse(mock.history.patch[0].data)).toEqual({ listFields: ['title', 'slug'] })
   })
 })
