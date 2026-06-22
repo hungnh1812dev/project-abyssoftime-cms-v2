@@ -278,6 +278,42 @@ func TestDocumentHandler_ListCollection(t *testing.T) {
 			t.Errorf("capped size = %d, want 100", gotSize)
 		}
 	})
+
+	t.Run("includes listFields in response", func(t *testing.T) {
+		uc := &mockDocumentUC{}
+		uc.getAllPaginatedFn = func(_ context.Context, _ string, _, _ int, _, _ string, _ int) ([]*entity.Document, []string, int64, error) {
+			return nil, nil, 0, nil
+		}
+		ctUC := &mockCTUC{findBySlugFn: func(_ context.Context, _ string) (*entity.ContentType, error) {
+			return &entity.ContentType{
+				ListFields: []string{"title", "createdAt"},
+				Fields:     []entity.FieldDefinition{{Name: "title", Type: "text"}},
+			}, nil
+		}}
+		hndl := handler.NewDocumentHandler(uc, ctUC, &mockUserResolver{})
+
+		recorder := httptest.NewRecorder()
+		_, router := gin.CreateTestContext(recorder)
+		router.GET("/api/document-manager/collection-type/:slug", hndl.ListCollection)
+		req := httptest.NewRequest(http.MethodGet, "/api/document-manager/collection-type/articles", nil)
+		router.ServeHTTP(recorder, req)
+
+		if recorder.Code != http.StatusOK {
+			t.Fatalf("status = %d, want 200", recorder.Code)
+		}
+		var resp map[string]any
+		_ = json.NewDecoder(recorder.Body).Decode(&resp)
+		rawFields, ok := resp["listFields"].([]any)
+		if !ok {
+			t.Fatal("response missing listFields")
+		}
+		if len(rawFields) != 2 {
+			t.Errorf("listFields len = %d, want 2", len(rawFields))
+		}
+		if rawFields[0] != "title" || rawFields[1] != "createdAt" {
+			t.Errorf("listFields = %v, want [title createdAt]", rawFields)
+		}
+	})
 }
 
 func TestDocumentHandler_GetCollection(t *testing.T) {

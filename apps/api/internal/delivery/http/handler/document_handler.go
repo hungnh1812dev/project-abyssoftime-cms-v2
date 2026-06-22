@@ -90,10 +90,11 @@ type paginatedListItem struct {
 }
 
 type paginatedResponse struct {
-	Items []paginatedListItem `json:"items"`
-	Total int64               `json:"total"`
-	Start int                 `json:"start"`
-	Size  int                 `json:"size"`
+	Items      []paginatedListItem `json:"items"`
+	Total      int64               `json:"total"`
+	Start      int                 `json:"start"`
+	Size       int                 `json:"size"`
+	ListFields []string            `json:"listFields,omitempty"`
 }
 
 func mergeDocData(doc *entity.Document) map[string]any {
@@ -296,10 +297,11 @@ func (h *DocumentHandler) ListCollection(ginCtx *gin.Context) {
 		}
 	}
 	ginCtx.JSON(http.StatusOK, paginatedResponse{
-		Items: items,
-		Total: total,
-		Start: start,
-		Size:  size,
+		Items:      items,
+		Total:      total,
+		Start:      start,
+		Size:       size,
+		ListFields: ct.ListFields,
 	})
 }
 
