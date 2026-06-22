@@ -142,6 +142,18 @@ func (r *documentRepository) DropCollection(ctx context.Context, contentTypeSlug
 	return r.db.WithContext(ctx).Migrator().DropTable(table)
 }
 
+func (r *documentRepository) TableInfo(ctx context.Context, contentTypeSlug string) (bool, int64, error) {
+	table := documentTableName(contentTypeSlug)
+	if !r.db.Migrator().HasTable(table) {
+		return false, 0, nil
+	}
+	var count int64
+	if err := r.db.WithContext(ctx).Table(table).Count(&count).Error; err != nil {
+		return true, 0, err
+	}
+	return true, count, nil
+}
+
 func docToRow(doc *entity.Document) map[string]any {
 	row := map[string]any{
 		"document_id":  doc.DocumentID,

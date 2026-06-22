@@ -216,3 +216,12 @@ func (r *documentRepository) EnsureCollection(ctx context.Context, contentTypeSl
 func (r *documentRepository) DropCollection(ctx context.Context, contentTypeSlug string) error {
 	return r.collection(contentTypeSlug).Drop(ctx)
 }
+
+func (r *documentRepository) TableInfo(ctx context.Context, contentTypeSlug string) (bool, int64, error) {
+	col := r.collection(contentTypeSlug)
+	count, err := col.CountDocuments(ctx, bson.M{})
+	if err != nil {
+		return false, 0, err
+	}
+	return count > 0, count, nil
+}

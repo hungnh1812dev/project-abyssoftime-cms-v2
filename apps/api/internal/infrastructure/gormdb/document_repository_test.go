@@ -466,3 +466,44 @@ func TestDocumentRepository_EnsureCollection_IgnoresRemovedField(t *testing.T) {
 		t.Error("expected 'summary' column to still exist after reducing fields")
 	}
 }
+
+func TestDocumentRepository_TableInfo(t *testing.T) {
+	db, err := NewClient("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	repo := NewDocumentRepository(db)
+	ctx := context.Background()
+
+	// Table doesn't exist yet
+	exists, count, err := repo.TableInfo(ctx, "blog")
+	if err != nil {
+		t.Fatalf("TableInfo: %v", err)
+	}
+	if exists {
+		t.Error("expected exists=false before EnsureCollection")
+	}
+
+	// Create table and insert data
+	if err := repo.EnsureCollection(ctx, "blog", testFields); err != nil {
+		t.Fatalf("EnsureCollection: %v", err)
+	}
+	for _, id := range []string{"d1", "d2", "d3"} {
+		_ = repo.UpsertDraft(ctx, "blog", &entity.Document{
+			DocumentID: id, Version: entity.VersionDraft,
+			Fields: map[string]any{"title": id}, Locale: "en",
+			CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
+		})
+	}
+
+	exists, count, err = repo.TableInfo(ctx, "blog")
+	if err != nil {
+		t.Fatalf("TableInfo: %v", err)
+	}
+	if !exists {
+		t.Error("expected exists=true after EnsureCollection")
+	}
+	if count != 3 {
+		t.Errorf("count = %d, want 3", count)
+	}
+}

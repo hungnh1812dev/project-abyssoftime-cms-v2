@@ -23,6 +23,7 @@ type DocumentRepository struct {
 	DeleteAllByContentTypeFn    func(ctx context.Context, contentTypeSlug string) error
 	EnsureCollectionFn          func(ctx context.Context, contentTypeSlug string, fields []entity.FieldDefinition) error
 	DropCollectionFn            func(ctx context.Context, contentTypeSlug string) error
+	TableInfoFn                 func(ctx context.Context, contentTypeSlug string) (bool, int64, error)
 }
 
 func (m *DocumentRepository) FindDraftByDocumentID(ctx context.Context, contentTypeSlug, documentID, locale string) (*entity.Document, error) {
@@ -81,4 +82,11 @@ func (m *DocumentRepository) DropCollection(ctx context.Context, contentTypeSlug
 		return m.DropCollectionFn(ctx, contentTypeSlug)
 	}
 	return nil
+}
+
+func (m *DocumentRepository) TableInfo(ctx context.Context, contentTypeSlug string) (bool, int64, error) {
+	if m.TableInfoFn != nil {
+		return m.TableInfoFn(ctx, contentTypeSlug)
+	}
+	return false, 0, nil
 }

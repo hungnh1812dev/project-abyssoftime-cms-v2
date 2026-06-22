@@ -24,4 +24,5 @@ type DocumentRepository interface {
 	DeleteAllByContentType(ctx context.Context, contentTypeSlug string) error
 	EnsureCollection(ctx context.Context, contentTypeSlug string, fields []entity.FieldDefinition) error
 	DropCollection(ctx context.Context, contentTypeSlug string) error
+	TableInfo(ctx context.Context, contentTypeSlug string) (exists bool, rowCount int64, err error)
 }
