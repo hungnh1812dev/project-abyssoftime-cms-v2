@@ -229,3 +229,67 @@ describe('CollectionListPage — navigation', () => {
     )
   })
 })
+
+describe('CollectionListPage — column chooser', () => {
+  it('shows configure columns button when no registry override', async () => {
+    const { getRegistration } = await import('@/content-type-registry')
+    vi.mocked(getRegistration).mockReturnValue(undefined)
+
+    mock.onGet('/api/document-manager/collection-type/blog-posts').reply(200, { items: [doc1], total: 1, start: 0, size: 20 })
+    renderWithProviders(<CollectionListPage contentType={ct} />)
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /configure columns/i })).toBeInTheDocument()
+    })
+  })
+
+  it('hides configure columns button when registry override exists', async () => {
+    const { getRegistration } = await import('@/content-type-registry')
+    vi.mocked(getRegistration).mockReturnValue({
+      slug: 'blog-posts',
+      kind: 'collection',
+      columns: [{ key: 'title', label: 'Title', type: 'text' }],
+    })
+
+    mock.onGet('/api/document-manager/collection-type/blog-posts').reply(200, { items: [doc1], total: 1, start: 0, size: 20 })
+    renderWithProviders(<CollectionListPage contentType={ct} />)
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: /configure columns/i })).not.toBeInTheDocument()
+    })
+  })
+
+  it('hides system columns when not in listFields', async () => {
+    const { getRegistration } = await import('@/content-type-registry')
+    vi.mocked(getRegistration).mockReturnValue(undefined)
+
+    const ctWithListFields: ContentType = {
+      ...ct,
+      listFields: ['title'],
+    }
+    mock.onGet('/api/document-manager/collection-type/blog-posts').reply(200, { items: [doc1], total: 1, start: 0, size: 20 })
+    renderWithProviders(<CollectionListPage contentType={ctWithListFields} />)
+    await waitFor(() => {
+      expect(screen.getByText('First Post')).toBeInTheDocument()
+    })
+    expect(screen.queryByText('Created At')).not.toBeInTheDocument()
+    expect(screen.queryByText('Updated At')).not.toBeInTheDocument()
+    expect(screen.queryByText('Updated By')).not.toBeInTheDocument()
+  })
+
+  it('shows system columns when included in listFields', async () => {
+    const { getRegistration } = await import('@/content-type-registry')
+    vi.mocked(getRegistration).mockReturnValue(undefined)
+
+    const ctWithListFields: ContentType = {
+      ...ct,
+      listFields: ['title', 'createdAt', 'updatedByName'],
+    }
+    mock.onGet('/api/document-manager/collection-type/blog-posts').reply(200, { items: [doc1], total: 1, start: 0, size: 20 })
+    renderWithProviders(<CollectionListPage contentType={ctWithListFields} />)
+    await waitFor(() => {
+      expect(screen.getByText('First Post')).toBeInTheDocument()
+    })
+    expect(screen.getByText('Created At')).toBeInTheDocument()
+    expect(screen.queryByText('Updated At')).not.toBeInTheDocument()
+    expect(screen.getByText('Updated By')).toBeInTheDocument()
+  })
+})

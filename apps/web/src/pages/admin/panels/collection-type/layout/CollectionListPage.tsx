@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -11,25 +12,31 @@ import {
   TableCell,
 } from '@/components/ui/table';
 import { useCollectionDocuments, useDeleteCollectionDocument, useDuplicateCollectionDocument } from '@/hooks/useCollectionDocuments';
+import { useUpdateListFields } from '@/hooks/useContentTypes';
 import { useLocales } from '@/hooks/useLocales';
 import { getRegistration, type CollectionColumnDef } from '@/content-type-registry';
+import { ColumnChooserDialog } from '@/components/collection/ColumnChooserDialog';
 import type { ContentType, Document, FieldDefinition } from '@/types/cms';
-import { Pencil, Trash2, Copy, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Pencil, Trash2, Copy, ArrowUpDown, ArrowUp, ArrowDown, Settings2 } from 'lucide-react';
 
 interface Props {
   contentType: ContentType;
 }
 
+const SYSTEM_FIELD_KEYS = new Set(['createdAt', 'updatedAt', 'updatedByName']);
+
 function deriveColumns(contentType: ContentType): CollectionColumnDef[] {
   const registration = getRegistration(contentType.Slug);
   if (registration?.columns) return registration.columns;
 
-  const listFieldNames = contentType.listFields ?? [];
+  const listFieldNames = (contentType.listFields ?? []).filter((name) => !SYSTEM_FIELD_KEYS.has(name));
   const fields = contentType.Fields ?? [];
   const fieldMap = new Map<string, FieldDefinition>();
   for (const field of fields) fieldMap.set(field.name, field);
 
-  const names = listFieldNames.length > 0 ? listFieldNames : fields.slice(0, 3).map((field) => field.name);
+  const names = listFieldNames.length > 0
+    ? listFieldNames
+    : fields.filter((field) => field.type !== 'component').slice(0, 3).map((field) => field.name);
 
   return names.map((name) => {
     const field = fieldMap.get(name);
@@ -40,6 +47,17 @@ function deriveColumns(contentType: ContentType): CollectionColumnDef[] {
     else if (fieldType === 'media') colType = 'image';
     return { key: name, label: name, type: colType };
   });
+}
+
+function deriveSystemVisibility(listFields: string[]): { showCreatedAt: boolean; showUpdatedAt: boolean; showUpdatedBy: boolean } {
+  if (listFields.length === 0) {
+    return { showCreatedAt: true, showUpdatedAt: true, showUpdatedBy: true };
+  }
+  return {
+    showCreatedAt: listFields.includes('createdAt'),
+    showUpdatedAt: listFields.includes('updatedAt'),
+    showUpdatedBy: listFields.includes('updatedByName'),
+  };
 }
 
 function cellValue(doc: Document, col: CollectionColumnDef): React.ReactNode {
@@ -111,15 +129,20 @@ export function CollectionListPage({ contentType }: Props) {
   const [start, setStart] = useState(0);
   const [orderBy, setOrderBy] = useState<SortField>('id');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [columnChooserOpen, setColumnChooserOpen] = useState(false);
   const { data: locales = [] } = useLocales();
   const activeLocale = locales[0] || '';
 
+  const queryClient = useQueryClient();
   const { data: page, isLoading } = useCollectionDocuments(contentType.Slug, start, PAGE_SIZE, activeLocale, orderBy, sortDir);
   const { mutate: deleteDoc } = useDeleteCollectionDocument();
   const { mutateAsync: duplicateDoc } = useDuplicateCollectionDocument();
+  const updateListFields = useUpdateListFields();
   const navigate = useNavigate();
 
+  const hasRegistryOverride = Boolean(getRegistration(contentType.Slug)?.columns);
   const columns = deriveColumns(contentType);
+  const systemVis = deriveSystemVisibility(contentType.listFields ?? []);
   const docs = page?.items ?? [];
   const total = page?.total ?? 0;
 
@@ -163,6 +186,18 @@ export function CollectionListPage({ contentType }: Props) {
     navigate(`/admin/content-type/collection-type/${contentType.Slug}/${doc.data.documentId}`);
   }
 
+  function handleSaveListFields(selectedFields: string[]) {
+    updateListFields.mutate(
+      { slug: contentType.Slug, listFields: selectedFields },
+      {
+        onSuccess: () => {
+          setColumnChooserOpen(false);
+          queryClient.invalidateQueries({ queryKey: ['documents', 'collection-type', contentType.Slug] });
+        },
+      },
+    );
+  }
+
   if (isLoading) {
     return <p className="text-muted-foreground p-6">Loading…</p>;
   }
@@ -174,8 +209,26 @@ export function CollectionListPage({ contentType }: Props) {
     <div className="space-y-4 p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">{contentType.Name}</h1>
-        <Button onClick={handleCreate}>Add new item</Button>
+        <div className="flex items-center gap-2">
+          {!hasRegistryOverride && (
+            <Button variant="outline" size="icon" aria-label="Configure columns" onClick={() => setColumnChooserOpen(true)}>
+              <Settings2 className="h-4 w-4" />
+            </Button>
+          )}
+          <Button onClick={handleCreate}>Add new item</Button>
+        </div>
       </div>
+
+      {!hasRegistryOverride && (
+        <ColumnChooserDialog
+          open={columnChooserOpen}
+          onOpenChange={setColumnChooserOpen}
+          contentType={contentType}
+          currentListFields={contentType.listFields ?? []}
+          onSave={handleSaveListFields}
+          isSaving={updateListFields.isPending}
+        />
+      )}
 
       {docs.length === 0 ? (
         <p className="text-muted-foreground">No entries yet.</p>
@@ -191,14 +244,20 @@ export function CollectionListPage({ contentType }: Props) {
                   {columns.map((column) => (
                     <TableHead key={column.key}>{column.label}</TableHead>
                   ))}
+                  {systemVis.showCreatedAt && (
+                    <TableHead>
+                      <SortableHeader label="Created At" field="createdAt" activeField={orderBy} activeDir={sortDir} onSort={handleSort} />
+                    </TableHead>
+                  )}
+                  {systemVis.showUpdatedAt && (
+                    <TableHead>
+                      <SortableHeader label="Updated At" field="updatedAt" activeField={orderBy} activeDir={sortDir} onSort={handleSort} />
+                    </TableHead>
+                  )}
+                  {systemVis.showUpdatedBy && (
+                    <TableHead>Updated By</TableHead>
+                  )}
                   <TableHead>Status</TableHead>
-                  <TableHead>
-                    <SortableHeader label="Created At" field="createdAt" activeField={orderBy} activeDir={sortDir} onSort={handleSort} />
-                  </TableHead>
-                  <TableHead>
-                    <SortableHeader label="Updated At" field="updatedAt" activeField={orderBy} activeDir={sortDir} onSort={handleSort} />
-                  </TableHead>
-                  <TableHead>Updated By</TableHead>
                   <TableHead className="w-24 text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -213,12 +272,18 @@ export function CollectionListPage({ contentType }: Props) {
                     {columns.map((column) => (
                       <TableCell key={column.key}>{cellValue(doc, column)}</TableCell>
                     ))}
+                    {systemVis.showCreatedAt && (
+                      <TableCell className="text-sm text-muted-foreground">{formatDate(doc.data.createdAt)}</TableCell>
+                    )}
+                    {systemVis.showUpdatedAt && (
+                      <TableCell className="text-sm text-muted-foreground">{formatDate(doc.data.updatedAt)}</TableCell>
+                    )}
+                    {systemVis.showUpdatedBy && (
+                      <TableCell className="text-sm text-muted-foreground">{String(doc.data.updatedByName ?? '')}</TableCell>
+                    )}
                     <TableCell>
                       <Badge variant={statusVariant[doc.status] ?? 'draft'}>{doc.status}</Badge>
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{formatDate(doc.data.createdAt)}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{formatDate(doc.data.updatedAt)}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{String(doc.data.updatedByName ?? '')}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
                         <Button variant="outline" size="icon-xs" className="hover:bg-accent-foreground/10" aria-label="Edit" onClick={(event) => handleEdit(event, doc)}>

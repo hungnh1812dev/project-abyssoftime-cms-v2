@@ -24,6 +24,7 @@ export interface PaginatedResponse<T> {
   total: number
   start: number
   size: number
+  listFields?: string[]
 }
 
 export type EntryStatus = 'draft' | 'modified' | 'published'
