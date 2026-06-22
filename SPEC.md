@@ -178,3 +178,4 @@ The frontend spec is not modularized. Key sections:
 |--------|--------|-------------|
 | Spec ready | core | [Fix Data Loss in EnsureCollection](specs/fix-data-loss-ensure-collection.md) — Non-destructive schema sync to prevent data wipe on cold start |
 | Spec ready | content | [Duplicate Document](specs/duplicate-document.md) — Collection List row action to fully clone a document |
+| Spec ready | content | [Configurable List Columns](specs/configurable-list-columns.md) — UI popup to choose visible columns on CollectionListPage, persisted to DB |
