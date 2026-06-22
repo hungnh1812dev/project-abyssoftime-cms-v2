@@ -311,3 +311,31 @@ func TestDocumentRepository_DeletePublishedByDocumentID(t *testing.T) {
 		t.Errorf("after delete, err = %v, want ErrNotFound", err)
 	}
 }
+
+func TestExistingColumns(t *testing.T) {
+	db, err := NewClient("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	repo := NewDocumentRepository(db)
+	ctx := context.Background()
+
+	if err := repo.EnsureCollection(ctx, "blog", testFields); err != nil {
+		t.Fatalf("EnsureCollection: %v", err)
+	}
+
+	cols, err := existingColumns(db, documentTableName("blog"))
+	if err != nil {
+		t.Fatalf("existingColumns: %v", err)
+	}
+
+	for _, want := range []string{"gorm_id", "document_id", "version", "locale", "title", "body", "created_at", "updated_at"} {
+		if !cols[want] {
+			t.Errorf("missing column %q", want)
+		}
+	}
+
+	if cols["nonexistent"] {
+		t.Error("unexpected column 'nonexistent'")
+	}
+}

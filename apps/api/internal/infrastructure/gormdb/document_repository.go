@@ -47,6 +47,23 @@ func (r *documentRepository) table(slug string) *gorm.DB {
 	return r.db.Table(documentTableName(slug))
 }
 
+func existingColumns(db *gorm.DB, table string) (map[string]bool, error) {
+	rows, err := db.Table(table).Limit(1).Rows()
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	cols, err := rows.Columns()
+	if err != nil {
+		return nil, err
+	}
+	set := make(map[string]bool, len(cols))
+	for _, c := range cols {
+		set[c] = true
+	}
+	return set, nil
+}
+
 func fieldColumnType(fieldType string) string {
 	switch fieldType {
 	case "number":
