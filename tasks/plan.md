@@ -81,6 +81,135 @@ Six bugs across auth, content API, frontend inputs, and response formatting:
 
 ---
 
+## Current: Phase DL — Fix Production Data Loss in EnsureCollection
+
+See [specs/fix-data-loss-ensure-collection.md](../specs/fix-data-loss-ensure-collection.md) for full spec.
+
+### Problem Summary
+
+GORM `EnsureCollection` drops and recreates document/component tables on every API startup. Render.com free tier cold-starts after ~15 min idle, destroying all Supabase data each time. MongoDB's version is non-destructive (index-only), so local dev is unaffected.
+
+### Dependency Graph
+
+```
+T1 (shared column introspection helper)
+ ├── T2 (document EnsureCollection → non-destructive)
+ │    └── T3 (document preservation tests)
+ ├── T4 (component EnsureCollection → non-destructive)
+ │    └── T5 (component preservation tests)
+ └─────── [Checkpoint 1: data safe, all tests green]
+              └── T6 (sync startup logging)
+                   └── [Checkpoint 2: observability, full suite green]
+```
+
+### T1: Shared column introspection helper
+
+**File**: `apps/api/internal/infrastructure/gormdb/document_repository.go`
+
+Add a package-level function `existingColumns(db *gorm.DB, table string) (map[string]bool, error)` that returns a set of column names for a raw table. Uses the cross-database approach:
+
+```go
+func existingColumns(db *gorm.DB, table string) (map[string]bool, error) {
+    rows, err := db.Table(table).Limit(1).Rows()
+    if err != nil { return nil, err }
+    defer rows.Close()
+    cols, err := rows.Columns()
+    if err != nil { return nil, err }
+    set := make(map[string]bool, len(cols))
+    for _, c := range cols { set[c] = true }
+    return set, nil
+}
+```
+
+Works on both SQLite (tests) and PostgreSQL (production) — no dialect-specific SQL needed.
+
+**Acceptance**: Existing tests still pass. Private function, no interface changes.
+**Verify**: `cd apps/api && go test ./internal/infrastructure/gormdb/ -run TestDocument`
+
+### T2: Rewrite document `EnsureCollection` (non-destructive)
+
+**File**: `apps/api/internal/infrastructure/gormdb/document_repository.go`
+
+Replace drop-and-recreate with:
+1. If table doesn't exist → `createDocumentTable()` (extract current CREATE logic)
+2. If table exists → `addMissingColumns()` using T1's helper, running `ALTER TABLE ADD COLUMN` only for missing field columns
+
+System columns (`gorm_id`, `document_id`, `version`, `locale`, timestamps, `*_by`) are only created with the table, never added after — they're always present from initial creation.
+
+**Acceptance**:
+- Data survives EnsureCollection calls
+- New fields get columns added
+- Removed fields keep their columns (no drops)
+- All 13 existing document tests pass unchanged
+
+**Verify**: `cd apps/api && go test ./internal/infrastructure/gormdb/ -run TestDocument`
+
+### T3: Document data-preservation tests
+
+**File**: `apps/api/internal/infrastructure/gormdb/document_repository_test.go`
+
+Add 3 tests:
+1. `TestDocumentRepository_EnsureCollection_PreservesData` — insert rows, re-run EnsureCollection, rows queryable
+2. `TestDocumentRepository_EnsureCollection_AddsNewColumn` — create with [title,body], insert, re-ensure with [title,body,summary], verify old data + new column
+3. `TestDocumentRepository_EnsureCollection_IgnoresRemovedField` — create with [title,body,summary], insert, re-ensure with [title,body], verify summary column still exists
+
+**Acceptance**: All 16 tests pass (13 existing + 3 new)
+**Verify**: `cd apps/api && go test ./internal/infrastructure/gormdb/ -run TestDocument -v`
+
+### T4: Rewrite component `EnsureCollection` (non-destructive)
+
+**File**: `apps/api/internal/infrastructure/gormdb/component_repository.go`
+
+Same pattern as T2. Uses the shared `existingColumns` function from T1. Component system columns differ slightly: `gorm_id`, `component_id`, `document_id`, `version`, `locale`, `created_at`, `updated_at`.
+
+**Acceptance**: Same criteria as T2 but for component tables. All 7 existing component tests pass.
+**Verify**: `cd apps/api && go test ./internal/infrastructure/gormdb/ -run TestComponent`
+
+### T5: Component data-preservation tests
+
+**File**: `apps/api/internal/infrastructure/gormdb/component_repository_test.go`
+
+Add 3 tests (same pattern as T3):
+1. `TestComponentRepository_EnsureCollection_PreservesData`
+2. `TestComponentRepository_EnsureCollection_AddsNewColumn`
+3. `TestComponentRepository_EnsureCollection_IgnoresRemovedField`
+
+**Acceptance**: All 10 tests pass (7 existing + 3 new)
+**Verify**: `cd apps/api && go test ./internal/infrastructure/gormdb/ -run TestComponent -v`
+
+### Checkpoint 1: Data safe
+
+1. `cd apps/api && go test ./internal/infrastructure/gormdb/ -v` — all 26 tests pass
+2. `cd apps/api && go test ./...` — full backend suite green
+3. Ready to deploy if needed (logging can come later)
+
+### T6: Sync startup logging
+
+**Files**:
+- `apps/api/internal/usecase/content_type/sync.go` — add log lines in `syncOne`
+- `apps/api/internal/infrastructure/gormdb/document_repository.go` — add `TableInfo` method
+- `apps/api/internal/domain/repository/document_repository.go` — add `TableInfo` to interface
+
+Add `TableInfo(ctx, slug) (exists bool, rowCount int64, err error)` to `DocumentRepository`. In `syncOne`, call it before `EnsureCollection` and log:
+```
+sync: content-type "blog-posts" — table exists=true, rows=42
+sync: content-type "about" — table exists=false, creating
+```
+
+Update the `fakeDocRepository` mock in `sync_test.go` with a no-op `TableInfo`.
+
+**Acceptance**: Startup shows per-content-type table status. All sync tests pass.
+**Verify**: `cd apps/api && go test ./internal/usecase/content_type/ -v` + `make dev-api` (check logs)
+
+### Checkpoint 2 (Final): Full verification
+
+1. `cd apps/api && go test ./...` — all tests green
+2. `make dev-api` — startup logs show table status
+3. Manual test: create documents → restart API → documents survive
+4. Ready for Render.com deploy
+
+---
+
 ## Upcoming
 
 *(Add new plans here as they are defined.)*
