@@ -10,6 +10,7 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
+    dedupe: ['ckeditor5', '@ckeditor/ckeditor5-react'],
   },
   build: {
     chunkSizeWarningLimit: 1400,
@@ -21,6 +22,8 @@ export default defineConfig({
               return 'react'
             if (id.includes('@tanstack/react-query')) return 'query'
             if (id.includes('@radix-ui')) return 'ui'
+            if (id.includes('ckeditor5') || id.includes('@ckeditor'))
+              return 'ckeditor'
           }
         },
       },
