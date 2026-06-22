@@ -51,6 +51,7 @@ func SetupRouter(cfg RouterConfig) *gin.Engine {
 	{
 		ctGroup.GET("", cfg.CTHandler.ListSummary)
 		ctGroup.GET("/:identifier", cfg.CTHandler.Get)
+		ctGroup.PATCH("/:slug/list-fields", cfg.CTHandler.UpdateListFields)
 	}
 
 	// Document routes — single-type
