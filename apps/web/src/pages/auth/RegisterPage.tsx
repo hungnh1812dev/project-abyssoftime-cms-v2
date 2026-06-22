@@ -21,7 +21,7 @@ export function RegisterPage() {
   const { data: setupData, isLoading: setupLoading } = useQuery({
     queryKey: ['auth-setup'],
     queryFn: () =>
-      api.get<{ adminExists: boolean }>('/auth/setup').then((r) => r.data),
+      api.get<{ adminExists: boolean }>('/auth/setup').then((response) => response.data),
     retry: false,
   })
 
@@ -35,7 +35,7 @@ export function RegisterPage() {
 
   const mutation = useMutation({
     mutationFn: (data: RegisterFields) =>
-      api.post('/auth/register', data).then((r) => r.data),
+      api.post('/auth/register', data).then((response) => response.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['auth-setup'] })
       navigate('/login')

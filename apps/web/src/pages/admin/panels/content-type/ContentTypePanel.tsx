@@ -171,10 +171,10 @@ export function ContentTypePanel({ contentType, id, isNew }: Props) {
       renderActions={() => (
         <>
           {locales.length > 1 && (
-            <select aria-label="Locale" value={activeLocale} onChange={(e) => setLocale(e.target.value)}>
-              {locales.map((l) => (
-                <option key={l} value={l}>
-                  {l}
+            <select aria-label="Locale" value={activeLocale} onChange={(event) => setLocale(event.target.value)}>
+              {locales.map((locale) => (
+                <option key={locale} value={locale}>
+                  {locale}
                 </option>
               ))}
             </select>
@@ -188,7 +188,7 @@ export function ContentTypePanel({ contentType, id, isNew }: Props) {
           queryFn: () =>
             api
               .get<CmsDocument>(apiBase, { params: { locale: activeLocale } })
-              .then((r) => stripSystemFields((r.data as CmsDocument).data)),
+              .then((response) => stripSystemFields((response.data as CmsDocument).data)),
         }}
         mutationFn={mutationFn}
         renderActions={({ isDirty, submitting }) => (

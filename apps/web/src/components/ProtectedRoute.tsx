@@ -17,7 +17,7 @@ export function ProtectedRoute({
   const { data: setupData, isLoading: setupLoading } = useQuery({
     queryKey: ['auth-setup'],
     queryFn: () =>
-      api.get<{ adminExists: boolean }>('/auth/setup').then((r) => r.data),
+      api.get<{ adminExists: boolean }>('/auth/setup').then((response) => response.data),
     enabled: !loading && !token,
     staleTime: 30_000,
   })

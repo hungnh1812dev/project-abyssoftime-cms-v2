@@ -18,54 +18,54 @@ func NewRoleCache() *RoleCache {
 	return &RoleCache{roles: make(map[string]*entity.RoleEntity)}
 }
 
-func (c *RoleCache) Load(roles []*entity.RoleEntity) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	m := make(map[string]*entity.RoleEntity, len(roles))
-	for _, r := range roles {
-		m[r.Slug] = r
+func (cache *RoleCache) Load(roles []*entity.RoleEntity) {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+	mapping := make(map[string]*entity.RoleEntity, len(roles))
+	for _, roleEntity := range roles {
+		mapping[roleEntity.Slug] = roleEntity
 	}
-	c.roles = m
+	cache.roles = mapping
 }
 
-func (c *RoleCache) HasPermission(roleSlug, permission string) bool {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	r, ok := c.roles[roleSlug]
+func (cache *RoleCache) HasPermission(roleSlug, permission string) bool {
+	cache.mu.RLock()
+	defer cache.mu.RUnlock()
+	roleEntity, ok := cache.roles[roleSlug]
 	if !ok {
 		return false
 	}
-	for _, p := range r.Permissions {
-		if p == permission {
+	for _, perm := range roleEntity.Permissions {
+		if perm == permission {
 			return true
 		}
 	}
 	return false
 }
 
-func (c *RoleCache) GetLevel(roleSlug string) int {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	r, ok := c.roles[roleSlug]
+func (cache *RoleCache) GetLevel(roleSlug string) int {
+	cache.mu.RLock()
+	defer cache.mu.RUnlock()
+	roleEntity, ok := cache.roles[roleSlug]
 	if !ok {
 		return 0
 	}
-	return r.Level
+	return roleEntity.Level
 }
 
-func (c *RoleCache) Get(roleSlug string) *entity.RoleEntity {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.roles[roleSlug]
+func (cache *RoleCache) Get(roleSlug string) *entity.RoleEntity {
+	cache.mu.RLock()
+	defer cache.mu.RUnlock()
+	return cache.roles[roleSlug]
 }
 
 func GinRequirePermission(cache *RoleCache, permission string) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		roleSlug := c.GetString("role")
+	return func(ginCtx *gin.Context) {
+		roleSlug := ginCtx.GetString("role")
 		if !cache.HasPermission(roleSlug, permission) {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+			ginCtx.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 			return
 		}
-		c.Next()
+		ginCtx.Next()
 	}
 }

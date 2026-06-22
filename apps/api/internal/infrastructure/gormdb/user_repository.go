@@ -14,20 +14,20 @@ import (
 var _ repository.UserRepository = (*userRepository)(nil)
 
 type userRepository struct {
-	db *gorm.DB
+	database *gorm.DB
 }
 
-func NewUserRepository(db *gorm.DB) repository.UserRepository {
-	return &userRepository{db: db}
+func NewUserRepository(database *gorm.DB) repository.UserRepository {
+	return &userRepository{database: database}
 }
 
 func (r *userRepository) Create(ctx context.Context, user *entity.User) error {
-	return r.db.WithContext(ctx).Create(user).Error
+	return r.database.WithContext(ctx).Create(user).Error
 }
 
 func (r *userRepository) FindByEmail(ctx context.Context, email string) (*entity.User, error) {
 	var user entity.User
-	if err := r.db.WithContext(ctx).Where("email = ?", email).First(&user).Error; err != nil {
+	if err := r.database.WithContext(ctx).Where("email = ?", email).First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, pkgerrors.ErrNotFound
 		}
@@ -38,7 +38,7 @@ func (r *userRepository) FindByEmail(ctx context.Context, email string) (*entity
 
 func (r *userRepository) FindByID(ctx context.Context, id string) (*entity.User, error) {
 	var user entity.User
-	if err := r.db.WithContext(ctx).Where("document_id = ?", id).First(&user).Error; err != nil {
+	if err := r.database.WithContext(ctx).Where("document_id = ?", id).First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, pkgerrors.ErrNotFound
 		}
@@ -52,7 +52,7 @@ func (r *userRepository) FindByIDs(ctx context.Context, ids []string) ([]*entity
 		return nil, nil
 	}
 	var users []*entity.User
-	if err := r.db.WithContext(ctx).Where("document_id IN ?", ids).Find(&users).Error; err != nil {
+	if err := r.database.WithContext(ctx).Where("document_id IN ?", ids).Find(&users).Error; err != nil {
 		return nil, err
 	}
 	return users, nil
@@ -60,7 +60,7 @@ func (r *userRepository) FindByIDs(ctx context.Context, ids []string) ([]*entity
 
 func (r *userRepository) HasSuperAdmin(ctx context.Context) (bool, error) {
 	var count int64
-	if err := r.db.WithContext(ctx).Model(&entity.User{}).Where("role = ?", entity.RoleSuperAdmin).Count(&count).Error; err != nil {
+	if err := r.database.WithContext(ctx).Model(&entity.User{}).Where("role = ?", entity.RoleSuperAdmin).Count(&count).Error; err != nil {
 		return false, err
 	}
 	return count > 0, nil
@@ -68,19 +68,19 @@ func (r *userRepository) HasSuperAdmin(ctx context.Context) (bool, error) {
 
 func (r *userRepository) FindAll(ctx context.Context, page, limit int) ([]*entity.User, int64, error) {
 	var total int64
-	if err := r.db.WithContext(ctx).Model(&entity.User{}).Count(&total).Error; err != nil {
+	if err := r.database.WithContext(ctx).Model(&entity.User{}).Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 
 	var users []*entity.User
-	if err := r.db.WithContext(ctx).Order("created_at DESC").Offset((page - 1) * limit).Limit(limit).Find(&users).Error; err != nil {
+	if err := r.database.WithContext(ctx).Order("created_at DESC").Offset((page - 1) * limit).Limit(limit).Find(&users).Error; err != nil {
 		return nil, 0, err
 	}
 	return users, total, nil
 }
 
 func (r *userRepository) Update(ctx context.Context, user *entity.User) error {
-	result := r.db.WithContext(ctx).Save(user)
+	result := r.database.WithContext(ctx).Save(user)
 	if result.Error != nil {
 		return result.Error
 	}
@@ -91,7 +91,7 @@ func (r *userRepository) Update(ctx context.Context, user *entity.User) error {
 }
 
 func (r *userRepository) Delete(ctx context.Context, id string) error {
-	result := r.db.WithContext(ctx).Where("document_id = ?", id).Delete(&entity.User{})
+	result := r.database.WithContext(ctx).Where("document_id = ?", id).Delete(&entity.User{})
 	if result.Error != nil {
 		return result.Error
 	}

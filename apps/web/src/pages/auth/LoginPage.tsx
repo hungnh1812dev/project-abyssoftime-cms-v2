@@ -26,7 +26,7 @@ export function LoginPage() {
   const { data: setupData, isLoading: setupLoading } = useQuery({
     queryKey: ['auth-setup'],
     queryFn: () =>
-      api.get<{ adminExists: boolean }>('/auth/setup').then((r) => r.data),
+      api.get<{ adminExists: boolean }>('/auth/setup').then((response) => response.data),
     staleTime: 30_000,
   })
 
@@ -38,7 +38,7 @@ export function LoginPage() {
 
   const mutation = useMutation({
     mutationFn: (data: LoginFields) =>
-      api.post<LoginResponse>('/auth/login', data).then((r) => r.data),
+      api.post<LoginResponse>('/auth/login', data).then((response) => response.data),
     onSuccess: (data) => {
       login(data.accessToken)
       navigate('/admin')

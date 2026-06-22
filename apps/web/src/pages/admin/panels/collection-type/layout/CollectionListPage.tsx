@@ -27,13 +27,13 @@ function deriveColumns(contentType: ContentType): CollectionColumnDef[] {
   const listFieldNames = contentType.listFields ?? [];
   const fields = contentType.Fields ?? [];
   const fieldMap = new Map<string, FieldDefinition>();
-  for (const f of fields) fieldMap.set(f.name, f);
+  for (const field of fields) fieldMap.set(field.name, field);
 
-  const names = listFieldNames.length > 0 ? listFieldNames : fields.slice(0, 3).map((f) => f.name);
+  const names = listFieldNames.length > 0 ? listFieldNames : fields.slice(0, 3).map((field) => field.name);
 
   return names.map((name) => {
-    const f = fieldMap.get(name);
-    const fieldType = f?.type ?? 'text';
+    const field = fieldMap.get(name);
+    const fieldType = field?.type ?? 'text';
     let colType: CollectionColumnDef['type'] = 'text';
     if (fieldType === 'boolean') colType = 'boolean';
     else if (fieldType === 'number') colType = 'number';
@@ -127,14 +127,14 @@ export function CollectionListPage({ contentType }: Props) {
     navigate(`/admin/content-type/collection-type/${contentType.Slug}/new`);
   }
 
-  function handleDelete(e: React.MouseEvent, doc: Document) {
-    e.stopPropagation();
+  function handleDelete(event: React.MouseEvent, doc: Document) {
+    event.stopPropagation();
     if (!window.confirm('Delete this entry?')) return;
     deleteDoc({ contentTypeSlug: contentType.Slug, id: doc.data.documentId as string });
   }
 
-  function handleDuplicate(e: React.MouseEvent, doc: Document) {
-    e.stopPropagation();
+  function handleDuplicate(event: React.MouseEvent, doc: Document) {
+    event.stopPropagation();
     duplicateDoc({
       contentTypeSlug: contentType.Slug,
       id: doc.data.documentId as string,
@@ -144,16 +144,16 @@ export function CollectionListPage({ contentType }: Props) {
     });
   }
 
-  function handleEdit(e: React.MouseEvent, doc: Document) {
-    e.stopPropagation();
+  function handleEdit(event: React.MouseEvent, doc: Document) {
+    event.stopPropagation();
     navigate(`/admin/content-type/collection-type/${contentType.Slug}/${doc.data.documentId}`);
   }
 
-  function handleSort(field: SortField) {
-    if (orderBy === field) {
-      setSortDir((prev) => (prev === 'desc' ? 'asc' : 'desc'));
+  function handleSort(sortField: SortField) {
+    if (orderBy === sortField) {
+      setSortDir((currentDir) => (currentDir === 'desc' ? 'asc' : 'desc'));
     } else {
-      setOrderBy(field);
+      setOrderBy(sortField);
       setSortDir('desc');
     }
     setStart(0);
@@ -181,15 +181,15 @@ export function CollectionListPage({ contentType }: Props) {
         <p className="text-muted-foreground">No entries yet.</p>
       ) : (
         <>
-          <div className="rounded-md border">
+          <div className="rounded-md border overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-16">
                     <SortableHeader label="Id" field="id" activeField={orderBy} activeDir={sortDir} onSort={handleSort} />
                   </TableHead>
-                  {columns.map((col) => (
-                    <TableHead key={col.key}>{col.label}</TableHead>
+                  {columns.map((column) => (
+                    <TableHead key={column.key}>{column.label}</TableHead>
                   ))}
                   <TableHead>Status</TableHead>
                   <TableHead>
@@ -210,8 +210,8 @@ export function CollectionListPage({ contentType }: Props) {
                     onClick={() => handleRowClick(doc)}
                   >
                     <TableCell className="font-mono text-sm">{String(doc.data.id ?? '')}</TableCell>
-                    {columns.map((col) => (
-                      <TableCell key={col.key}>{cellValue(doc, col)}</TableCell>
+                    {columns.map((column) => (
+                      <TableCell key={column.key}>{cellValue(doc, column)}</TableCell>
                     ))}
                     <TableCell>
                       <Badge variant={statusVariant[doc.status] ?? 'draft'}>{doc.status}</Badge>
@@ -221,14 +221,14 @@ export function CollectionListPage({ contentType }: Props) {
                     <TableCell className="text-sm text-muted-foreground">{String(doc.data.updatedByName ?? '')}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="icon" aria-label="Edit" onClick={(e) => handleEdit(e, doc)}>
-                          <Pencil className="h-4 w-4" />
+                        <Button variant="outline" size="icon-xs" className="hover:bg-accent-foreground/10" aria-label="Edit" onClick={(event) => handleEdit(event, doc)}>
+                          <Pencil className="h-3 w-3" />
                         </Button>
-                        <Button variant="ghost" size="icon" aria-label="Duplicate" onClick={(e) => handleDuplicate(e, doc)}>
-                          <Copy className="h-4 w-4" />
+                        <Button variant="outline" size="icon-xs" className="hover:bg-accent-foreground/10" aria-label="Duplicate" onClick={(event) => handleDuplicate(event, doc)}>
+                          <Copy className="h-3 w-3" />
                         </Button>
-                        <Button variant="ghost" size="icon" aria-label="Delete" onClick={(e) => handleDelete(e, doc)}>
-                          <Trash2 className="h-4 w-4" />
+                        <Button variant="destructive" size="icon-xs" aria-label="Delete" onClick={(event) => handleDelete(event, doc)}>
+                          <Trash2 className="h-3 w-3" />
                         </Button>
                       </div>
                     </TableCell>

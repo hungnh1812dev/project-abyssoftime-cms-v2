@@ -19,7 +19,7 @@ func setupCompDB(t *testing.T, slug, comp string) *componentRepository {
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
-	repo := &componentRepository{db: db}
+	repo := &componentRepository{database: db}
 	if err := repo.EnsureCollection(context.Background(), slug, comp, compTestFields); err != nil {
 		t.Fatalf("EnsureCollection: %v", err)
 	}
@@ -170,7 +170,7 @@ func TestComponentRepository_EnsureCollection_PreservesData(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
-	repo := &componentRepository{db: db}
+	repo := &componentRepository{database: db}
 	ctx := context.Background()
 	now := time.Now().UTC()
 
@@ -208,7 +208,7 @@ func TestComponentRepository_EnsureCollection_AddsNewColumn(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
-	repo := &componentRepository{db: db}
+	repo := &componentRepository{database: db}
 	ctx := context.Background()
 	now := time.Now().UTC()
 
@@ -252,7 +252,7 @@ func TestComponentRepository_EnsureCollection_IgnoresRemovedField(t *testing.T) 
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
-	repo := &componentRepository{db: db}
+	repo := &componentRepository{database: db}
 	ctx := context.Background()
 	now := time.Now().UTC()
 

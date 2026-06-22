@@ -4,8 +4,8 @@ import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import type { Document, PaginatedResponse } from '@/types/cms'
 
-function onMutationError(err: unknown) {
-  const msg = (err as AxiosError<{ error: string }>).response?.data?.error ?? 'Something went wrong'
+function onMutationError(error: unknown) {
+  const msg = (error as AxiosError<{ error: string }>).response?.data?.error ?? 'Something went wrong'
   toast.error(msg)
 }
 
@@ -23,7 +23,7 @@ export function useCollectionDocuments(slug: string, start: number, size: number
         .get<PaginatedResponse<Document>>(`/api/document-manager/collection-type/${slug}`, {
           params: { start, size, locale, orderBy, sortDir },
         })
-        .then((r) => r.data),
+        .then((response) => response.data),
     enabled: Boolean(slug),
   })
 }
@@ -36,13 +36,13 @@ export function useCollectionDocument(slug: string, documentId: string, locale: 
         .get<Document>(`/api/document-manager/collection-type/${slug}/${documentId}`, {
           params: { locale },
         })
-        .then((r) => r.data),
+        .then((response) => response.data),
     enabled: Boolean(documentId),
   })
 }
 
 export function useCreateCollectionDocument() {
-  const qc = useQueryClient()
+  const queryClient = useQueryClient()
   return useMutation({
     mutationFn: ({
       contentTypeSlug,
@@ -55,15 +55,15 @@ export function useCreateCollectionDocument() {
     }) =>
       api
         .post<Document>(`/api/document-manager/collection-type/${contentTypeSlug}`, { data }, { params: { locale } })
-        .then((r) => r.data),
+        .then((response) => response.data),
     onSuccess: (_, { contentTypeSlug }) =>
-      qc.invalidateQueries({ queryKey: KEYS.list(contentTypeSlug) }),
+      queryClient.invalidateQueries({ queryKey: KEYS.list(contentTypeSlug) }),
     onError: onMutationError,
   })
 }
 
 export function useUpdateCollectionDocument() {
-  const qc = useQueryClient()
+  const queryClient = useQueryClient()
   return useMutation({
     mutationFn: ({
       contentTypeSlug,
@@ -82,10 +82,10 @@ export function useUpdateCollectionDocument() {
           { data },
           { params: { locale } },
         )
-        .then((r) => r.data),
+        .then((response) => response.data),
     onSuccess: (result, { contentTypeSlug }) => {
-      qc.invalidateQueries({ queryKey: KEYS.list(contentTypeSlug) })
-      qc.invalidateQueries({
+      queryClient.invalidateQueries({ queryKey: KEYS.list(contentTypeSlug) })
+      queryClient.invalidateQueries({
         queryKey: KEYS.detail(contentTypeSlug, result.data.documentId as string, result.data.locale as string),
       })
     },
@@ -94,7 +94,7 @@ export function useUpdateCollectionDocument() {
 }
 
 export function useDeleteCollectionDocument() {
-  const qc = useQueryClient()
+  const queryClient = useQueryClient()
   return useMutation({
     mutationFn: ({
       contentTypeSlug,
@@ -104,13 +104,13 @@ export function useDeleteCollectionDocument() {
       id: string
     }) => api.delete(`/api/document-manager/collection-type/${contentTypeSlug}/${id}`),
     onSuccess: (_, { contentTypeSlug }) =>
-      qc.invalidateQueries({ queryKey: KEYS.list(contentTypeSlug) }),
+      queryClient.invalidateQueries({ queryKey: KEYS.list(contentTypeSlug) }),
     onError: onMutationError,
   })
 }
 
 export function useDuplicateCollectionDocument() {
-  const qc = useQueryClient()
+  const queryClient = useQueryClient()
   return useMutation({
     mutationFn: ({
       contentTypeSlug,
@@ -127,15 +127,15 @@ export function useDuplicateCollectionDocument() {
           undefined,
           { params: { locale } },
         )
-        .then((r) => r.data),
+        .then((response) => response.data),
     onSuccess: (_, { contentTypeSlug }) =>
-      qc.invalidateQueries({ queryKey: KEYS.list(contentTypeSlug) }),
+      queryClient.invalidateQueries({ queryKey: KEYS.list(contentTypeSlug) }),
     onError: onMutationError,
   })
 }
 
 export function usePublishCollectionDocument() {
-  const qc = useQueryClient()
+  const queryClient = useQueryClient()
   return useMutation({
     mutationFn: ({
       contentTypeSlug,
@@ -152,19 +152,19 @@ export function usePublishCollectionDocument() {
           undefined,
           { params: { locale } },
         )
-        .then((r) => r.data),
+        .then((response) => response.data),
     onSuccess: (_, { contentTypeSlug, id, locale }) => {
-      qc.invalidateQueries({
+      queryClient.invalidateQueries({
         queryKey: KEYS.detail(contentTypeSlug, id, locale ?? ''),
       })
-      qc.invalidateQueries({ queryKey: KEYS.list(contentTypeSlug) })
+      queryClient.invalidateQueries({ queryKey: KEYS.list(contentTypeSlug) })
     },
     onError: onMutationError,
   })
 }
 
 export function useUnpublishCollectionDocument() {
-  const qc = useQueryClient()
+  const queryClient = useQueryClient()
   return useMutation({
     mutationFn: ({
       contentTypeSlug,
@@ -181,12 +181,12 @@ export function useUnpublishCollectionDocument() {
           undefined,
           { params: { locale } },
         )
-        .then((r) => r.data),
+        .then((response) => response.data),
     onSuccess: (_, { contentTypeSlug, id, locale }) => {
-      qc.invalidateQueries({
+      queryClient.invalidateQueries({
         queryKey: KEYS.detail(contentTypeSlug, id, locale ?? ''),
       })
-      qc.invalidateQueries({ queryKey: KEYS.list(contentTypeSlug) })
+      queryClient.invalidateQueries({ queryKey: KEYS.list(contentTypeSlug) })
     },
     onError: onMutationError,
   })

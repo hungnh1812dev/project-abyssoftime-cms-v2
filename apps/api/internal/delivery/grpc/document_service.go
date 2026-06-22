@@ -27,131 +27,131 @@ type documentUseCase interface {
 
 type DocumentServiceServer struct {
 	pb.UnimplementedDocumentServiceServer
-	uc documentUseCase
+	usecase documentUseCase
 }
 
-func NewDocumentServiceServer(uc documentUseCase) *DocumentServiceServer {
-	return &DocumentServiceServer{uc: uc}
+func NewDocumentServiceServer(usecase documentUseCase) *DocumentServiceServer {
+	return &DocumentServiceServer{usecase: usecase}
 }
 
-func (s *DocumentServiceServer) GetDocument(ctx context.Context, req *pb.GetDocumentRequest) (*pb.Document, error) {
-	doc, _, err := s.uc.GetForEdit(ctx, req.ContentTypeSlug, req.DocumentId, req.Locale, nil)
+func (server *DocumentServiceServer) GetDocument(ctx context.Context, req *pb.GetDocumentRequest) (*pb.Document, error) {
+	doc, _, err := server.usecase.GetForEdit(ctx, req.ContentTypeSlug, req.DocumentId, req.Locale, nil)
 	if err != nil {
 		return nil, toGRPCError(err)
 	}
 	return toProtoDoc(doc), nil
 }
 
-func (s *DocumentServiceServer) ListDocuments(ctx context.Context, req *pb.ListDocumentsRequest) (*pb.ListDocumentsResponse, error) {
-	docs, _, total, err := s.uc.GetAllPaginated(ctx, req.ContentTypeSlug, int(req.Start), int(req.Size), req.Locale, nil, "createdAt", -1)
+func (server *DocumentServiceServer) ListDocuments(ctx context.Context, req *pb.ListDocumentsRequest) (*pb.ListDocumentsResponse, error) {
+	docs, _, total, err := server.usecase.GetAllPaginated(ctx, req.ContentTypeSlug, int(req.Start), int(req.Size), req.Locale, nil, "createdAt", -1)
 	if err != nil {
 		return nil, toGRPCError(err)
 	}
 	items := make([]*pb.Document, len(docs))
-	for i, d := range docs {
-		items[i] = toProtoDoc(d)
+	for i, doc := range docs {
+		items[i] = toProtoDoc(doc)
 	}
 	return &pb.ListDocumentsResponse{Items: items, Total: total, Start: req.Start, Size: req.Size}, nil
 }
 
-func (s *DocumentServiceServer) SaveDocument(ctx context.Context, req *pb.SaveDocumentRequest) (*pb.Document, error) {
+func (server *DocumentServiceServer) SaveDocument(ctx context.Context, req *pb.SaveDocumentRequest) (*pb.Document, error) {
 	data := decodeData(req.Data)
 	doc := &entity.Document{DocumentID: req.DocumentId, Fields: data, Locale: req.Locale}
-	saved, err := s.uc.Save(ctx, req.ContentTypeSlug, doc, nil, middleware.UserID(ctx))
+	saved, err := server.usecase.Save(ctx, req.ContentTypeSlug, doc, nil, middleware.UserID(ctx))
 	if err != nil {
 		return nil, toGRPCError(err)
 	}
 	return toProtoDoc(saved), nil
 }
 
-func (s *DocumentServiceServer) PublishDocument(ctx context.Context, req *pb.PublishDocumentRequest) (*pb.Document, error) {
-	if err := s.uc.Publish(ctx, req.ContentTypeSlug, req.DocumentId, req.Locale, nil, middleware.UserID(ctx)); err != nil {
+func (server *DocumentServiceServer) PublishDocument(ctx context.Context, req *pb.PublishDocumentRequest) (*pb.Document, error) {
+	if err := server.usecase.Publish(ctx, req.ContentTypeSlug, req.DocumentId, req.Locale, nil, middleware.UserID(ctx)); err != nil {
 		return nil, toGRPCError(err)
 	}
-	doc, err := s.uc.GetPublished(ctx, req.ContentTypeSlug, req.DocumentId, req.Locale, nil)
+	doc, err := server.usecase.GetPublished(ctx, req.ContentTypeSlug, req.DocumentId, req.Locale, nil)
 	if err != nil {
 		return nil, toGRPCError(err)
 	}
 	return toProtoDoc(doc), nil
 }
 
-func (s *DocumentServiceServer) UnpublishDocument(ctx context.Context, req *pb.PublishDocumentRequest) (*pb.Document, error) {
-	if err := s.uc.Unpublish(ctx, req.ContentTypeSlug, req.DocumentId, req.Locale); err != nil {
+func (server *DocumentServiceServer) UnpublishDocument(ctx context.Context, req *pb.PublishDocumentRequest) (*pb.Document, error) {
+	if err := server.usecase.Unpublish(ctx, req.ContentTypeSlug, req.DocumentId, req.Locale); err != nil {
 		return nil, toGRPCError(err)
 	}
-	doc, _, err := s.uc.GetForEdit(ctx, req.ContentTypeSlug, req.DocumentId, req.Locale, nil)
+	doc, _, err := server.usecase.GetForEdit(ctx, req.ContentTypeSlug, req.DocumentId, req.Locale, nil)
 	if err != nil {
 		return nil, toGRPCError(err)
 	}
 	return toProtoDoc(doc), nil
 }
 
-func (s *DocumentServiceServer) DeleteDocument(ctx context.Context, req *pb.DeleteDocumentRequest) (*pb.DeleteDocumentResponse, error) {
-	if err := s.uc.Delete(ctx, req.ContentTypeSlug, req.DocumentId, nil); err != nil {
+func (server *DocumentServiceServer) DeleteDocument(ctx context.Context, req *pb.DeleteDocumentRequest) (*pb.DeleteDocumentResponse, error) {
+	if err := server.usecase.Delete(ctx, req.ContentTypeSlug, req.DocumentId, nil); err != nil {
 		return nil, toGRPCError(err)
 	}
 	return &pb.DeleteDocumentResponse{Success: true}, nil
 }
 
-func (s *DocumentServiceServer) GetSingleType(ctx context.Context, req *pb.GetSingleTypeRequest) (*pb.Document, error) {
-	doc, _, err := s.uc.GetSingleType(ctx, req.ContentTypeSlug, req.Locale, nil)
+func (server *DocumentServiceServer) GetSingleType(ctx context.Context, req *pb.GetSingleTypeRequest) (*pb.Document, error) {
+	doc, _, err := server.usecase.GetSingleType(ctx, req.ContentTypeSlug, req.Locale, nil)
 	if err != nil {
 		return nil, toGRPCError(err)
 	}
 	return toProtoDoc(doc), nil
 }
 
-func (s *DocumentServiceServer) SaveSingleType(ctx context.Context, req *pb.SaveSingleTypeRequest) (*pb.Document, error) {
+func (server *DocumentServiceServer) SaveSingleType(ctx context.Context, req *pb.SaveSingleTypeRequest) (*pb.Document, error) {
 	data := decodeData(req.Data)
-	saved, err := s.uc.SaveSingleType(ctx, req.ContentTypeSlug, data, req.Locale, nil, middleware.UserID(ctx))
+	saved, err := server.usecase.SaveSingleType(ctx, req.ContentTypeSlug, data, req.Locale, nil, middleware.UserID(ctx))
 	if err != nil {
 		return nil, toGRPCError(err)
 	}
-	doc, _, err := s.uc.GetSingleType(ctx, req.ContentTypeSlug, saved.Locale, nil)
-	if err != nil {
-		return nil, toGRPCError(err)
-	}
-	return toProtoDoc(doc), nil
-}
-
-func (s *DocumentServiceServer) PublishSingleType(ctx context.Context, req *pb.GetSingleTypeRequest) (*pb.Document, error) {
-	if err := s.uc.PublishSingleType(ctx, req.ContentTypeSlug, req.Locale, nil, middleware.UserID(ctx)); err != nil {
-		return nil, toGRPCError(err)
-	}
-	doc, _, err := s.uc.GetSingleType(ctx, req.ContentTypeSlug, req.Locale, nil)
+	doc, _, err := server.usecase.GetSingleType(ctx, req.ContentTypeSlug, saved.Locale, nil)
 	if err != nil {
 		return nil, toGRPCError(err)
 	}
 	return toProtoDoc(doc), nil
 }
 
-func (s *DocumentServiceServer) UnpublishSingleType(ctx context.Context, req *pb.GetSingleTypeRequest) (*pb.Document, error) {
-	if err := s.uc.UnpublishSingleType(ctx, req.ContentTypeSlug, req.Locale); err != nil {
+func (server *DocumentServiceServer) PublishSingleType(ctx context.Context, req *pb.GetSingleTypeRequest) (*pb.Document, error) {
+	if err := server.usecase.PublishSingleType(ctx, req.ContentTypeSlug, req.Locale, nil, middleware.UserID(ctx)); err != nil {
 		return nil, toGRPCError(err)
 	}
-	doc, _, err := s.uc.GetSingleType(ctx, req.ContentTypeSlug, req.Locale, nil)
+	doc, _, err := server.usecase.GetSingleType(ctx, req.ContentTypeSlug, req.Locale, nil)
 	if err != nil {
 		return nil, toGRPCError(err)
 	}
 	return toProtoDoc(doc), nil
 }
 
-func toProtoDoc(d *entity.Document) *pb.Document {
-	pb := &pb.Document{
-		DocumentId:  d.DocumentID,
-		Version:     string(d.Version),
-		Data:        encodeData(d.Fields),
-		Locale:      d.Locale,
-		CreatedAt:   timestamppb.New(d.CreatedAt),
-		UpdatedAt:   timestamppb.New(d.UpdatedAt),
-		CreatedBy:   d.CreatedBy,
-		UpdatedBy:   d.UpdatedBy,
-		PublishedBy: d.PublishedBy,
+func (server *DocumentServiceServer) UnpublishSingleType(ctx context.Context, req *pb.GetSingleTypeRequest) (*pb.Document, error) {
+	if err := server.usecase.UnpublishSingleType(ctx, req.ContentTypeSlug, req.Locale); err != nil {
+		return nil, toGRPCError(err)
 	}
-	if d.PublishedAt != nil {
-		pb.PublishedAt = timestamppb.New(*d.PublishedAt)
+	doc, _, err := server.usecase.GetSingleType(ctx, req.ContentTypeSlug, req.Locale, nil)
+	if err != nil {
+		return nil, toGRPCError(err)
 	}
-	return pb
+	return toProtoDoc(doc), nil
+}
+
+func toProtoDoc(document *entity.Document) *pb.Document {
+	protoBuffer := &pb.Document{
+		DocumentId:  document.DocumentID,
+		Version:     string(document.Version),
+		Data:        encodeData(document.Fields),
+		Locale:      document.Locale,
+		CreatedAt:   timestamppb.New(document.CreatedAt),
+		UpdatedAt:   timestamppb.New(document.UpdatedAt),
+		CreatedBy:   document.CreatedBy,
+		UpdatedBy:   document.UpdatedBy,
+		PublishedBy: document.PublishedBy,
+	}
+	if document.PublishedAt != nil {
+		protoBuffer.PublishedAt = timestamppb.New(*document.PublishedAt)
+	}
+	return protoBuffer
 }
 
 func encodeData(data map[string]any) []byte {

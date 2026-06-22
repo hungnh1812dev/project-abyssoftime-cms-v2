@@ -25,36 +25,36 @@ export function useUserList(page: number) {
   return useQuery<UserListResponse>({
     queryKey: KEYS.list(page),
     queryFn: () =>
-      api.get<UserListResponse>(`/api/users?page=${page}&limit=20`).then((r) => r.data),
+      api.get<UserListResponse>(`/api/users?page=${page}&limit=20`).then((response) => response.data),
   })
 }
 
 export function useUpdateUserRole() {
-  const qc = useQueryClient()
+  const queryClient = useQueryClient()
   return useMutation({
     mutationFn: ({ id, role }: { id: string; role: string }) =>
       api.put(`/api/users/${id}/role`, { role }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: KEYS.all })
+      queryClient.invalidateQueries({ queryKey: KEYS.all })
     },
-    onError: (err: unknown) => {
+    onError: (error: unknown) => {
       const msg =
-        (err as AxiosError<{ error: string }>).response?.data?.error ?? 'Failed to update role'
+        (error as AxiosError<{ error: string }>).response?.data?.error ?? 'Failed to update role'
       toast.error(msg)
     },
   })
 }
 
 export function useDeleteUser() {
-  const qc = useQueryClient()
+  const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (id: string) => api.delete(`/api/users/${id}`),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: KEYS.all })
+      queryClient.invalidateQueries({ queryKey: KEYS.all })
     },
-    onError: (err: unknown) => {
+    onError: (error: unknown) => {
       const msg =
-        (err as AxiosError<{ error: string }>).response?.data?.error ?? 'Failed to delete user'
+        (error as AxiosError<{ error: string }>).response?.data?.error ?? 'Failed to delete user'
       toast.error(msg)
     },
   })

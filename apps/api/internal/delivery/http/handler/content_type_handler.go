@@ -19,11 +19,11 @@ type contentTypeUseCase interface {
 }
 
 type ContentTypeHandler struct {
-	uc contentTypeUseCase
+	usecase contentTypeUseCase
 }
 
-func NewContentTypeHandler(uc contentTypeUseCase) *ContentTypeHandler {
-	return &ContentTypeHandler{uc: uc}
+func NewContentTypeHandler(usecase contentTypeUseCase) *ContentTypeHandler {
+	return &ContentTypeHandler{usecase: usecase}
 }
 
 type contentTypeSummary struct {
@@ -33,10 +33,10 @@ type contentTypeSummary struct {
 	Kind entity.ContentKind `json:"Kind"`
 }
 
-func (h *ContentTypeHandler) ListSummary(c *gin.Context) {
-	cts, err := h.uc.FindAll(c.Request.Context())
+func (h *ContentTypeHandler) ListSummary(ginCtx *gin.Context) {
+	cts, err := h.usecase.FindAll(ginCtx.Request.Context())
 	if err != nil {
-		ginWriteErr(c, err)
+		ginWriteErr(ginCtx, err)
 		return
 	}
 	summaries := make([]contentTypeSummary, len(cts))
@@ -48,23 +48,23 @@ func (h *ContentTypeHandler) ListSummary(c *gin.Context) {
 			Kind: ct.Kind,
 		}
 	}
-	c.JSON(http.StatusOK, summaries)
+	ginCtx.JSON(http.StatusOK, summaries)
 }
 
-func (h *ContentTypeHandler) Get(c *gin.Context) {
-	identifier := c.Param("identifier")
+func (h *ContentTypeHandler) Get(ginCtx *gin.Context) {
+	identifier := ginCtx.Param("identifier")
 	var (
-		ct  *entity.ContentType
-		err error
+		contentType *entity.ContentType
+		err         error
 	)
 	if objectIDRe.MatchString(identifier) {
-		ct, err = h.uc.FindByID(c.Request.Context(), identifier)
+		contentType, err = h.usecase.FindByID(ginCtx.Request.Context(), identifier)
 	} else {
-		ct, err = h.uc.FindBySlug(c.Request.Context(), identifier)
+		contentType, err = h.usecase.FindBySlug(ginCtx.Request.Context(), identifier)
 	}
 	if err != nil {
-		ginWriteErr(c, err)
+		ginWriteErr(ginCtx, err)
 		return
 	}
-	c.JSON(http.StatusOK, ct)
+	ginCtx.JSON(http.StatusOK, contentType)
 }

@@ -14,6 +14,6 @@ func NewLocaleHandler(supportedLocales []string) *LocaleHandler {
 	return &LocaleHandler{supportedLocales: supportedLocales}
 }
 
-func (h *LocaleHandler) List(c *gin.Context) {
-	c.JSON(http.StatusOK, h.supportedLocales)
+func (h *LocaleHandler) List(ginCtx *gin.Context) {
+	ginCtx.JSON(http.StatusOK, h.supportedLocales)
 }

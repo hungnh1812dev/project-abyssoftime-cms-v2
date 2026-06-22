@@ -25,33 +25,33 @@ type authUseCase interface {
 }
 
 type AuthHandler struct {
-	uc             authUseCase
+	usecase        authUseCase
 	cookieSecure   bool
 	cookieSameSite http.SameSite
 }
 
-func NewAuthHandler(uc authUseCase, cookieSecure bool, cookieSameSite http.SameSite) *AuthHandler {
-	return &AuthHandler{uc: uc, cookieSecure: cookieSecure, cookieSameSite: cookieSameSite}
+func NewAuthHandler(usecase authUseCase, cookieSecure bool, cookieSameSite http.SameSite) *AuthHandler {
+	return &AuthHandler{usecase: usecase, cookieSecure: cookieSecure, cookieSameSite: cookieSameSite}
 }
 
-func (h *AuthHandler) Register(c *gin.Context) {
+func (h *AuthHandler) Register(ginCtx *gin.Context) {
 	var req struct {
 		Email       string `json:"email"`
 		Password    string `json:"password"`
 		DisplayName string `json:"displayName"`
 	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		ginWriteError(c, http.StatusBadRequest, "invalid request body")
+	if err := ginCtx.ShouldBindJSON(&req); err != nil {
+		ginWriteError(ginCtx, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
-	user, err := h.uc.Register(c.Request.Context(), req.Email, req.Password, req.DisplayName)
+	user, err := h.usecase.Register(ginCtx.Request.Context(), req.Email, req.Password, req.DisplayName)
 	if err != nil {
-		ginWriteErr(c, err)
+		ginWriteErr(ginCtx, err)
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{
+	ginCtx.JSON(http.StatusCreated, gin.H{
 		"id":          user.ID,
 		"email":       user.Email,
 		"displayName": user.DisplayName,
@@ -59,20 +59,20 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	})
 }
 
-func (h *AuthHandler) Login(c *gin.Context) {
+func (h *AuthHandler) Login(ginCtx *gin.Context) {
 	var req struct {
 		Email      string `json:"email"`
 		Password   string `json:"password"`
 		RememberMe bool   `json:"rememberMe"`
 	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		ginWriteError(c, http.StatusBadRequest, "invalid request body")
+	if err := ginCtx.ShouldBindJSON(&req); err != nil {
+		ginWriteError(ginCtx, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
-	access, refresh, err := h.uc.Login(c.Request.Context(), req.Email, req.Password)
+	access, refresh, err := h.usecase.Login(ginCtx.Request.Context(), req.Email, req.Password)
 	if err != nil {
-		ginWriteErr(c, err)
+		ginWriteErr(ginCtx, err)
 		return
 	}
 
@@ -80,48 +80,48 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	if req.RememberMe {
 		maxAge = refreshCookieMaxAgeRemember
 	}
-	c.SetSameSite(h.cookieSameSite)
-	c.SetCookie(RefreshCookieName, refresh, maxAge, "/", "", h.cookieSecure, true)
+	ginCtx.SetSameSite(h.cookieSameSite)
+	ginCtx.SetCookie(RefreshCookieName, refresh, maxAge, "/", "", h.cookieSecure, true)
 
-	c.JSON(http.StatusOK, gin.H{
+	ginCtx.JSON(http.StatusOK, gin.H{
 		"accessToken": access,
 	})
 }
 
-func (h *AuthHandler) Refresh(c *gin.Context) {
-	cookieVal, err := c.Cookie(RefreshCookieName)
+func (h *AuthHandler) Refresh(ginCtx *gin.Context) {
+	cookieVal, err := ginCtx.Cookie(RefreshCookieName)
 	if err != nil {
-		ginWriteError(c, http.StatusUnauthorized, "missing refresh token")
+		ginWriteError(ginCtx, http.StatusUnauthorized, "missing refresh token")
 		return
 	}
 
-	access, refresh, err := h.uc.RefreshToken(c.Request.Context(), cookieVal)
+	access, refresh, err := h.usecase.RefreshToken(ginCtx.Request.Context(), cookieVal)
 	if err != nil {
-		ginWriteErr(c, err)
+		ginWriteErr(ginCtx, err)
 		return
 	}
 
-	c.SetSameSite(h.cookieSameSite)
-	c.SetCookie(RefreshCookieName, refresh, refreshCookieMaxAgeRemember, "/", "", h.cookieSecure, true)
+	ginCtx.SetSameSite(h.cookieSameSite)
+	ginCtx.SetCookie(RefreshCookieName, refresh, refreshCookieMaxAgeRemember, "/", "", h.cookieSecure, true)
 
-	c.JSON(http.StatusOK, gin.H{
+	ginCtx.JSON(http.StatusOK, gin.H{
 		"accessToken": access,
 	})
 }
 
-func (h *AuthHandler) SetupStatus(c *gin.Context) {
-	adminExists, err := h.uc.SetupStatus(c.Request.Context())
+func (h *AuthHandler) SetupStatus(ginCtx *gin.Context) {
+	adminExists, err := h.usecase.SetupStatus(ginCtx.Request.Context())
 	if err != nil {
-		ginWriteErr(c, err)
+		ginWriteErr(ginCtx, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
+	ginCtx.JSON(http.StatusOK, gin.H{
 		"adminExists": adminExists,
 	})
 }
 
-func (h *AuthHandler) Logout(c *gin.Context) {
-	c.SetSameSite(h.cookieSameSite)
-	c.SetCookie(RefreshCookieName, "", -1, "/", "", h.cookieSecure, true)
-	c.Status(http.StatusOK)
+func (h *AuthHandler) Logout(ginCtx *gin.Context) {
+	ginCtx.SetSameSite(h.cookieSameSite)
+	ginCtx.SetCookie(RefreshCookieName, "", -1, "/", "", h.cookieSecure, true)
+	ginCtx.Status(http.StatusOK)
 }

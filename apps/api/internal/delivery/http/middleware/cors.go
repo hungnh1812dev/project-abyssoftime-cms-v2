@@ -9,33 +9,33 @@ import (
 
 func CORS(allowedOrigins []string) gin.HandlerFunc {
 	allowed := make(map[string]bool, len(allowedOrigins))
-	for _, o := range allowedOrigins {
-		allowed[strings.TrimRight(o, "/")] = true
+	for _, origin := range allowedOrigins {
+		allowed[strings.TrimRight(origin, "/")] = true
 	}
 
-	return func(c *gin.Context) {
-		origin := c.GetHeader("Origin")
+	return func(ginCtx *gin.Context) {
+		origin := ginCtx.GetHeader("Origin")
 		if origin == "" {
-			c.Next()
+			ginCtx.Next()
 			return
 		}
 
 		if !allowed[strings.TrimRight(origin, "/")] {
-			c.Next()
+			ginCtx.Next()
 			return
 		}
 
-		c.Header("Access-Control-Allow-Origin", origin)
-		c.Header("Access-Control-Allow-Credentials", "true")
-		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		c.Header("Access-Control-Allow-Headers", "Authorization, Content-Type")
-		c.Header("Access-Control-Max-Age", "86400")
+		ginCtx.Header("Access-Control-Allow-Origin", origin)
+		ginCtx.Header("Access-Control-Allow-Credentials", "true")
+		ginCtx.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		ginCtx.Header("Access-Control-Allow-Headers", "Authorization, Content-Type")
+		ginCtx.Header("Access-Control-Max-Age", "86400")
 
-		if c.Request.Method == http.MethodOptions {
-			c.AbortWithStatus(http.StatusNoContent)
+		if ginCtx.Request.Method == http.MethodOptions {
+			ginCtx.AbortWithStatus(http.StatusNoContent)
 			return
 		}
 
-		c.Next()
+		ginCtx.Next()
 	}
 }

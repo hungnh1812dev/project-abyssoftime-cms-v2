@@ -36,15 +36,15 @@ func resolveGormSortClause(orderBy string, sortDir int) string {
 var _ repository.DocumentRepository = (*documentRepository)(nil)
 
 type documentRepository struct {
-	db *gorm.DB
+	database *gorm.DB
 }
 
-func NewDocumentRepository(db *gorm.DB) repository.DocumentRepository {
-	return &documentRepository{db: db}
+func NewDocumentRepository(database *gorm.DB) repository.DocumentRepository {
+	return &documentRepository{database: database}
 }
 
 func (r *documentRepository) table(slug string) *gorm.DB {
-	return r.db.Table(documentTableName(slug))
+	return r.database.Table(documentTableName(slug))
 }
 
 func existingColumns(db *gorm.DB, table string) (map[string]bool, error) {
@@ -78,12 +78,12 @@ func fieldColumnType(fieldType string) string {
 }
 
 func (r *documentRepository) isPostgres() bool {
-	return r.db.Dialector.Name() == "postgres"
+	return r.database.Dialector.Name() == "postgres"
 }
 
 func (r *documentRepository) EnsureCollection(ctx context.Context, contentTypeSlug string, fields []entity.FieldDefinition) error {
 	table := documentTableName(contentTypeSlug)
-	if !r.db.Migrator().HasTable(table) {
+	if !r.database.Migrator().HasTable(table) {
 		return r.createDocumentTable(ctx, table, fields)
 	}
 	return r.addMissingDocumentColumns(ctx, table, fields)
@@ -113,11 +113,11 @@ func (r *documentRepository) createDocumentTable(ctx context.Context, table stri
 	cols = append(cols, "published_by TEXT")
 
 	sql := fmt.Sprintf("CREATE TABLE %s (%s)", table, strings.Join(cols, ", "))
-	return r.db.WithContext(ctx).Exec(sql).Error
+	return r.database.WithContext(ctx).Exec(sql).Error
 }
 
 func (r *documentRepository) addMissingDocumentColumns(ctx context.Context, table string, fields []entity.FieldDefinition) error {
-	cols, err := existingColumns(r.db, table)
+	cols, err := existingColumns(r.database, table)
 	if err != nil {
 		return err
 	}
@@ -130,7 +130,7 @@ func (r *documentRepository) addMissingDocumentColumns(ctx context.Context, tabl
 			continue
 		}
 		sql := fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table, col, fieldColumnType(f.Type))
-		if err := r.db.WithContext(ctx).Exec(sql).Error; err != nil {
+		if err := r.database.WithContext(ctx).Exec(sql).Error; err != nil {
 			return err
 		}
 	}
@@ -139,16 +139,16 @@ func (r *documentRepository) addMissingDocumentColumns(ctx context.Context, tabl
 
 func (r *documentRepository) DropCollection(ctx context.Context, contentTypeSlug string) error {
 	table := documentTableName(contentTypeSlug)
-	return r.db.WithContext(ctx).Migrator().DropTable(table)
+	return r.database.WithContext(ctx).Migrator().DropTable(table)
 }
 
 func (r *documentRepository) TableInfo(ctx context.Context, contentTypeSlug string) (bool, int64, error) {
 	table := documentTableName(contentTypeSlug)
-	if !r.db.Migrator().HasTable(table) {
+	if !r.database.Migrator().HasTable(table) {
 		return false, 0, nil
 	}
 	var count int64
-	if err := r.db.WithContext(ctx).Table(table).Count(&count).Error; err != nil {
+	if err := r.database.WithContext(ctx).Table(table).Count(&count).Error; err != nil {
 		return true, 0, err
 	}
 	return true, count, nil

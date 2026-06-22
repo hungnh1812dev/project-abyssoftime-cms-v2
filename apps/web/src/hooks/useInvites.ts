@@ -31,36 +31,36 @@ const KEYS = {
 export function useInviteList() {
   return useQuery<InviteListResponse>({
     queryKey: KEYS.list,
-    queryFn: () => api.get<InviteListResponse>('/api/invites').then((r) => r.data),
+    queryFn: () => api.get<InviteListResponse>('/api/invites').then((response) => response.data),
   })
 }
 
 export function useCreateInvite() {
-  const qc = useQueryClient()
+  const queryClient = useQueryClient()
   return useMutation({
     mutationFn: ({ email, role }: { email: string; role: string }) =>
-      api.post<CreateInviteResponse>('/api/invites', { email, role }).then((r) => r.data),
+      api.post<CreateInviteResponse>('/api/invites', { email, role }).then((response) => response.data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: KEYS.list })
+      queryClient.invalidateQueries({ queryKey: KEYS.list })
     },
-    onError: (err: unknown) => {
+    onError: (error: unknown) => {
       const msg =
-        (err as AxiosError<{ error: string }>).response?.data?.error ?? 'Failed to create invite'
+        (error as AxiosError<{ error: string }>).response?.data?.error ?? 'Failed to create invite'
       toast.error(msg)
     },
   })
 }
 
 export function useRevokeInvite() {
-  const qc = useQueryClient()
+  const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (id: string) => api.delete(`/api/invites/${id}`),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: KEYS.list })
+      queryClient.invalidateQueries({ queryKey: KEYS.list })
     },
-    onError: (err: unknown) => {
+    onError: (error: unknown) => {
       const msg =
-        (err as AxiosError<{ error: string }>).response?.data?.error ?? 'Failed to revoke invite'
+        (error as AxiosError<{ error: string }>).response?.data?.error ?? 'Failed to revoke invite'
       toast.error(msg)
     },
   })
@@ -69,10 +69,10 @@ export function useRevokeInvite() {
 export function useAcceptInvite() {
   return useMutation({
     mutationFn: ({ token, password, displayName }: { token: string; password: string; displayName: string }) =>
-      api.post(`/auth/invite/${token}`, { password, displayName }).then((r) => r.data),
-    onError: (err: unknown) => {
+      api.post(`/auth/invite/${token}`, { password, displayName }).then((response) => response.data),
+    onError: (error: unknown) => {
       const msg =
-        (err as AxiosError<{ error: string }>).response?.data?.error ?? 'Failed to accept invite'
+        (error as AxiosError<{ error: string }>).response?.data?.error ?? 'Failed to accept invite'
       toast.error(msg)
     },
   })

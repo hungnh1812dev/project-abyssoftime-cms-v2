@@ -39,36 +39,36 @@ export function useAccessTokenList(page: number) {
   return useQuery<TokenListResponse>({
     queryKey: KEYS.list(page),
     queryFn: () =>
-      api.get<TokenListResponse>(`/api/access-tokens?page=${page}&limit=20`).then((r) => r.data),
+      api.get<TokenListResponse>(`/api/access-tokens?page=${page}&limit=20`).then((response) => response.data),
   })
 }
 
 export function useCreateAccessToken() {
-  const qc = useQueryClient()
+  const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (data: { name: string; scopes: string[]; expiresIn?: string }) =>
-      api.post<CreateTokenResponse>('/api/access-tokens', data).then((r) => r.data),
+      api.post<CreateTokenResponse>('/api/access-tokens', data).then((response) => response.data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: KEYS.all })
+      queryClient.invalidateQueries({ queryKey: KEYS.all })
     },
-    onError: (err: unknown) => {
+    onError: (error: unknown) => {
       const msg =
-        (err as AxiosError<{ error: string }>).response?.data?.error ?? 'Failed to create token'
+        (error as AxiosError<{ error: string }>).response?.data?.error ?? 'Failed to create token'
       toast.error(msg)
     },
   })
 }
 
 export function useDeleteAccessToken() {
-  const qc = useQueryClient()
+  const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (id: string) => api.delete(`/api/access-tokens/${id}`),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: KEYS.all })
+      queryClient.invalidateQueries({ queryKey: KEYS.all })
     },
-    onError: (err: unknown) => {
+    onError: (error: unknown) => {
       const msg =
-        (err as AxiosError<{ error: string }>).response?.data?.error ?? 'Failed to delete token'
+        (error as AxiosError<{ error: string }>).response?.data?.error ?? 'Failed to delete token'
       toast.error(msg)
     },
   })

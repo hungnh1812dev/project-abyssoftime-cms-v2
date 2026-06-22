@@ -16,43 +16,43 @@ type contentTypeUseCase interface {
 
 type ContentTypeServiceServer struct {
 	pb.UnimplementedContentTypeServiceServer
-	uc contentTypeUseCase
+	usecase contentTypeUseCase
 }
 
-func NewContentTypeServiceServer(uc contentTypeUseCase) *ContentTypeServiceServer {
-	return &ContentTypeServiceServer{uc: uc}
+func NewContentTypeServiceServer(usecase contentTypeUseCase) *ContentTypeServiceServer {
+	return &ContentTypeServiceServer{usecase: usecase}
 }
 
-func (s *ContentTypeServiceServer) GetContentType(ctx context.Context, req *pb.GetContentTypeRequest) (*pb.ContentType, error) {
-	ct, err := s.uc.FindBySlug(ctx, req.Slug)
+func (server *ContentTypeServiceServer) GetContentType(ctx context.Context, req *pb.GetContentTypeRequest) (*pb.ContentType, error) {
+	contentType, err := server.usecase.FindBySlug(ctx, req.Slug)
 	if err != nil {
 		return nil, toGRPCError(err)
 	}
-	return toProtoCT(ct), nil
+	return toProtoCT(contentType), nil
 }
 
-func (s *ContentTypeServiceServer) ListContentTypes(ctx context.Context, _ *pb.ListContentTypesRequest) (*pb.ListContentTypesResponse, error) {
-	cts, err := s.uc.FindAll(ctx)
+func (server *ContentTypeServiceServer) ListContentTypes(ctx context.Context, _ *pb.ListContentTypesRequest) (*pb.ListContentTypesResponse, error) {
+	contentTypes, err := server.usecase.FindAll(ctx)
 	if err != nil {
 		return nil, toGRPCError(err)
 	}
-	result := make([]*pb.ContentType, len(cts))
-	for i, ct := range cts {
-		result[i] = toProtoCT(ct)
+	result := make([]*pb.ContentType, len(contentTypes))
+	for i, contentType := range contentTypes {
+		result[i] = toProtoCT(contentType)
 	}
 	return &pb.ListContentTypesResponse{ContentTypes: result}, nil
 }
 
-func toProtoCT(ct *entity.ContentType) *pb.ContentType {
+func toProtoCT(contentType *entity.ContentType) *pb.ContentType {
 	return &pb.ContentType{
-		Id:         ct.DocumentID,
-		Name:       ct.Name,
-		Slug:       ct.Slug,
-		Kind:       string(ct.Kind),
-		Fields:     toProtoFields(ct.Fields),
-		ListFields: ct.ListFields,
-		CreatedAt:  timestamppb.New(ct.CreatedAt),
-		UpdatedAt:  timestamppb.New(ct.UpdatedAt),
+		Id:         contentType.DocumentID,
+		Name:       contentType.Name,
+		Slug:       contentType.Slug,
+		Kind:       string(contentType.Kind),
+		Fields:     toProtoFields(contentType.Fields),
+		ListFields: contentType.ListFields,
+		CreatedAt:  timestamppb.New(contentType.CreatedAt),
+		UpdatedAt:  timestamppb.New(contentType.UpdatedAt),
 	}
 }
 
@@ -61,12 +61,12 @@ func toProtoFields(fields []entity.FieldDefinition) []*pb.FieldDefinition {
 		return nil
 	}
 	result := make([]*pb.FieldDefinition, len(fields))
-	for i, f := range fields {
+	for i, field := range fields {
 		result[i] = &pb.FieldDefinition{
-			Name:   f.Name,
-			Type:   f.Type,
-			Ext:    f.Ext,
-			Fields: toProtoFields(f.Fields),
+			Name:   field.Name,
+			Type:   field.Type,
+			Ext:    field.Ext,
+			Fields: toProtoFields(field.Fields),
 		}
 	}
 	return result
