@@ -3,23 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogClose,
-} from '@/components/ui/dialog';
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-} from '@/components/ui/table';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { useCollectionDocuments, useDeleteCollectionDocument, useDuplicateCollectionDocument } from '@/hooks/useCollectionDocuments';
 import { useUpdateListFields } from '@/hooks/useContentTypes';
 import { useLocales } from '@/hooks/useLocales';
@@ -44,9 +29,13 @@ function deriveColumns(contentType: ContentType): CollectionColumnDef[] {
   const fieldMap = new Map<string, FieldDefinition>();
   for (const field of fields) fieldMap.set(field.name, field);
 
-  const names = listFieldNames.length > 0
-    ? listFieldNames
-    : fields.filter((field) => field.type !== 'component').slice(0, 3).map((field) => field.name);
+  const names =
+    listFieldNames.length > 0
+      ? listFieldNames
+      : fields
+          .filter((field) => field.type !== 'component')
+          .slice(0, 3)
+          .map((field) => field.name);
 
   return names.map((name) => {
     const field = fieldMap.get(name);
@@ -78,7 +67,7 @@ function cellValue(doc: Document, col: CollectionColumnDef): React.ReactNode {
     case 'number':
       return String(raw ?? '');
     case 'image':
-      return <img src={String(raw ?? '')} alt={col.label} className="h-8 w-8 object-cover rounded" />;
+      return <img src={String(raw ?? '')} alt={col.label} className="h-8 w-8 rounded object-cover" />;
     default:
       return String(raw ?? '');
   }
@@ -116,11 +105,7 @@ function SortableHeader({
   const isActive = activeField === field;
   const Icon = isActive ? (activeDir === 'asc' ? ArrowUp : ArrowDown) : ArrowUpDown;
   return (
-    <button
-      type="button"
-      className="flex items-center gap-1 font-medium hover:text-foreground"
-      onClick={() => onSort(field)}
-    >
+    <button type="button" className="hover:text-foreground flex items-center gap-1 font-medium" onClick={() => onSort(field)}>
       {label}
       <Icon className={`h-3.5 w-3.5 ${isActive ? 'text-foreground' : 'text-muted-foreground'}`} />
     </button>
@@ -227,7 +212,13 @@ export function CollectionListPage({ contentType }: Props) {
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">{contentType.Name}</h1>
         <div className="flex items-center gap-2">
-          <LocaleSelector value={activeLocale} onChange={(code) => { setSelectedLocale(code); setStart(0); }} />
+          <LocaleSelector
+            value={activeLocale}
+            onChange={(code) => {
+              setSelectedLocale(code);
+              setStart(0);
+            }}
+          />
           {!hasRegistryOverride && (
             <Button variant="outline" size="icon" aria-label="Configure columns" onClick={() => setColumnChooserOpen(true)}>
               <Settings2 className="h-4 w-4" />
@@ -248,7 +239,11 @@ export function CollectionListPage({ contentType }: Props) {
         />
       )}
 
-      <Dialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+      <Dialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}>
         <DialogContent showCloseButton={false}>
           <DialogHeader>
             <DialogTitle>Delete entry</DialogTitle>
@@ -256,7 +251,9 @@ export function CollectionListPage({ contentType }: Props) {
           </DialogHeader>
           <DialogFooter>
             <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
-            <Button variant="destructive" onClick={confirmDelete}>Delete</Button>
+            <Button variant="destructive" onClick={confirmDelete}>
+              Delete
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -265,7 +262,7 @@ export function CollectionListPage({ contentType }: Props) {
         <p className="text-muted-foreground">No entries yet.</p>
       ) : (
         <>
-          <div className="rounded-md border overflow-x-auto">
+          <div className="overflow-x-auto rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -285,33 +282,21 @@ export function CollectionListPage({ contentType }: Props) {
                       <SortableHeader label="Updated At" field="updatedAt" activeField={orderBy} activeDir={sortDir} onSort={handleSort} />
                     </TableHead>
                   )}
-                  {systemVis.showUpdatedBy && (
-                    <TableHead>Updated By</TableHead>
-                  )}
+                  {systemVis.showUpdatedBy && <TableHead>Updated By</TableHead>}
                   <TableHead>Status</TableHead>
                   <TableHead className="w-24 text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {docs.map((doc) => (
-                  <TableRow
-                    key={doc.data.documentId as string}
-                    className="cursor-pointer"
-                    onClick={() => handleRowClick(doc)}
-                  >
+                  <TableRow key={doc.data.documentId as string} className="cursor-pointer" onClick={() => handleRowClick(doc)}>
                     <TableCell className="font-mono text-sm">{String(doc.data.id ?? '')}</TableCell>
                     {columns.map((column) => (
                       <TableCell key={column.key}>{cellValue(doc, column)}</TableCell>
                     ))}
-                    {systemVis.showCreatedAt && (
-                      <TableCell className="text-sm text-muted-foreground">{formatDate(doc.data.createdAt)}</TableCell>
-                    )}
-                    {systemVis.showUpdatedAt && (
-                      <TableCell className="text-sm text-muted-foreground">{formatDate(doc.data.updatedAt)}</TableCell>
-                    )}
-                    {systemVis.showUpdatedBy && (
-                      <TableCell className="text-sm text-muted-foreground">{String(doc.data.updatedByName ?? '')}</TableCell>
-                    )}
+                    {systemVis.showCreatedAt && <TableCell className="text-muted-foreground text-sm">{formatDate(doc.data.createdAt)}</TableCell>}
+                    {systemVis.showUpdatedAt && <TableCell className="text-muted-foreground text-sm">{formatDate(doc.data.updatedAt)}</TableCell>}
+                    {systemVis.showUpdatedBy && <TableCell className="text-muted-foreground text-sm">{String(doc.data.updatedByName ?? '')}</TableCell>}
                     <TableCell>
                       <Badge variant={statusVariant[doc.status] ?? 'draft'}>{doc.status}</Badge>
                     </TableCell>

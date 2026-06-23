@@ -1,57 +1,55 @@
-import { lazy, Suspense } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
-import { LoginPage } from "@/pages/auth/LoginPage";
-import { RegisterPage } from "@/pages/auth/RegisterPage";
-import { AdminLayout } from "@/pages/admin/layout/AdminLayout";
-import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { AdminPage } from "./pages/admin/AdminPage";
+import { lazy, Suspense } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { LoginPage } from '@/pages/auth/LoginPage';
+import { RegisterPage } from '@/pages/auth/RegisterPage';
+import { AdminLayout } from '@/pages/admin/layout/AdminLayout';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
+import { AdminPage } from './pages/admin/AdminPage';
 
 const ContentTypePage = lazy(() =>
-  import("@/pages/admin/panels/ContentTypePage").then((module) => ({
+  import('@/pages/admin/panels/ContentTypePage').then((module) => ({
     default: module.ContentTypePage,
   })),
 );
 
 const CollectionDetailPage = lazy(() =>
-  import("@/pages/admin/panels/collection-type/CollectionDetailPage").then(
-    (module) => ({
-      default: module.CollectionDetailPage,
-    }),
-  ),
+  import('@/pages/admin/panels/collection-type/CollectionDetailPage').then((module) => ({
+    default: module.CollectionDetailPage,
+  })),
 );
 
 const MediaLibraryPage = lazy(() =>
-  import("@/pages/admin/settings/MediaLibraryPage").then((module) => ({
+  import('@/pages/admin/settings/MediaLibraryPage').then((module) => ({
     default: module.MediaLibraryPage,
   })),
 );
 
 const UsersPage = lazy(() =>
-  import("@/pages/admin/settings/UsersPage").then((module) => ({
+  import('@/pages/admin/settings/UsersPage').then((module) => ({
     default: module.UsersPage,
   })),
 );
 
 const AccessTokensPage = lazy(() =>
-  import("@/pages/admin/settings/AccessTokensPage").then((module) => ({
+  import('@/pages/admin/settings/AccessTokensPage').then((module) => ({
     default: module.AccessTokensPage,
   })),
 );
 
 const RolesPage = lazy(() =>
-  import("@/pages/admin/settings/RolesPage").then((module) => ({
+  import('@/pages/admin/settings/RolesPage').then((module) => ({
     default: module.RolesPage,
   })),
 );
 
 const InternationalizePage = lazy(() =>
-  import("@/pages/admin/settings/InternationalizePage").then((module) => ({
+  import('@/pages/admin/settings/InternationalizePage').then((module) => ({
     default: module.InternationalizePage,
   })),
 );
 
 const InviteAcceptPage = lazy(() =>
-  import("@/pages/auth/InviteAcceptPage").then((module) => ({
+  import('@/pages/auth/InviteAcceptPage').then((module) => ({
     default: module.InviteAcceptPage,
   })),
 );
@@ -87,8 +85,7 @@ export function AppRouter() {
           <ProtectedRoute>
             <AdminLayout />
           </ProtectedRoute>
-        }
-      >
+        }>
         <Route index element={<AdminPage />} />
 
         <Route

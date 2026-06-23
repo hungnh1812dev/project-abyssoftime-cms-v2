@@ -1,12 +1,5 @@
 import { useState } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { flattenFields, type ContentType } from '@/types/cms';
 
@@ -33,44 +26,19 @@ function defaultSelection(contentType: ContentType): Set<string> {
 }
 
 function initialSelection(contentType: ContentType, currentListFields: string[]): Set<string> {
-  return currentListFields.length > 0
-    ? new Set(currentListFields)
-    : defaultSelection(contentType);
+  return currentListFields.length > 0 ? new Set(currentListFields) : defaultSelection(contentType);
 }
 
-export function ColumnChooserDialog({
-  open,
-  onOpenChange,
-  contentType,
-  currentListFields,
-  onSave,
-  isSaving,
-}: ColumnChooserDialogProps) {
+export function ColumnChooserDialog({ open, onOpenChange, contentType, currentListFields, onSave, isSaving }: ColumnChooserDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      {open && (
-        <ColumnChooserContent
-          contentType={contentType}
-          currentListFields={currentListFields}
-          onOpenChange={onOpenChange}
-          onSave={onSave}
-          isSaving={isSaving}
-        />
-      )}
+      {open && <ColumnChooserContent contentType={contentType} currentListFields={currentListFields} onOpenChange={onOpenChange} onSave={onSave} isSaving={isSaving} />}
     </Dialog>
   );
 }
 
-function ColumnChooserContent({
-  contentType,
-  currentListFields,
-  onOpenChange,
-  onSave,
-  isSaving,
-}: Omit<ColumnChooserDialogProps, 'open'>) {
-  const [selected, setSelected] = useState<Set<string>>(
-    () => initialSelection(contentType, currentListFields),
-  );
+function ColumnChooserContent({ contentType, currentListFields, onOpenChange, onSave, isSaving }: Omit<ColumnChooserDialogProps, 'open'>) {
+  const [selected, setSelected] = useState<Set<string>>(() => initialSelection(contentType, currentListFields));
 
   const contentFields = flattenFields(contentType.Fields ?? []).filter((field) => field.type !== 'component');
 
@@ -99,18 +67,13 @@ function ColumnChooserContent({
         <DialogDescription>Choose which columns to display in the list view.</DialogDescription>
       </DialogHeader>
 
-      <div className="space-y-4 max-h-80 overflow-y-auto">
+      <div className="max-h-80 space-y-4 overflow-y-auto">
         <div>
-          <h4 className="text-sm font-medium mb-2">Content fields</h4>
+          <h4 className="mb-2 text-sm font-medium">Content fields</h4>
           <div className="space-y-2">
             {contentFields.map((field) => (
-              <label key={field.name} className="flex items-center gap-2 text-sm cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={selected.has(field.name)}
-                  onChange={() => handleToggle(field.name)}
-                  className="rounded border-input"
-                />
+              <label key={field.name} className="flex cursor-pointer items-center gap-2 text-sm">
+                <input type="checkbox" checked={selected.has(field.name)} onChange={() => handleToggle(field.name)} className="border-input rounded" />
                 {field.name}
               </label>
             ))}
@@ -118,16 +81,11 @@ function ColumnChooserContent({
         </div>
 
         <div>
-          <h4 className="text-sm font-medium mb-2">System fields</h4>
+          <h4 className="mb-2 text-sm font-medium">System fields</h4>
           <div className="space-y-2">
             {SYSTEM_DISPLAY_FIELDS.map((field) => (
-              <label key={field.key} className="flex items-center gap-2 text-sm cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={selected.has(field.key)}
-                  onChange={() => handleToggle(field.key)}
-                  className="rounded border-input"
-                />
+              <label key={field.key} className="flex cursor-pointer items-center gap-2 text-sm">
+                <input type="checkbox" checked={selected.has(field.key)} onChange={() => handleToggle(field.key)} className="border-input rounded" />
                 {field.label}
               </label>
             ))}

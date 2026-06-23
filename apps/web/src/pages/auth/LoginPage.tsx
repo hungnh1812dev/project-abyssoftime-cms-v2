@@ -1,63 +1,61 @@
-import { useState } from 'react'
-import { useForm } from 'react-hook-form'
-import { useMutation, useQuery } from '@tanstack/react-query'
-import { useNavigate, Navigate, Link } from 'react-router-dom'
-import { api } from '@/lib/api'
-import { useAuth } from '@/context/AuthContext'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { useNavigate, Navigate, Link } from 'react-router-dom';
+import { api } from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 interface LoginFields {
-  email: string
-  password: string
-  rememberMe: boolean
+  email: string;
+  password: string;
+  rememberMe: boolean;
 }
 
 interface LoginResponse {
-  accessToken: string
+  accessToken: string;
 }
 
 export function LoginPage() {
-  const navigate = useNavigate()
-  const { login } = useAuth()
-  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const navigate = useNavigate();
+  const { login } = useAuth();
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const { data: setupData, isLoading: setupLoading } = useQuery({
     queryKey: ['auth-setup'],
-    queryFn: () =>
-      api.get<{ adminExists: boolean }>('/auth/setup').then((response) => response.data),
+    queryFn: () => api.get<{ adminExists: boolean }>('/auth/setup').then((response) => response.data),
     staleTime: 30_000,
-  })
+  });
 
   const {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<LoginFields>()
+  } = useForm<LoginFields>();
 
   const mutation = useMutation({
-    mutationFn: (data: LoginFields) =>
-      api.post<LoginResponse>('/auth/login', data).then((response) => response.data),
+    mutationFn: (data: LoginFields) => api.post<LoginResponse>('/auth/login', data).then((response) => response.data),
     onSuccess: (data) => {
-      login(data.accessToken)
-      navigate('/admin')
+      login(data.accessToken);
+      navigate('/admin');
     },
     onError: () => {
-      setErrorMsg('Invalid email or password.')
+      setErrorMsg('Invalid email or password.');
     },
-  })
+  });
 
   if (setupLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <p className="text-muted-foreground text-sm">Loading…</p>
       </div>
-    )
+    );
   }
 
   if (setupData && !setupData.adminExists) {
-    return <Navigate to="/register" replace />
+    return <Navigate to="/register" replace />;
   }
 
   return (
@@ -69,7 +67,7 @@ export function LoginPage() {
         </div>
 
         {errorMsg && (
-          <div role="alert" className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <div role="alert" className="border-destructive/50 bg-destructive/10 text-destructive rounded-md border px-4 py-3 text-sm">
             {errorMsg}
           </div>
         )}
@@ -106,13 +104,8 @@ export function LoginPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <input
-              id="rememberMe"
-              type="checkbox"
-              className="h-4 w-4 rounded border-border"
-              {...register('rememberMe')}
-            />
-            <Label htmlFor="rememberMe" className="text-sm font-normal cursor-pointer">
+            <input id="rememberMe" type="checkbox" className="border-border h-4 w-4 rounded" {...register('rememberMe')} />
+            <Label htmlFor="rememberMe" className="cursor-pointer text-sm font-normal">
               Stay logged in
             </Label>
           </div>
@@ -130,5 +123,5 @@ export function LoginPage() {
         </p>
       </div>
     </div>
-  )
+  );
 }
