@@ -1,5 +1,5 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { api, setAccessToken } from '@/lib/api';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { api, setAccessToken, onSessionExpired } from '@/lib/api';
 
 interface JwtPayload {
   userId: string;
@@ -24,6 +24,8 @@ interface AuthContextValue extends AuthState {
   logout: () => void;
 }
 
+const LOGGED_OUT_STATE: AuthState = { token: null, role: null, userId: null, loading: false };
+
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -34,18 +36,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loading: true,
   });
 
+  const mountedRef = useRef(true);
+
   useEffect(() => {
+    mountedRef.current = true;
+
+    onSessionExpired(() => {
+      if (mountedRef.current) {
+        setAccessToken(null);
+        setState(LOGGED_OUT_STATE);
+      }
+    });
+
     api
-      .post<{ accessToken: string }>('/auth/refresh', {}, { _retried: true } as object)
+      .post<{ accessToken: string }>(
+        '/auth/refresh',
+        {},
+        {
+          _retried: true,
+          headers: { 'Cache-Control': 'no-cache, no-store' },
+        } as object,
+      )
       .then((response) => {
+        if (!mountedRef.current) return;
         const token = response.data.accessToken;
         const { userId, role } = decodeToken(token);
         setAccessToken(token);
         setState({ token, role, userId, loading: false });
       })
       .catch(() => {
-        setState({ token: null, role: null, userId: null, loading: false });
+        if (mountedRef.current) {
+          setState(LOGGED_OUT_STATE);
+        }
       });
+
+    return () => {
+      mountedRef.current = false;
+      onSessionExpired(null);
+    };
   }, []);
 
   function login(token: string) {
@@ -54,11 +82,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState({ token, role, userId, loading: false });
   }
 
-  function logout() {
-    api.post('/auth/logout').catch(() => {});
+  const logout = useCallback(async () => {
     setAccessToken(null);
-    setState({ token: null, role: null, userId: null, loading: false });
-  }
+    setState(LOGGED_OUT_STATE);
+    try {
+      await api.post('/auth/logout');
+    } catch {
+      // cookie cleared server-side on best-effort basis
+    }
+  }, []);
 
   return <AuthContext.Provider value={{ ...state, login, logout }}>{children}</AuthContext.Provider>;
 }
