@@ -2,6 +2,7 @@ export interface FieldDefinition {
   name: string;
   type: string;
   ext?: string[];
+  repeatable?: boolean;
   fields?: FieldDefinition[];
 }
 

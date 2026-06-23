@@ -186,3 +186,4 @@ The frontend spec is not modularized. Key sections:
 | Spec ready | content | [Duplicate Document](specs/duplicate-document.md) — Collection List row action to fully clone a document |
 | Spec ready | content | [Configurable List Columns](specs/configurable-list-columns.md) — UI popup to choose visible columns on CollectionListPage, persisted to DB |
 | Spec ready | i18n | [Internationalization](specs/internationalization.md) — DB-backed locale management, settings page, locale selector in CollectionListPage |
+| Spec ready | content | [Repeatable Components](specs/repeatable-components.md) — Component fields support single-item (non-repeatable) and ordered array (repeatable) modes |

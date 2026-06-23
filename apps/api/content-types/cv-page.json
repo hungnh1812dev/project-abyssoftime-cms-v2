@@ -1,0 +1,59 @@
+{
+  "slug": "cv-page",
+  "name": "CV Page",
+  "kind": "collection",
+  "fields": [
+    {
+      "type": "layout",
+      "fields": [
+        { "name": "position", "type": "text" },
+        { "name": "isMain", "type": "boolean" }
+      ]
+    },
+    { "name": "company", "type": "text" },
+    { "name": "summary", "type": "richtext" },
+    {
+      "name": "skills",
+      "type": "component",
+      "component": "skill",
+      "repeatable": true,
+      "fields": [
+        { "name": "level", "type": "text" },
+        { "name": "skill", "type": "text" }
+      ]
+    },
+    {
+      "name": "experiences",
+      "type": "component",
+      "component": "experience",
+      "repeatable": true,
+      "fields": [
+        {
+          "type": "layout",
+          "fields": [
+            { "name": "company", "type": "text" },
+            { "name": "location", "type": "text" }
+          ]
+        },
+        {
+          "name": "roles",
+          "type": "component",
+          "component": "role",
+          "repeatable": true,
+          "fields": [
+            {
+              "type": "layout",
+              "fields": [
+                { "name": "position", "type": "text" },
+                { "name": "period", "type": "text" }
+              ]
+            },
+            { "name": "projects", "type": "text" },
+            { "name": "techStack", "type": "json" },
+            { "name": "responsibilities", "type": "richtext" }
+          ]
+        }
+      ]
+    }
+  ]
+}
