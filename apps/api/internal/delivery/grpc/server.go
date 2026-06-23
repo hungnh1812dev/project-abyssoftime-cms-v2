@@ -13,12 +13,12 @@ func NewServer(
 	docUC documentUseCase,
 	mediaUC mediaUseCase,
 ) *grpc.Server {
-	srv := grpc.NewServer(
+	grpcServer := grpc.NewServer(
 		grpc.UnaryInterceptor(interceptor.AuthUnaryInterceptor()),
 	)
-	pb.RegisterAuthServiceServer(srv, NewAuthServiceServer(authUC))
-	pb.RegisterContentTypeServiceServer(srv, NewContentTypeServiceServer(ctUC))
-	pb.RegisterDocumentServiceServer(srv, NewDocumentServiceServer(docUC))
-	pb.RegisterMediaServiceServer(srv, NewMediaServiceServer(mediaUC))
-	return srv
+	pb.RegisterAuthServiceServer(grpcServer, NewAuthServiceServer(authUC))
+	pb.RegisterContentTypeServiceServer(grpcServer, NewContentTypeServiceServer(ctUC))
+	pb.RegisterDocumentServiceServer(grpcServer, NewDocumentServiceServer(docUC))
+	pb.RegisterMediaServiceServer(grpcServer, NewMediaServiceServer(mediaUC))
+	return grpcServer
 }

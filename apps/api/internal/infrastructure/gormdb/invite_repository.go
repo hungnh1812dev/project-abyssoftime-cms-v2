@@ -15,20 +15,20 @@ import (
 var _ repository.InviteRepository = (*inviteRepository)(nil)
 
 type inviteRepository struct {
-	db *gorm.DB
+	database *gorm.DB
 }
 
-func NewInviteRepository(db *gorm.DB) repository.InviteRepository {
-	return &inviteRepository{db: db}
+func NewInviteRepository(database *gorm.DB) repository.InviteRepository {
+	return &inviteRepository{database: database}
 }
 
 func (r *inviteRepository) Create(ctx context.Context, invite *entity.Invite) error {
-	return r.db.WithContext(ctx).Create(invite).Error
+	return r.database.WithContext(ctx).Create(invite).Error
 }
 
 func (r *inviteRepository) FindByHash(ctx context.Context, tokenHash string) (*entity.Invite, error) {
 	var inv entity.Invite
-	if err := r.db.WithContext(ctx).Where("token_hash = ?", tokenHash).First(&inv).Error; err != nil {
+	if err := r.database.WithContext(ctx).Where("token_hash = ?", tokenHash).First(&inv).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, pkgerrors.ErrNotFound
 		}
@@ -39,7 +39,7 @@ func (r *inviteRepository) FindByHash(ctx context.Context, tokenHash string) (*e
 
 func (r *inviteRepository) FindByEmail(ctx context.Context, email string) (*entity.Invite, error) {
 	var inv entity.Invite
-	if err := r.db.WithContext(ctx).Where("email = ?", email).First(&inv).Error; err != nil {
+	if err := r.database.WithContext(ctx).Where("email = ?", email).First(&inv).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, pkgerrors.ErrNotFound
 		}
@@ -49,7 +49,7 @@ func (r *inviteRepository) FindByEmail(ctx context.Context, email string) (*enti
 }
 
 func (r *inviteRepository) Delete(ctx context.Context, id string) error {
-	result := r.db.WithContext(ctx).Where("document_id = ?", id).Delete(&entity.Invite{})
+	result := r.database.WithContext(ctx).Where("document_id = ?", id).Delete(&entity.Invite{})
 	if result.Error != nil {
 		return result.Error
 	}
@@ -60,12 +60,12 @@ func (r *inviteRepository) Delete(ctx context.Context, id string) error {
 }
 
 func (r *inviteRepository) DeleteExpired(ctx context.Context) error {
-	return r.db.WithContext(ctx).Where("expires_at < ?", time.Now().UTC()).Delete(&entity.Invite{}).Error
+	return r.database.WithContext(ctx).Where("expires_at < ?", time.Now().UTC()).Delete(&entity.Invite{}).Error
 }
 
 func (r *inviteRepository) FindAll(ctx context.Context) ([]*entity.Invite, error) {
 	var invites []*entity.Invite
-	if err := r.db.WithContext(ctx).Order("created_at DESC").Find(&invites).Error; err != nil {
+	if err := r.database.WithContext(ctx).Order("created_at DESC").Find(&invites).Error; err != nil {
 		return nil, err
 	}
 	return invites, nil

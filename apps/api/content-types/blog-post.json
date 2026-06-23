@@ -2,7 +2,6 @@
   "slug": "blog-posts",
   "name": "Blog Posts",
   "kind": "collection",
-  "listFields": ["title", "slug", "featured"],
   "fields": [
     { "name": "title", "type": "text" },
     { "name": "slug", "type": "text" },

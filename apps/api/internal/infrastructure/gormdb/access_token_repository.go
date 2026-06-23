@@ -15,20 +15,20 @@ import (
 var _ repository.AccessTokenRepository = (*accessTokenRepository)(nil)
 
 type accessTokenRepository struct {
-	db *gorm.DB
+	database *gorm.DB
 }
 
-func NewAccessTokenRepository(db *gorm.DB) repository.AccessTokenRepository {
-	return &accessTokenRepository{db: db}
+func NewAccessTokenRepository(database *gorm.DB) repository.AccessTokenRepository {
+	return &accessTokenRepository{database: database}
 }
 
 func (r *accessTokenRepository) Create(ctx context.Context, token *entity.AccessToken) error {
-	return r.db.WithContext(ctx).Create(token).Error
+	return r.database.WithContext(ctx).Create(token).Error
 }
 
 func (r *accessTokenRepository) FindByHash(ctx context.Context, tokenHash string) (*entity.AccessToken, error) {
 	var token entity.AccessToken
-	if err := r.db.WithContext(ctx).Where("token_hash = ?", tokenHash).First(&token).Error; err != nil {
+	if err := r.database.WithContext(ctx).Where("token_hash = ?", tokenHash).First(&token).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, pkgerrors.ErrNotFound
 		}
@@ -39,19 +39,19 @@ func (r *accessTokenRepository) FindByHash(ctx context.Context, tokenHash string
 
 func (r *accessTokenRepository) FindAll(ctx context.Context, page, limit int) ([]*entity.AccessToken, int64, error) {
 	var total int64
-	if err := r.db.WithContext(ctx).Model(&entity.AccessToken{}).Count(&total).Error; err != nil {
+	if err := r.database.WithContext(ctx).Model(&entity.AccessToken{}).Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 
 	var tokens []*entity.AccessToken
-	if err := r.db.WithContext(ctx).Order("created_at DESC").Offset((page - 1) * limit).Limit(limit).Find(&tokens).Error; err != nil {
+	if err := r.database.WithContext(ctx).Order("created_at DESC").Offset((page - 1) * limit).Limit(limit).Find(&tokens).Error; err != nil {
 		return nil, 0, err
 	}
 	return tokens, total, nil
 }
 
 func (r *accessTokenRepository) Delete(ctx context.Context, id string) error {
-	result := r.db.WithContext(ctx).Where("document_id = ?", id).Delete(&entity.AccessToken{})
+	result := r.database.WithContext(ctx).Where("document_id = ?", id).Delete(&entity.AccessToken{})
 	if result.Error != nil {
 		return result.Error
 	}
@@ -62,5 +62,5 @@ func (r *accessTokenRepository) Delete(ctx context.Context, id string) error {
 }
 
 func (r *accessTokenRepository) UpdateLastUsed(ctx context.Context, id string, at time.Time) error {
-	return r.db.WithContext(ctx).Model(&entity.AccessToken{}).Where("gorm_id = ?", id).Update("last_used_at", at).Error
+	return r.database.WithContext(ctx).Model(&entity.AccessToken{}).Where("gorm_id = ?", id).Update("last_used_at", at).Error
 }

@@ -30,8 +30,8 @@ export function MediaInput({ name, control, ext, 'aria-label': ariaLabel }: Medi
           setFileName(asset.fileName);
         }
 
-        function handleRemove(e: React.MouseEvent) {
-          e.stopPropagation();
+        function handleRemove(event: React.MouseEvent) {
+          event.stopPropagation();
           field.onChange(null);
           setPreviewUrl(null);
           setFileName(null);
@@ -46,8 +46,8 @@ export function MediaInput({ name, control, ext, 'aria-label': ariaLabel }: Medi
               tabIndex={0}
               className="border-input hover:border-ring relative cursor-pointer overflow-hidden rounded-md border transition-colors"
               onClick={() => setIsLibraryOpen(true)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') setIsLibraryOpen(true);
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') setIsLibraryOpen(true);
               }}>
               {displayUrl ? (
                 <>

@@ -1,12 +1,19 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useSingleTypeDocument, useSaveSingleType, usePublishSingleType, useUnpublishSingleType } from '@/hooks/useSingleTypeDocuments';
-import { useCollectionDocument, useCreateCollectionDocument, useUpdateCollectionDocument, usePublishCollectionDocument, useUnpublishCollectionDocument } from '@/hooks/useCollectionDocuments';
+import {
+  useCollectionDocument,
+  useCreateCollectionDocument,
+  useUpdateCollectionDocument,
+  usePublishCollectionDocument,
+  useUnpublishCollectionDocument,
+} from '@/hooks/useCollectionDocuments';
 import { useLocales } from '@/hooks/useLocales';
 import { api } from '@/lib/api';
 import type { Document as CmsDocument, ContentType } from '@/types/cms';
 import { stripSystemFields } from '@/types/cms';
 import { useState } from 'react';
+import { LocaleSelector } from '@/components/locale/LocaleSelector';
 import { ContentDetailLayout } from './ContentDetailLayout';
 import { ContentTypeBuilder } from './ContentTypeBuilder';
 
@@ -43,18 +50,11 @@ export function ContentTypePanel({ contentType, id, isNew }: Props) {
   const isSingle = contentType.Kind === 'single';
   const navigate = useNavigate();
   const { data: locales = [] } = useLocales();
-  const [locale, setLocale] = useState('');
-  const activeLocale = locale || locales[0] || '';
+  const [selectedLocale, setSelectedLocale] = useState('');
+  const activeLocale = selectedLocale || locales.find((loc) => loc.isDefault)?.code || locales[0]?.code || '';
 
-  const singleQuery = useSingleTypeDocument(
-    isSingle ? contentType.Slug : '',
-    activeLocale,
-  );
-  const collectionQuery = useCollectionDocument(
-    !isSingle && !isNew ? contentType.Slug : '',
-    id ?? '',
-    activeLocale,
-  );
+  const singleQuery = useSingleTypeDocument(isSingle ? contentType.Slug : '', activeLocale);
+  const collectionQuery = useCollectionDocument(!isSingle && !isNew ? contentType.Slug : '', id ?? '', activeLocale);
 
   const saveSingle = useSaveSingleType();
   const createCollection = useCreateCollectionDocument();
@@ -65,8 +65,8 @@ export function ContentTypePanel({ contentType, id, isNew }: Props) {
   const publishCollection = usePublishCollectionDocument();
   const unpublishCollection = useUnpublishCollectionDocument();
 
-  const isLoading = isSingle ? singleQuery.isLoading : (!isNew && collectionQuery.isLoading);
-  const doc = isSingle ? singleQuery.data : (isNew ? undefined : collectionQuery.data);
+  const isLoading = isSingle ? singleQuery.isLoading : !isNew && collectionQuery.isLoading;
+  const doc = isSingle ? singleQuery.data : isNew ? undefined : collectionQuery.data;
 
   if (isLoading) {
     return <p className="text-muted-foreground">Loading…</p>;
@@ -81,10 +81,7 @@ export function ContentTypePanel({ contentType, id, isNew }: Props) {
             data,
             locale: activeLocale,
           });
-          navigate(
-            `/admin/content-type/collection-type/${contentType.Slug}/${created.data.documentId}?locale=${activeLocale}`,
-            { replace: true },
-          );
+          navigate(`/admin/content-type/collection-type/${contentType.Slug}/${created.data.documentId}?locale=${activeLocale}`, { replace: true });
         }
       : async (data: Record<string, unknown>) => {
           await saveSingle.mutateAsync({
@@ -103,8 +100,7 @@ export function ContentTypePanel({ contentType, id, isNew }: Props) {
               ← Go back
             </Link>
           ) : undefined
-        }
-      >
+        }>
         <ContentTypeBuilder schema={schema} mutationFn={handleFirstSave} />
       </ContentDetailLayout>
     );
@@ -120,7 +116,7 @@ export function ContentTypePanel({ contentType, id, isNew }: Props) {
     : (data: Record<string, unknown>) =>
         updateCollection.mutateAsync({
           contentTypeSlug: contentType.Slug,
-          id: (doc.data.documentId as string),
+          id: doc.data.documentId as string,
           data,
           locale: activeLocale,
         });
@@ -129,7 +125,7 @@ export function ContentTypePanel({ contentType, id, isNew }: Props) {
     if (isSingle) {
       publishSingle.mutate({ contentTypeSlug: contentType.Slug, locale: activeLocale });
     } else {
-      publishCollection.mutate({ contentTypeSlug: contentType.Slug, id: (doc.data.documentId as string), locale: activeLocale });
+      publishCollection.mutate({ contentTypeSlug: contentType.Slug, id: doc.data.documentId as string, locale: activeLocale });
     }
   };
 
@@ -137,7 +133,7 @@ export function ContentTypePanel({ contentType, id, isNew }: Props) {
     if (isSingle) {
       unpublishSingle.mutate({ contentTypeSlug: contentType.Slug, locale: activeLocale });
     } else {
-      unpublishCollection.mutate({ contentTypeSlug: contentType.Slug, id: (doc.data.documentId as string), locale: activeLocale });
+      unpublishCollection.mutate({ contentTypeSlug: contentType.Slug, id: doc.data.documentId as string, locale: activeLocale });
     }
   };
 
@@ -148,9 +144,7 @@ export function ContentTypePanel({ contentType, id, isNew }: Props) {
   const canUnpublish = doc.status !== 'draft';
   const schema = contentType.Fields ?? [];
 
-  const apiBase = isSingle
-    ? `/api/document-manager/single-type/${contentType.Slug}`
-    : `/api/document-manager/collection-type/${contentType.Slug}/${(doc.data.documentId as string)}`;
+  const apiBase = isSingle ? `/api/document-manager/single-type/${contentType.Slug}` : `/api/document-manager/collection-type/${contentType.Slug}/${doc.data.documentId as string}`;
 
   return (
     <ContentDetailLayout
@@ -163,57 +157,34 @@ export function ContentTypePanel({ contentType, id, isNew }: Props) {
           </Link>
         ) : undefined
       }
-      metadata={doc.data.updatedByName ? (
-        <p className="text-muted-foreground text-sm">
-          Last updated by {doc.data.updatedByName as string} on {formatAuditDate(doc.data.updatedAt)}
-        </p>
-      ) : undefined}
+      metadata={
+        doc.data.updatedByName ? (
+          <p className="text-muted-foreground text-sm">
+            Last updated by {doc.data.updatedByName as string} on {formatAuditDate(doc.data.updatedAt)}
+          </p>
+        ) : undefined
+      }
       renderActions={() => (
         <>
-          {locales.length > 1 && (
-            <select aria-label="Locale" value={activeLocale} onChange={(e) => setLocale(e.target.value)}>
-              {locales.map((l) => (
-                <option key={l} value={l}>
-                  {l}
-                </option>
-              ))}
-            </select>
-          )}
+          <LocaleSelector value={activeLocale} onChange={setSelectedLocale} />
         </>
       )}>
       <ContentTypeBuilder
         schema={schema}
         query={{
-          queryKey: ['documents', isSingle ? 'single-type' : 'collection-type', 'detail', contentType.Slug, (doc.data.documentId as string), activeLocale, 'data'],
-          queryFn: () =>
-            api
-              .get<CmsDocument>(apiBase, { params: { locale: activeLocale } })
-              .then((r) => stripSystemFields((r.data as CmsDocument).data)),
+          queryKey: ['documents', isSingle ? 'single-type' : 'collection-type', 'detail', contentType.Slug, doc.data.documentId as string, activeLocale, 'data'],
+          queryFn: () => api.get<CmsDocument>(apiBase, { params: { locale: activeLocale } }).then((response) => stripSystemFields((response.data as CmsDocument).data)),
         }}
         mutationFn={mutationFn}
         renderActions={({ isDirty, submitting }) => (
           <>
             {canPublish && (
-              <Button
-                type="button"
-                variant="success"
-                onClick={handlePublish}
-                disabled={isDirty || submitting || isPublishing}
-                loading={isPublishing}
-                loadingText="Publishing..."
-              >
+              <Button type="button" variant="success" onClick={handlePublish} disabled={isDirty || submitting || isPublishing} loading={isPublishing} loadingText="Publishing...">
                 Publish
               </Button>
             )}
             {canUnpublish && (
-              <Button
-                type="button"
-                variant="destructive"
-                onClick={handleUnpublish}
-                disabled={submitting || isUnpublishing}
-                loading={isUnpublishing}
-                loadingText="Unpublishing..."
-              >
+              <Button type="button" variant="destructive" onClick={handleUnpublish} disabled={submitting || isUnpublishing} loading={isUnpublishing} loadingText="Unpublishing...">
                 Unpublish
               </Button>
             )}

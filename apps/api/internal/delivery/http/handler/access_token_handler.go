@@ -18,41 +18,41 @@ type accessTokenUseCase interface {
 }
 
 type AccessTokenHandler struct {
-	uc accessTokenUseCase
+	usecase accessTokenUseCase
 }
 
-func NewAccessTokenHandler(uc accessTokenUseCase) *AccessTokenHandler {
-	return &AccessTokenHandler{uc: uc}
+func NewAccessTokenHandler(usecase accessTokenUseCase) *AccessTokenHandler {
+	return &AccessTokenHandler{usecase: usecase}
 }
 
-func (h *AccessTokenHandler) Create(c *gin.Context) {
+func (h *AccessTokenHandler) Create(ginCtx *gin.Context) {
 	var req struct {
 		Name      string   `json:"name"`
 		Scopes    []string `json:"scopes"`
 		ExpiresIn *string  `json:"expiresIn"`
 	}
-	if err := c.ShouldBindJSON(&req); err != nil || req.Name == "" {
-		ginWriteError(c, http.StatusBadRequest, "invalid request body")
+	if err := ginCtx.ShouldBindJSON(&req); err != nil || req.Name == "" {
+		ginWriteError(ginCtx, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
 	var expiresAt *time.Time
 	if req.ExpiresIn != nil {
-		d, err := time.ParseDuration(*req.ExpiresIn)
+		duration, err := time.ParseDuration(*req.ExpiresIn)
 		if err == nil {
-			t := time.Now().UTC().Add(d)
+			t := time.Now().UTC().Add(duration)
 			expiresAt = &t
 		}
 	}
 
-	createdBy := c.GetString("userID")
-	token, plaintext, err := h.uc.Create(c.Request.Context(), req.Name, req.Scopes, expiresAt, createdBy)
+	createdBy := ginCtx.GetString("userID")
+	token, plaintext, err := h.usecase.Create(ginCtx.Request.Context(), req.Name, req.Scopes, expiresAt, createdBy)
 	if err != nil {
-		ginWriteErr(c, err)
+		ginWriteErr(ginCtx, err)
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{
+	ginCtx.JSON(http.StatusCreated, gin.H{
 		"id":        token.ID,
 		"name":      token.Name,
 		"prefix":    token.Prefix,
@@ -63,9 +63,9 @@ func (h *AccessTokenHandler) Create(c *gin.Context) {
 	})
 }
 
-func (h *AccessTokenHandler) List(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+func (h *AccessTokenHandler) List(ginCtx *gin.Context) {
+	page, _ := strconv.Atoi(ginCtx.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(ginCtx.DefaultQuery("limit", "20"))
 	if page < 1 {
 		page = 1
 	}
@@ -73,9 +73,9 @@ func (h *AccessTokenHandler) List(c *gin.Context) {
 		limit = 20
 	}
 
-	tokens, total, err := h.uc.List(c.Request.Context(), page, limit)
+	tokens, total, err := h.usecase.List(ginCtx.Request.Context(), page, limit)
 	if err != nil {
-		ginWriteErr(c, err)
+		ginWriteErr(ginCtx, err)
 		return
 	}
 
@@ -89,24 +89,24 @@ func (h *AccessTokenHandler) List(c *gin.Context) {
 		CreatedAt  time.Time  `json:"createdAt"`
 	}
 	items := make([]tokenItem, len(tokens))
-	for i, t := range tokens {
+	for i, token := range tokens {
 		items[i] = tokenItem{
-			ID:         t.DocumentID,
-			Name:       t.Name,
-			Prefix:     t.Prefix,
-			Scopes:     t.Scopes,
-			ExpiresAt:  t.ExpiresAt,
-			LastUsedAt: t.LastUsedAt,
-			CreatedAt:  t.CreatedAt,
+			ID:         token.DocumentID,
+			Name:       token.Name,
+			Prefix:     token.Prefix,
+			Scopes:     token.Scopes,
+			ExpiresAt:  token.ExpiresAt,
+			LastUsedAt: token.LastUsedAt,
+			CreatedAt:  token.CreatedAt,
 		}
 	}
-	c.JSON(http.StatusOK, gin.H{"items": items, "total": total, "page": page, "limit": limit})
+	ginCtx.JSON(http.StatusOK, gin.H{"items": items, "total": total, "page": page, "limit": limit})
 }
 
-func (h *AccessTokenHandler) Delete(c *gin.Context) {
-	if err := h.uc.Delete(c.Request.Context(), c.Param("id")); err != nil {
-		ginWriteErr(c, err)
+func (h *AccessTokenHandler) Delete(ginCtx *gin.Context) {
+	if err := h.usecase.Delete(ginCtx.Request.Context(), ginCtx.Param("id")); err != nil {
+		ginWriteErr(ginCtx, err)
 		return
 	}
-	c.Status(http.StatusNoContent)
+	ginCtx.Status(http.StatusNoContent)
 }

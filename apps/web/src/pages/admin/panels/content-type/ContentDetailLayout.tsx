@@ -1,13 +1,13 @@
-import type { ReactNode } from 'react'
-import { StickyActionBar } from '@/pages/admin/layout/StickyActionBar'
+import type { ReactNode } from 'react';
+import { StickyActionBar } from '@/pages/admin/layout/StickyActionBar';
 
 interface Props {
-  title: string
-  status?: string
-  backLink?: ReactNode
-  metadata?: ReactNode
-  renderActions?: () => ReactNode
-  children: ReactNode
+  title: string;
+  status?: string;
+  backLink?: ReactNode;
+  metadata?: ReactNode;
+  renderActions?: () => ReactNode;
+  children: ReactNode;
 }
 
 export function ContentDetailLayout({ title, status, backLink, metadata, renderActions, children }: Props) {
@@ -20,5 +20,5 @@ export function ContentDetailLayout({ title, status, backLink, metadata, renderA
         {children}
       </div>
     </div>
-  )
+  );
 }

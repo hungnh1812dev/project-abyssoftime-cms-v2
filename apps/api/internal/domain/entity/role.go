@@ -18,6 +18,7 @@ const (
 	PermRolesManage       Permission = "roles:manage"
 	PermAccessTokenManage Permission = "access_tokens:manage"
 	PermContentTypesRead  Permission = "content_types:read"
+	PermLocalesManage    Permission = "locales:manage"
 )
 
 var AllPermissions = []Permission{
@@ -25,7 +26,7 @@ var AllPermissions = []Permission{
 	PermContentPublish, PermContentUnpublish,
 	PermMediaRead, PermMediaUpload, PermMediaDelete,
 	PermUsersManage, PermRolesManage, PermAccessTokenManage,
-	PermContentTypesRead,
+	PermContentTypesRead, PermLocalesManage,
 }
 
 func IsValidPermission(p string) bool {

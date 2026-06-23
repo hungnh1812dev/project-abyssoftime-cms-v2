@@ -229,7 +229,7 @@ func TestSync_UpdatesFieldsWhenChanged(t *testing.T) {
 	}
 }
 
-func TestSync_CreatesContentTypeWithListFields(t *testing.T) {
+func TestSync_CreatesContentTypeWithNilListFields(t *testing.T) {
 	repo := &repomock.ContentTypeRepository{}
 	repo.FindAllFn = func(_ context.Context) ([]*entity.ContentType, error) { return nil, nil }
 	repo.FindBySlugFn = func(_ context.Context, _ string) (*entity.ContentType, error) {
@@ -263,12 +263,12 @@ func TestSync_CreatesContentTypeWithListFields(t *testing.T) {
 	if created == nil {
 		t.Fatal("Sync() did not create a content type")
 	}
-	if len(created.ListFields) != 2 || created.ListFields[0] != "title" || created.ListFields[1] != "slug" {
-		t.Errorf("Sync() created ContentType.ListFields = %v, want [title slug]", created.ListFields)
+	if created.ListFields != nil {
+		t.Errorf("Sync() created ContentType.ListFields = %v, want nil (ListFields is user-managed)", created.ListFields)
 	}
 }
 
-func TestSync_UpdatesWhenListFieldsChanged(t *testing.T) {
+func TestSync_PreservesUserConfiguredListFields(t *testing.T) {
 	existing := &entity.ContentType{
 		DocumentID: "ct-1",
 		Slug:       "articles",
@@ -285,9 +285,9 @@ func TestSync_UpdatesWhenListFieldsChanged(t *testing.T) {
 	repo.FindBySlugFn = func(_ context.Context, _ string) (*entity.ContentType, error) {
 		return existing, nil
 	}
-	var updated *entity.ContentType
+	updateCalled := false
 	repo.UpdateFn = func(_ context.Context, ct *entity.ContentType) error {
-		updated = ct
+		updateCalled = true
 		return nil
 	}
 
@@ -298,18 +298,17 @@ func TestSync_UpdatesWhenListFieldsChanged(t *testing.T) {
 	defs := []contenttype.ContentTypeDefinition{
 		{
 			Slug: "articles", Name: "Articles", Kind: "collection",
-			ListFields: []string{"title", "body"},
-			Fields:     []entity.FieldDefinition{{Name: "title", Type: "text"}, {Name: "body", Type: "richtext"}},
+			Fields: []entity.FieldDefinition{{Name: "title", Type: "text"}, {Name: "body", Type: "richtext"}},
 		},
 	}
 	if err := syncer.Sync(ctx, defs); err != nil {
 		t.Fatalf("Sync() error = %v", err)
 	}
-	if updated == nil {
-		t.Fatal("Sync() did not update the content type when ListFields changed")
+	if updateCalled {
+		t.Error("Sync() should not trigger an update when only ListFields differs (it is user-managed)")
 	}
-	if len(updated.ListFields) != 2 || updated.ListFields[1] != "body" {
-		t.Errorf("Sync() updated ContentType.ListFields = %v, want [title body]", updated.ListFields)
+	if len(existing.ListFields) != 1 || existing.ListFields[0] != "title" {
+		t.Errorf("Sync() modified existing.ListFields = %v, want [title] (preserved)", existing.ListFields)
 	}
 }
 

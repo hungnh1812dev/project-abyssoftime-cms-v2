@@ -311,3 +311,349 @@ func TestDocumentRepository_DeletePublishedByDocumentID(t *testing.T) {
 		t.Errorf("after delete, err = %v, want ErrNotFound", err)
 	}
 }
+
+func TestExistingColumns(t *testing.T) {
+	db, err := NewClient("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	repo := NewDocumentRepository(db)
+	ctx := context.Background()
+
+	if err := repo.EnsureCollection(ctx, "blog", testFields); err != nil {
+		t.Fatalf("EnsureCollection: %v", err)
+	}
+
+	cols, err := existingColumns(db, documentTableName("blog"))
+	if err != nil {
+		t.Fatalf("existingColumns: %v", err)
+	}
+
+	for _, want := range []string{"gorm_id", "document_id", "version", "locale", "title", "body", "created_at", "updated_at"} {
+		if !cols[want] {
+			t.Errorf("missing column %q", want)
+		}
+	}
+
+	if cols["nonexistent"] {
+		t.Error("unexpected column 'nonexistent'")
+	}
+}
+
+func TestDocumentRepository_EnsureCollection_PreservesData(t *testing.T) {
+	db, err := NewClient("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	repo := NewDocumentRepository(db)
+	ctx := context.Background()
+
+	if err := repo.EnsureCollection(ctx, "blog", testFields); err != nil {
+		t.Fatalf("EnsureCollection: %v", err)
+	}
+
+	doc := &entity.Document{
+		DocumentID: "d1", Version: entity.VersionDraft,
+		Fields: map[string]any{"title": "Keep me"}, Locale: "en",
+		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
+	}
+	if err := repo.UpsertDraft(ctx, "blog", doc); err != nil {
+		t.Fatalf("UpsertDraft: %v", err)
+	}
+
+	// Re-run EnsureCollection — data must survive
+	if err := repo.EnsureCollection(ctx, "blog", testFields); err != nil {
+		t.Fatalf("EnsureCollection (2nd): %v", err)
+	}
+
+	found, err := repo.FindDraftByDocumentID(ctx, "blog", "d1", "en")
+	if err != nil {
+		t.Fatalf("FindDraftByDocumentID after re-ensure: %v", err)
+	}
+	title, _ := found.Fields["title"].(string)
+	if title != "Keep me" {
+		t.Errorf("title = %q, want %q", title, "Keep me")
+	}
+}
+
+func TestDocumentRepository_EnsureCollection_AddsNewColumn(t *testing.T) {
+	db, err := NewClient("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	repo := NewDocumentRepository(db)
+	ctx := context.Background()
+
+	if err := repo.EnsureCollection(ctx, "blog", testFields); err != nil {
+		t.Fatalf("EnsureCollection: %v", err)
+	}
+
+	doc := &entity.Document{
+		DocumentID: "d1", Version: entity.VersionDraft,
+		Fields: map[string]any{"title": "Hello"}, Locale: "en",
+		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
+	}
+	if err := repo.UpsertDraft(ctx, "blog", doc); err != nil {
+		t.Fatalf("UpsertDraft: %v", err)
+	}
+
+	extendedFields := append(testFields, entity.FieldDefinition{Name: "summary", Type: "text"})
+	if err := repo.EnsureCollection(ctx, "blog", extendedFields); err != nil {
+		t.Fatalf("EnsureCollection (extended): %v", err)
+	}
+
+	// Old data still exists
+	found, err := repo.FindDraftByDocumentID(ctx, "blog", "d1", "en")
+	if err != nil {
+		t.Fatalf("FindDraftByDocumentID: %v", err)
+	}
+	title, _ := found.Fields["title"].(string)
+	if title != "Hello" {
+		t.Errorf("title = %q, want %q", title, "Hello")
+	}
+
+	// New column exists
+	cols, err := existingColumns(db, documentTableName("blog"))
+	if err != nil {
+		t.Fatalf("existingColumns: %v", err)
+	}
+	if !cols["summary"] {
+		t.Error("expected 'summary' column to exist after extending fields")
+	}
+}
+
+func TestDocumentRepository_EnsureCollection_IgnoresRemovedField(t *testing.T) {
+	db, err := NewClient("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	repo := NewDocumentRepository(db)
+	ctx := context.Background()
+
+	extendedFields := append(testFields, entity.FieldDefinition{Name: "summary", Type: "text"})
+	if err := repo.EnsureCollection(ctx, "blog", extendedFields); err != nil {
+		t.Fatalf("EnsureCollection: %v", err)
+	}
+
+	doc := &entity.Document{
+		DocumentID: "d1", Version: entity.VersionDraft,
+		Fields: map[string]any{"title": "Hello", "summary": "World"}, Locale: "en",
+		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
+	}
+	if err := repo.UpsertDraft(ctx, "blog", doc); err != nil {
+		t.Fatalf("UpsertDraft: %v", err)
+	}
+
+	// Re-ensure with fewer fields — summary column must remain
+	if err := repo.EnsureCollection(ctx, "blog", testFields); err != nil {
+		t.Fatalf("EnsureCollection (reduced): %v", err)
+	}
+
+	found, err := repo.FindDraftByDocumentID(ctx, "blog", "d1", "en")
+	if err != nil {
+		t.Fatalf("FindDraftByDocumentID: %v", err)
+	}
+	title, _ := found.Fields["title"].(string)
+	if title != "Hello" {
+		t.Errorf("title = %q, want %q", title, "Hello")
+	}
+
+	cols, err := existingColumns(db, documentTableName("blog"))
+	if err != nil {
+		t.Fatalf("existingColumns: %v", err)
+	}
+	if !cols["summary"] {
+		t.Error("expected 'summary' column to still exist after reducing fields")
+	}
+}
+
+func TestDocumentRepository_LayoutFieldsRoundTrip(t *testing.T) {
+	db, err := NewClient("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	repo := NewDocumentRepository(db)
+	ctx := context.Background()
+
+	layoutFields := []entity.FieldDefinition{
+		{
+			Name: "layout",
+			Type: "layout",
+			Fields: []entity.FieldDefinition{
+				{Name: "packName", Type: "text"},
+				{Name: "packTitle", Type: "text"},
+			},
+		},
+		{Name: "words", Type: "json"},
+	}
+
+	if err := repo.EnsureCollection(ctx, "en-vocab-pack", layoutFields); err != nil {
+		t.Fatalf("EnsureCollection: %v", err)
+	}
+
+	cols, err := existingColumns(db, documentTableName("en-vocab-pack"))
+	if err != nil {
+		t.Fatalf("existingColumns: %v", err)
+	}
+	if !cols["pack_name"] {
+		t.Error("expected 'pack_name' column to exist")
+	}
+	if !cols["pack_title"] {
+		t.Error("expected 'pack_title' column to exist")
+	}
+
+	doc := &entity.Document{
+		DocumentID: "d1", Version: entity.VersionDraft,
+		Fields:    map[string]any{"packName": "Pack 1", "packTitle": "Title 1", "words": `["hello"]`},
+		Locale:    "en",
+		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
+	}
+	if err := repo.UpsertDraft(ctx, "en-vocab-pack", doc); err != nil {
+		t.Fatalf("UpsertDraft: %v", err)
+	}
+
+	found, err := repo.FindDraftByDocumentID(ctx, "en-vocab-pack", "d1", "en")
+	if err != nil {
+		t.Fatalf("FindDraftByDocumentID: %v", err)
+	}
+	if got := found.Fields["packName"]; got != "Pack 1" {
+		t.Errorf("packName = %v, want %q", got, "Pack 1")
+	}
+	if got := found.Fields["packTitle"]; got != "Title 1" {
+		t.Errorf("packTitle = %v, want %q", got, "Title 1")
+	}
+
+	// Update and verify round-trip
+	doc.Fields["packName"] = "Pack 2"
+	doc.Fields["packTitle"] = "Title 2"
+	if err := repo.UpsertDraft(ctx, "en-vocab-pack", doc); err != nil {
+		t.Fatalf("UpsertDraft (update): %v", err)
+	}
+
+	found, err = repo.FindDraftByDocumentID(ctx, "en-vocab-pack", "d1", "en")
+	if err != nil {
+		t.Fatalf("FindDraftByDocumentID (after update): %v", err)
+	}
+	if got := found.Fields["packName"]; got != "Pack 2" {
+		t.Errorf("packName after update = %v, want %q", got, "Pack 2")
+	}
+	if got := found.Fields["packTitle"]; got != "Title 2" {
+		t.Errorf("packTitle after update = %v, want %q", got, "Title 2")
+	}
+}
+
+func TestDocumentRepository_LayoutFieldsMigrateExistingTable(t *testing.T) {
+	db, err := NewClient("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	repo := NewDocumentRepository(db)
+	ctx := context.Background()
+
+	// Simulate old code: table created with layout field skipped entirely
+	oldSQL := fmt.Sprintf("CREATE TABLE %s (gorm_id INTEGER PRIMARY KEY AUTOINCREMENT, document_id TEXT, version TEXT, locale TEXT, words TEXT, created_at TIMESTAMP, updated_at TIMESTAMP, published_at TIMESTAMP, created_by TEXT, updated_by TEXT, published_by TEXT)",
+		documentTableName("en-vocab-pack"))
+	if err := db.Exec(oldSQL).Error; err != nil {
+		t.Fatalf("create old table: %v", err)
+	}
+
+	// Insert a document using old schema (no pack_name, pack_title columns)
+	insertSQL := fmt.Sprintf("INSERT INTO %s (document_id, version, locale, words, created_at, updated_at, created_by, updated_by) VALUES ('d1', 'draft', 'en', '[\"hello\"]', datetime('now'), datetime('now'), 'u1', 'u1')",
+		documentTableName("en-vocab-pack"))
+	if err := db.Exec(insertSQL).Error; err != nil {
+		t.Fatalf("insert: %v", err)
+	}
+
+	// Now call EnsureCollection with layout fields (simulates restart with fix)
+	layoutFields := []entity.FieldDefinition{
+		{
+			Name: "layout",
+			Type: "layout",
+			Fields: []entity.FieldDefinition{
+				{Name: "packName", Type: "text"},
+				{Name: "packTitle", Type: "text"},
+			},
+		},
+		{Name: "words", Type: "json"},
+	}
+	if err := repo.EnsureCollection(ctx, "en-vocab-pack", layoutFields); err != nil {
+		t.Fatalf("EnsureCollection: %v", err)
+	}
+
+	// Verify columns were added
+	cols, err := existingColumns(db, documentTableName("en-vocab-pack"))
+	if err != nil {
+		t.Fatalf("existingColumns: %v", err)
+	}
+	if !cols["pack_name"] {
+		t.Error("expected 'pack_name' column after migration")
+	}
+	if !cols["pack_title"] {
+		t.Error("expected 'pack_title' column after migration")
+	}
+
+	// Update the existing document with layout field values
+	doc := &entity.Document{
+		DocumentID: "d1", Version: entity.VersionDraft,
+		Fields:    map[string]any{"packName": "New Pack", "packTitle": "New Title", "words": `["hello"]`},
+		Locale:    "en",
+		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
+		CreatedBy: "u1", UpdatedBy: "u1",
+	}
+	if err := repo.UpsertDraft(ctx, "en-vocab-pack", doc); err != nil {
+		t.Fatalf("UpsertDraft: %v", err)
+	}
+
+	// Read back and verify
+	found, err := repo.FindDraftByDocumentID(ctx, "en-vocab-pack", "d1", "en")
+	if err != nil {
+		t.Fatalf("FindDraftByDocumentID: %v", err)
+	}
+	if got := found.Fields["packName"]; got != "New Pack" {
+		t.Errorf("packName = %v, want %q", got, "New Pack")
+	}
+	if got := found.Fields["packTitle"]; got != "New Title" {
+		t.Errorf("packTitle = %v, want %q", got, "New Title")
+	}
+}
+
+func TestDocumentRepository_TableInfo(t *testing.T) {
+	db, err := NewClient("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	repo := NewDocumentRepository(db)
+	ctx := context.Background()
+
+	// Table doesn't exist yet
+	exists, count, err := repo.TableInfo(ctx, "blog")
+	if err != nil {
+		t.Fatalf("TableInfo: %v", err)
+	}
+	if exists {
+		t.Error("expected exists=false before EnsureCollection")
+	}
+
+	// Create table and insert data
+	if err := repo.EnsureCollection(ctx, "blog", testFields); err != nil {
+		t.Fatalf("EnsureCollection: %v", err)
+	}
+	for _, id := range []string{"d1", "d2", "d3"} {
+		_ = repo.UpsertDraft(ctx, "blog", &entity.Document{
+			DocumentID: id, Version: entity.VersionDraft,
+			Fields: map[string]any{"title": id}, Locale: "en",
+			CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
+		})
+	}
+
+	exists, count, err = repo.TableInfo(ctx, "blog")
+	if err != nil {
+		t.Fatalf("TableInfo: %v", err)
+	}
+	if !exists {
+		t.Error("expected exists=true after EnsureCollection")
+	}
+	if count != 3 {
+		t.Errorf("count = %d, want 3", count)
+	}
+}

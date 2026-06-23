@@ -12,43 +12,43 @@ import (
 )
 
 // GinAuth validates the Bearer token and injects userID + role into both
-// the Gin context (c.Set) and the request context (context.WithValue).
+// the Gin context (ginCtx.Set) and the request context (context.WithValue).
 // The dual injection keeps the GraphQL @auth directive and usecases working
 // unchanged — they read from context.Context, not from gin.Context.
 func GinAuth() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		header := c.GetHeader("Authorization")
+	return func(ginCtx *gin.Context) {
+		header := ginCtx.GetHeader("Authorization")
 		if !strings.HasPrefix(header, "Bearer ") {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+			ginCtx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 			return
 		}
 
 		claims, err := pkgjwt.ValidateToken(strings.TrimPrefix(header, "Bearer "))
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+			ginCtx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 			return
 		}
 
-		c.Set("userID", claims.UserID)
-		c.Set("role", claims.Role)
+		ginCtx.Set("userID", claims.UserID)
+		ginCtx.Set("role", claims.Role)
 
-		ctx := context.WithValue(c.Request.Context(), ContextKeyUserID, claims.UserID)
+		ctx := context.WithValue(ginCtx.Request.Context(), ContextKeyUserID, claims.UserID)
 		ctx = context.WithValue(ctx, ContextKeyRole, claims.Role)
-		c.Request = c.Request.WithContext(ctx)
+		ginCtx.Request = ginCtx.Request.WithContext(ctx)
 
-		c.Next()
+		ginCtx.Next()
 	}
 }
 
 // GinRequireRole aborts with 403 if the role in context does not match.
 // Deprecated: use GinRequireMinRole for hierarchy-aware checks.
 func GinRequireRole(role string) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		if c.GetString("role") != role {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+	return func(ginCtx *gin.Context) {
+		if ginCtx.GetString("role") != role {
+			ginCtx.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 			return
 		}
-		c.Next()
+		ginCtx.Next()
 	}
 }
 
@@ -56,12 +56,12 @@ func GinRequireRole(role string) gin.HandlerFunc {
 // is below the specified minimum role.
 func GinRequireMinRole(minRole string) gin.HandlerFunc {
 	minLevel := entity.RoleLevel(entity.Role(minRole))
-	return func(c *gin.Context) {
-		actual := entity.RoleLevel(entity.Role(c.GetString("role")))
+	return func(ginCtx *gin.Context) {
+		actual := entity.RoleLevel(entity.Role(ginCtx.GetString("role")))
 		if actual < minLevel {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+			ginCtx.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 			return
 		}
-		c.Next()
+		ginCtx.Next()
 	}
 }
