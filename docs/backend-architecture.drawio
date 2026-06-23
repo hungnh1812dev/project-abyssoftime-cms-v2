@@ -1,0 +1,1080 @@
+<mxfile host="app.diagrams.net" agent="Claude Code" pages="8">
+  <diagram id="startup-flow" name="1. Startup Flow">
+    <mxGraphModel dx="1981" dy="1152" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1200" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title1" parent="1" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=18;fontColor=#1a1a1a;" value="&lt;b&gt;Backend Startup Flow&lt;/b&gt;&lt;br&gt;apps/api/cmd/server/main.go" vertex="1">
+          <mxGeometry height="50" width="400" x="500" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="step1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=0;arcSize=20;" value="&lt;b&gt;main()&lt;/b&gt;&lt;br&gt;Entry Point&lt;br&gt;&lt;font style=&quot;color: light-dark(rgb(136, 136, 136), rgb(255, 255, 51));&quot;&gt;apps/api/cmd/server/main.go&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="280" x="560" y="90" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow1" edge="1" parent="1" source="step1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="step2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="step2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;arcSize=15;" value="&lt;b&gt;1. config.Load()&lt;/b&gt;&lt;div&gt;&lt;b&gt;&lt;br&gt;&lt;/b&gt;Load environment variables&lt;br&gt;&lt;font color=&quot;#666&quot; size=&quot;2&quot;&gt;PORT, DB_*, JWT_SECRET, CORS_*, STORAGE_*&lt;br&gt;Parse per-entity DB overrides (DB_ENTITY_*)&lt;br&gt;Return strongly-typed Config struct&lt;/font&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="80" width="360" x="520" y="180" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow2" edge="1" parent="1" source="step2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="step3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="step3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;arcSize=15;" value="&lt;b&gt;2. pkgjwt.SetSecret()&lt;/b&gt;&lt;br&gt;Initialize global HMAC signing key (HS256)" vertex="1">
+          <mxGeometry height="50" width="280" x="560" y="290" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow3" edge="1" parent="1" source="step3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="step4_group">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="step4_group" parent="1" style="swimlane;startSize=30;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;rounded=1;fontSize=12;" value="3. Database Connections (dual-database support)" vertex="1">
+          <mxGeometry height="120" width="560" x="420" y="370" as="geometry">
+            <mxRectangle height="30" width="310" x="420" y="370" as="alternateBounds" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="db_mongo" parent="step4_group" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" value="&lt;b&gt;MongoDB&lt;/b&gt; (default)&lt;br&gt;&lt;font size=&quot;1&quot;&gt;Build URI from DB_*&lt;br&gt;TLS 1.2+ / 30s timeout&lt;br&gt;EnsureIndexes()&lt;/font&gt;" vertex="1">
+          <mxGeometry height="70" width="230" x="30" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="db_pg" parent="step4_group" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" value="&lt;b&gt;PostgreSQL&lt;/b&gt; (GORM ORM)&lt;br&gt;&lt;font size=&quot;1&quot;&gt;Build DSN / Auto-migrate&lt;br&gt;Create tables / Ping verify&lt;br&gt;User, ContentType, MediaAsset, Role...&lt;/font&gt;" vertex="1">
+          <mxGeometry height="70" width="230" x="300" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow4" edge="1" parent="1" source="step4_group" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;" target="step5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="step5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;arcSize=15;" value="&lt;b&gt;4. Create Repository Instances&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;2&quot;&gt;UserRepo | ContentTypeRepo | DocumentRepo | MediaAssetRepo&lt;br&gt;RoleRepo | InviteRepo | AccessTokenRepo | LocaleRepo&lt;br&gt;StorageAdapter (Cloudinary or S3)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="70" width="440" x="480" y="520" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow5" edge="1" parent="1" source="step5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="step6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="step6" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;arcSize=15;" value="&lt;b&gt;5. Initialize UseCase Layer&lt;/b&gt; (business logic)&lt;br&gt;&lt;font size=&quot;2&quot;&gt;AuthUseCase | ContentTypeUseCase | DocumentUseCase&lt;br&gt;MediaUseCase | RoleUseCase | InviteUseCase&lt;br&gt;AccessTokenUseCase | LocaleUseCase&lt;/font&gt;" vertex="1">
+          <mxGeometry height="70" width="440" x="480" y="620" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow6" edge="1" parent="1" source="step6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="step7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="step7" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;arcSize=15;" value="&lt;b&gt;6. Seed Defaults&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;2&quot;&gt;Roles: super_admin(4), admin(3), editor(2), guest(1)&lt;br&gt;Locales from SUPPORTED_LOCALES (en, vi)&lt;br&gt;Sync content-types/*.json → DB&lt;br&gt;Preload role-permission cache (in-memory)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="80" width="400" x="500" y="720" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow7" edge="1" parent="1" source="step7" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="step8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="step8" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;arcSize=15;" value="&lt;b&gt;7. Build Dynamic GraphQL Schema&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;2&quot;&gt;ResolverFactory reads content-type definitions&lt;br&gt;Generate Query/Mutation types, recursive field types&lt;br&gt;Register custom JSON scalar&lt;/font&gt;" vertex="1">
+          <mxGeometry height="70" width="400" x="500" y="830" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow8" edge="1" parent="1" source="step8" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="step9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="step9" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;arcSize=15;" value="&lt;b&gt;8. Setup HTTP Router (Gin) + gRPC Server&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;2&quot;&gt;Register middleware (CORS, Auth, Permission)&lt;br&gt;Mount all REST routes + GraphQL endpoint&lt;br&gt;Register gRPC services with interceptors&lt;/font&gt;" vertex="1">
+          <mxGeometry height="70" width="400" x="500" y="930" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow9a" edge="1" parent="1" source="step9" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;exitX=0.25;exitY=1;entryX=0.5;entryY=0;" target="listen_http">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow9b" edge="1" parent="1" source="step9" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;exitX=0.75;exitY=1;entryX=0.5;entryY=0;" target="listen_grpc">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="listen_http" parent="1" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;" value="&lt;b&gt;HTTP Server&lt;/b&gt;&lt;br&gt;:8080&lt;br&gt;&lt;font size=&quot;2&quot;&gt;REST + GraphQL&lt;/font&gt;" vertex="1">
+          <mxGeometry height="70" width="170" x="460" y="1040" as="geometry" />
+        </mxCell>
+        <mxCell id="listen_grpc" parent="1" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;" value="&lt;b&gt;gRPC Server&lt;/b&gt;&lt;br&gt;:9090&lt;br&gt;&lt;font size=&quot;2&quot;&gt;Proto services&lt;/font&gt;" vertex="1">
+          <mxGeometry height="70" width="170" x="770" y="1040" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="request-flow" name="2. Request Flow (REST)">
+    <mxGraphModel dx="1981" dy="1152" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1200" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title2" parent="1" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=18;fontColor=#1a1a1a;" value="&lt;b&gt;REST API Request Flow&lt;/b&gt;" vertex="1">
+          <mxGeometry height="40" width="300" x="550" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="client" parent="1" style="shape=actor;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;" value="&lt;b&gt;Client&lt;/b&gt;&lt;br&gt;(Browser / Mobile / API)" vertex="1">
+          <mxGeometry height="90" width="90" x="655" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow_c1" edge="1" parent="1" source="client" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" target="gin_server">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="gin_server" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;" value="&lt;b&gt;Gin HTTP Server :8080&lt;/b&gt;" vertex="1">
+          <mxGeometry height="40" width="240" x="580" y="160" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow_g1" edge="1" parent="1" source="gin_server" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" target="mw_group">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="mw_group" parent="1" style="swimlane;startSize=30;fillColor=#FFF3E0;strokeColor=#E65100;rounded=1;fontSize=13;fontColor=#E65100;" value="Middleware Pipeline" vertex="1">
+          <mxGeometry height="200" width="800" x="300" y="230" as="geometry" />
+        </mxCell>
+        <mxCell id="mw_cors" parent="mw_group" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" value="&lt;b&gt;CORS&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;Check origin against&lt;br&gt;CORS_ORIGINS list&lt;br&gt;Set Access-Control-*&lt;br&gt;headers&lt;br&gt;Handle OPTIONS preflight&lt;/font&gt;" vertex="1">
+          <mxGeometry height="130" width="200" x="20" y="45" as="geometry" />
+        </mxCell>
+        <mxCell id="mw_jwt" parent="mw_group" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" value="&lt;b&gt;JWT Auth&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;Extract Bearer token&lt;br&gt;from Authorization header&lt;br&gt;Validate HS256 signature&lt;br&gt;Inject userID + role&lt;br&gt;into Gin context&lt;br&gt;&lt;b&gt;401&lt;/b&gt; if invalid/missing&lt;/font&gt;" vertex="1">
+          <mxGeometry height="130" width="200" x="290" y="45" as="geometry" />
+        </mxCell>
+        <mxCell id="mw_perm" parent="mw_group" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" value="&lt;b&gt;Permission Check&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;Read role from context&lt;br&gt;Lookup in role cache&lt;br&gt;Match permission string&lt;br&gt;(e.g. content:read)&lt;br&gt;&lt;b&gt;403&lt;/b&gt; if denied&lt;br&gt;&lt;br&gt;Hierarchy:&lt;br&gt;super_admin(4) &gt; admin(3)&lt;br&gt;&gt; editor(2) &gt; guest(1)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="140" width="210" x="560" y="45" as="geometry" />
+        </mxCell>
+        <mxCell id="mw_arr1" edge="1" parent="mw_group" source="mw_cors" style="endArrow=block;endFill=1;html=1;rounded=1;strokeWidth=2;strokeColor=#E65100;" target="mw_jwt" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="mw_arr2" edge="1" parent="mw_group" source="mw_jwt" style="endArrow=block;endFill=1;html=1;rounded=1;strokeWidth=2;strokeColor=#E65100;" target="mw_perm" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow_mw_h" edge="1" parent="1" source="mw_group" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" target="handler_group">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="handler_group" parent="1" style="swimlane;startSize=30;fillColor=#E8F5E9;strokeColor=#2E7D32;rounded=1;fontSize=13;fontColor=#2E7D32;fontStyle=1" value="Handler Layer (HTTP Handlers)" vertex="1">
+          <mxGeometry height="120" width="700" x="350" y="470" as="geometry" />
+        </mxCell>
+        <mxCell id="h_auth" parent="handler_group" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" value="&lt;b&gt;Auth&lt;/b&gt;&lt;br&gt;Handler" vertex="1">
+          <mxGeometry height="60" width="70" x="15" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="h_doc" parent="handler_group" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" value="&lt;b&gt;Document&lt;/b&gt;&lt;br&gt;Handler" vertex="1">
+          <mxGeometry height="60" width="70" x="100" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="h_media" parent="handler_group" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" value="&lt;b&gt;Media&lt;/b&gt;&lt;br&gt;Handler" vertex="1">
+          <mxGeometry height="60" width="70" x="185" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="h_ct" parent="handler_group" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" value="&lt;b&gt;Content&lt;br&gt;Type&lt;/b&gt;&lt;br&gt;Handler" vertex="1">
+          <mxGeometry height="60" width="70" x="270" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="h_user" parent="handler_group" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" value="&lt;b&gt;User&lt;/b&gt;&lt;br&gt;Handler" vertex="1">
+          <mxGeometry height="60" width="70" x="355" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="h_role" parent="handler_group" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" value="&lt;b&gt;Role&lt;/b&gt;&lt;br&gt;Handler" vertex="1">
+          <mxGeometry height="60" width="70" x="440" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="h_invite" parent="handler_group" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" value="&lt;b&gt;Invite&lt;/b&gt;&lt;br&gt;Handler" vertex="1">
+          <mxGeometry height="60" width="70" x="525" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="h_locale" parent="handler_group" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" value="&lt;b&gt;Locale&lt;/b&gt;&lt;br&gt;Handler" vertex="1">
+          <mxGeometry height="60" width="70" x="610" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="h_note" parent="1" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=10;fontColor=#666;" value="Parse request (body, params, query) → Call usecase → Map errors to HTTP status → Return JSON" vertex="1">
+          <mxGeometry height="20" width="600" x="400" y="595" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow_h_uc" edge="1" parent="1" source="handler_group" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" target="usecase_layer">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="usecase_layer" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;arcSize=12;" value="&lt;b&gt;UseCase Layer&lt;/b&gt; (Business Logic)&lt;br&gt;&lt;br&gt;&lt;font size=&quot;2&quot;&gt;Validation &amp;amp; business rules&lt;/font&gt;&lt;div&gt;&lt;font size=&quot;2&quot;&gt;Orchestrate repository calls&lt;br&gt;Password hashing (bcrypt)&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font size=&quot;2&quot;&gt;Token generation (JWT HS256)&lt;br&gt;Content-type schema sync&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font size=&quot;2&quot;&gt;Document versioning (draft/published)&lt;br&gt;Media thumbnail generation&lt;/font&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="160" width="600" x="400" y="630" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow_uc_r" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;exitX=0.25;exitY=1;entryX=0.5;entryY=0;" target="repo_layer">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="550" y="790" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arrow_uc_ext" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;exitX=0.75;exitY=1;entryX=0.5;entryY=0;" target="ext_layer">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="850" y="790" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="repo_layer" parent="1" style="swimlane;startSize=25;fillColor=#F3E5F5;strokeColor=#7B1FA2;rounded=1;fontSize=12;fontColor=#7B1FA2;" value="Repository Layer" vertex="1">
+          <mxGeometry height="140" width="350" x="300" y="840" as="geometry" />
+        </mxCell>
+        <mxCell id="repo_mongo" parent="repo_layer" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" value="&lt;b&gt;MongoDB&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;mongo-driver&lt;br&gt;Dynamic collections&lt;br&gt;documents_&amp;lt;slug&amp;gt;&lt;/font&gt;" vertex="1">
+          <mxGeometry height="90" width="130" x="30" y="35" as="geometry" />
+        </mxCell>
+        <mxCell id="repo_pg" parent="repo_layer" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" value="&lt;b&gt;PostgreSQL&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;GORM ORM&lt;br&gt;Auto-migration&lt;br&gt;Typed models&lt;/font&gt;" vertex="1">
+          <mxGeometry height="90" width="130" x="190" y="35" as="geometry" />
+        </mxCell>
+        <mxCell id="ext_layer" parent="1" style="swimlane;startSize=25;fillColor=#E3F2FD;strokeColor=#1565C0;rounded=1;fontSize=12;fontColor=#1565C0;" value="External Services" vertex="1">
+          <mxGeometry height="140" width="300" x="750" y="840" as="geometry" />
+        </mxCell>
+        <mxCell id="ext_cloud" parent="ext_layer" style="shape=cloud;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" value="&lt;b&gt;Cloudinary&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;Media upload&lt;br&gt;Thumbnails&lt;/font&gt;" vertex="1">
+          <mxGeometry height="90" width="120" x="15" y="35" as="geometry" />
+        </mxCell>
+        <mxCell id="ext_s3" parent="ext_layer" style="shape=cloud;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" value="&lt;b&gt;AWS S3&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;Media upload&lt;br&gt;Object storage&lt;/font&gt;" vertex="1">
+          <mxGeometry height="90" width="120" x="160" y="35" as="geometry" />
+        </mxCell>
+        <mxCell id="err_note" parent="1" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;size=15;fillColor=#FFF9C4;strokeColor=#F9A825;fontSize=10;align=center;" value="&lt;b&gt;Error → HTTP Status Mapping&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;&lt;br&gt;&lt;/font&gt;&lt;div&gt;&lt;font size=&quot;1&quot;&gt;ErrConflict → 409&lt;/font&gt;&lt;div&gt;&lt;font size=&quot;1&quot;&gt;ErrUnauthorized → 401&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font size=&quot;1&quot;&gt;ErrForbidden → 403&lt;br&gt;ErrNotFound → 404&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font size=&quot;1&quot;&gt;ErrBadRequest → 400&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font size=&quot;1&quot;&gt;ErrValidation → 422&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font size=&quot;1&quot;&gt;Unknown → 500&lt;/font&gt;&lt;/div&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="130" width="260" x="60" y="470" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="auth-flow" name="3. Authentication Flow">
+    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1200" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <!-- Title -->
+        <mxCell id="title3" value="&lt;b&gt;Authentication Flows&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=18;fontColor=#1a1a1a;" vertex="1" parent="1">
+          <mxGeometry x="550" y="20" width="300" height="40" as="geometry" />
+        </mxCell>
+        <!-- ===== REGISTER FLOW ===== -->
+        <mxCell id="reg_title" value="&lt;b&gt;REGISTER&lt;/b&gt; (first user only → super_admin) — POST /auth/register" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontSize=13;fontColor=#1565C0;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="70" width="600" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="reg1" value="Client&lt;br&gt;POST /auth/register&lt;br&gt;&lt;font size=&quot;1&quot;&gt;{email, password,&lt;br&gt;displayName}&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="80" y="110" width="160" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="reg2" value="HasSuperAdmin?&lt;br&gt;&lt;font size=&quot;1&quot;&gt;(must be false)&lt;/font&gt;" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="310" y="100" width="150" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="reg3" value="bcrypt hash&lt;br&gt;password" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="530" y="115" width="130" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="reg4" value="Create User&lt;br&gt;with &lt;b&gt;super_admin&lt;/b&gt;&lt;br&gt;role + return tokens" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="730" y="110" width="160" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="reg_err" value="&lt;font color=&quot;#b85450&quot;&gt;&lt;b&gt;403&lt;/b&gt; Forbidden&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="340" y="210" width="90" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="reg_a1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;endArrow=block;endFill=1;" edge="1" parent="1" source="reg1" target="reg2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="reg_a2" value="No" style="edgeStyle=orthogonalEdgeStyle;rounded=1;endArrow=block;endFill=1;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="reg2" target="reg3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="reg_a3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;endArrow=block;endFill=1;" edge="1" parent="1" source="reg3" target="reg4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="reg_a4" value="Yes" style="edgeStyle=orthogonalEdgeStyle;rounded=1;endArrow=block;endFill=1;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="reg2" target="reg_err">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- ===== LOGIN FLOW ===== -->
+        <mxCell id="login_title" value="&lt;b&gt;LOGIN&lt;/b&gt; — POST /auth/login" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontSize=13;fontColor=#1565C0;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="280" width="400" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="log1" value="Client&lt;br&gt;POST /auth/login&lt;br&gt;&lt;font size=&quot;1&quot;&gt;{email, password,&lt;br&gt;rememberMe?}&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="80" y="320" width="150" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="log2" value="Find user&lt;br&gt;by email" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="290" y="330" width="110" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="log3" value="bcrypt.Compare&lt;br&gt;password" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="460" y="330" width="120" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="log4" value="Resolve role slug&lt;br&gt;&lt;font size=&quot;1&quot;&gt;(role table, fallback&lt;br&gt;to user.Role)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="640" y="325" width="130" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="log5" value="Generate tokens&lt;br&gt;&lt;font size=&quot;1&quot;&gt;&lt;b&gt;Access:&lt;/b&gt; 15 min (HS256)&lt;br&gt;{userID, role}&lt;br&gt;&lt;b&gt;Refresh:&lt;/b&gt; 7d (HS256)&lt;br&gt;{userID}&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="830" y="310" width="160" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="log6" value="Set HttpOnly&lt;br&gt;refresh cookie&lt;br&gt;&lt;font size=&quot;1&quot;&gt;+ return access&lt;br&gt;token in body&lt;br&gt;&lt;br&gt;Cookie: Secure,&lt;br&gt;SameSite(configurable)&lt;br&gt;MaxAge: 7d (14d if&lt;br&gt;rememberMe)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1050" y="300" width="160" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="log_a1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;endArrow=block;endFill=1;" edge="1" parent="1" source="log1" target="log2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="log_a2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;endArrow=block;endFill=1;" edge="1" parent="1" source="log2" target="log3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="log_a3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;endArrow=block;endFill=1;" edge="1" parent="1" source="log3" target="log4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="log_a4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;endArrow=block;endFill=1;" edge="1" parent="1" source="log4" target="log5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="log_a5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;endArrow=block;endFill=1;" edge="1" parent="1" source="log5" target="log6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- ===== REFRESH FLOW ===== -->
+        <mxCell id="ref_title" value="&lt;b&gt;REFRESH TOKEN&lt;/b&gt; — POST /auth/refresh" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontSize=13;fontColor=#1565C0;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="460" width="400" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="ref1" value="Client&lt;br&gt;POST /auth/refresh&lt;br&gt;&lt;font size=&quot;1&quot;&gt;(body or cookie)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="80" y="500" width="150" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="ref2" value="Extract refresh&lt;br&gt;token&lt;br&gt;&lt;font size=&quot;1&quot;&gt;body first,&lt;br&gt;fallback cookie&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="300" y="495" width="130" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="ref3" value="Validate token&lt;br&gt;+ load user&lt;br&gt;+ resolve role" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="500" y="500" width="130" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="ref4" value="Issue new&lt;br&gt;access + refresh&lt;br&gt;tokens" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="700" y="500" width="130" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="ref_a1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;endArrow=block;endFill=1;" edge="1" parent="1" source="ref1" target="ref2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ref_a2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;endArrow=block;endFill=1;" edge="1" parent="1" source="ref2" target="ref3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ref_a3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;endArrow=block;endFill=1;" edge="1" parent="1" source="ref3" target="ref4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- ===== PROTECTED REQUEST FLOW ===== -->
+        <mxCell id="prot_title" value="&lt;b&gt;PROTECTED REQUEST&lt;/b&gt; — Any authenticated endpoint" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontSize=13;fontColor=#1565C0;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="600" width="500" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="prot1" value="Client&lt;br&gt;&lt;font size=&quot;1&quot;&gt;Authorization:&lt;br&gt;Bearer &amp;lt;token&amp;gt;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="80" y="640" width="130" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="prot2" value="Extract &amp;amp;&lt;br&gt;validate JWT&lt;br&gt;&lt;font size=&quot;1&quot;&gt;HS256&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="280" y="640" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="prot3" value="Inject userID&lt;br&gt;+ role into&lt;br&gt;context" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="470" y="640" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="prot4" value="Check permission&lt;br&gt;against role cache" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="660" y="640" width="130" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="prot5" value="&lt;b&gt;Handler&lt;/b&gt;&lt;br&gt;processes&lt;br&gt;request" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="860" y="640" width="110" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="prot_a1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;endArrow=block;endFill=1;" edge="1" parent="1" source="prot1" target="prot2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="prot_a2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;endArrow=block;endFill=1;" edge="1" parent="1" source="prot2" target="prot3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="prot_a3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;endArrow=block;endFill=1;" edge="1" parent="1" source="prot3" target="prot4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="prot_a4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;endArrow=block;endFill=1;" edge="1" parent="1" source="prot4" target="prot5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- Permission Strings Box -->
+        <mxCell id="perm_box" value="&lt;b&gt;Permission Strings&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;2&quot;&gt;content:read | content:create | content:update | content:delete | content:publish | content:unpublish&lt;br&gt;media:read | media:upload | media:delete&lt;br&gt;users:manage | roles:manage | access_tokens:manage | content_types:read | locales:manage&lt;/font&gt;" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;size=18;fillColor=#FFF9C4;strokeColor=#F9A825;fontSize=11;align=center;" vertex="1" parent="1">
+          <mxGeometry x="350" y="740" width="600" height="80" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="clean-arch" name="4. Clean Architecture">
+    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <!-- Title -->
+        <mxCell id="title4" value="&lt;b&gt;Clean Architecture Layers&lt;/b&gt;&lt;br&gt;Dependency direction: outer → inner" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=18;fontColor=#1a1a1a;" vertex="1" parent="1">
+          <mxGeometry x="420" y="20" width="400" height="50" as="geometry" />
+        </mxCell>
+        <!-- Outermost: Delivery Layer -->
+        <mxCell id="delivery_outer" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1565C0;strokeWidth=2;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="120" y="90" width="1000" height="780" as="geometry" />
+        </mxCell>
+        <mxCell id="delivery_label" value="&lt;b&gt;DELIVERY LAYER&lt;/b&gt; (outermost)" style="text;html=1;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=14;fontColor=#1565C0;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="140" y="100" width="300" height="30" as="geometry" />
+        </mxCell>
+        <!-- Delivery: REST -->
+        <mxCell id="del_rest" value="&lt;b&gt;REST / Gin&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;2&quot;&gt;internal/delivery/http/&lt;br&gt;handler/*.go&lt;br&gt;router.go&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#1565C0;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="160" y="140" width="200" height="80" as="geometry" />
+        </mxCell>
+        <!-- Delivery: GraphQL -->
+        <mxCell id="del_gql" value="&lt;b&gt;GraphQL&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;2&quot;&gt;graphql/dynamic/&lt;br&gt;resolver_factory.go&lt;br&gt;Dynamic schema from&lt;br&gt;content-type JSON&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#1565C0;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="420" y="140" width="200" height="80" as="geometry" />
+        </mxCell>
+        <!-- Delivery: gRPC -->
+        <mxCell id="del_grpc" value="&lt;b&gt;gRPC&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;2&quot;&gt;internal/delivery/grpc/&lt;br&gt;Proto-based services&lt;br&gt;Auth, ContentType,&lt;br&gt;Document, Media&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#1565C0;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="680" y="140" width="200" height="80" as="geometry" />
+        </mxCell>
+        <!-- Middleware bar -->
+        <mxCell id="mw_bar" value="&lt;b&gt;Middleware:&lt;/b&gt;  CORS → JWT Auth → Role/Permission Check (in-memory cache)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#E65100;fontSize=12;fontColor=#E65100;" vertex="1" parent="1">
+          <mxGeometry x="160" y="240" width="720" height="35" as="geometry" />
+        </mxCell>
+        <!-- UseCase Layer -->
+        <mxCell id="uc_outer" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF8E1;strokeColor=#F9A825;strokeWidth=2;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="200" y="310" width="840" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_label" value="&lt;b&gt;USECASE LAYER&lt;/b&gt; (business logic)" style="text;html=1;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=14;fontColor=#F9A825;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="220" y="315" width="300" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_auth" value="&lt;b&gt;Auth&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;Login, Register&lt;br&gt;Token mgmt&lt;br&gt;bcrypt&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="220" y="350" width="100" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_doc" value="&lt;b&gt;Document&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;CRUD&lt;br&gt;Publish/Unpublish&lt;br&gt;Versioning&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="340" y="350" width="100" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_ct" value="&lt;b&gt;ContentType&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;Sync JSON→DB&lt;br&gt;List, Update&lt;br&gt;ListFields&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="460" y="350" width="100" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_media" value="&lt;b&gt;Media&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;Upload, Delete&lt;br&gt;List, Thumbnail&lt;br&gt;generation&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="580" y="350" width="100" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_role" value="&lt;b&gt;Role&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;CRUD&lt;br&gt;Permissions&lt;br&gt;Hierarchy&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="700" y="350" width="100" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_more" value="&lt;b&gt;+ More&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;Invite, Locale&lt;br&gt;AccessToken&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="820" y="350" width="100" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_note" value="Depends on repository &lt;b&gt;interfaces&lt;/b&gt; (contracts), not implementations" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=11;fontColor=#888;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="320" y="440" width="500" height="25" as="geometry" />
+        </mxCell>
+        <!-- Arrows: Delivery → UseCase -->
+        <mxCell id="a_del_uc1" value="calls" style="endArrow=block;endFill=1;html=1;rounded=1;strokeWidth=2;strokeColor=#666;exitX=0.5;exitY=1;entryX=0.2;entryY=0;dashed=1;" edge="1" parent="1" source="del_rest" target="uc_outer">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a_del_uc2" value="calls" style="endArrow=block;endFill=1;html=1;rounded=1;strokeWidth=2;strokeColor=#666;exitX=0.5;exitY=1;entryX=0.5;entryY=0;dashed=1;" edge="1" parent="1" source="del_gql" target="uc_outer">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a_del_uc3" value="calls" style="endArrow=block;endFill=1;html=1;rounded=1;strokeWidth=2;strokeColor=#666;exitX=0.5;exitY=1;entryX=0.8;entryY=0;dashed=1;" edge="1" parent="1" source="del_grpc" target="uc_outer">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- Domain Layer -->
+        <mxCell id="domain_outer" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#2E7D32;strokeWidth=2;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="280" y="540" width="680" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="domain_label" value="&lt;b&gt;DOMAIN LAYER&lt;/b&gt; (innermost — entities &amp; interfaces)" style="text;html=1;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=14;fontColor=#2E7D32;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="300" y="545" width="450" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="dom_user" value="User" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="300" y="580" width="80" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="dom_doc" value="Document" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="395" y="580" width="80" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="dom_ct" value="ContentType" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="490" y="580" width="90" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="dom_media" value="MediaAsset" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="595" y="580" width="80" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="dom_role" value="Role" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="690" y="580" width="80" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="dom_more" value="Invite | AccessToken | Locale | Component | Field" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="790" y="580" width="150" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="dom_repo_iface" value="&lt;b&gt;Repository Interfaces&lt;/b&gt; (contracts only)&lt;br&gt;&lt;font size=&quot;1&quot;&gt;UserRepository | ContentTypeRepository | DocumentRepository | MediaAssetRepository&lt;br&gt;RoleRepository | InviteRepository | AccessTokenRepository | LocaleRepository | StorageAdapter&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#2E7D32;fontSize=11;dashed=1;dashPattern=5 5;" vertex="1" parent="1">
+          <mxGeometry x="300" y="630" width="640" height="50" as="geometry" />
+        </mxCell>
+        <!-- Arrow: UseCase → Domain -->
+        <mxCell id="a_uc_dom" value="calls" style="endArrow=block;endFill=1;html=1;rounded=1;strokeWidth=2;strokeColor=#666;dashed=1;" edge="1" parent="1" source="uc_outer" target="domain_outer">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- Infrastructure Layer -->
+        <mxCell id="infra_outer" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#7B1FA2;strokeWidth=2;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="200" y="730" width="840" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="infra_label" value="&lt;b&gt;INFRASTRUCTURE LAYER&lt;/b&gt; (implementations)" style="text;html=1;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=14;fontColor=#7B1FA2;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="220" y="735" width="400" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="infra_mongo" value="&lt;b&gt;mongodb/&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;mongo-driver&lt;br&gt;Dynamic collections&lt;br&gt;per content-type slug&lt;/font&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="230" y="770" width="160" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="infra_gorm" value="&lt;b&gt;gormdb/&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;PostgreSQL ORM&lt;br&gt;Auto-migration&lt;br&gt;Typed models&lt;/font&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="440" y="770" width="160" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="infra_cloud" value="&lt;b&gt;Cloudinary&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;Media upload&lt;br&gt;Thumbnails&lt;/font&gt;" style="shape=cloud;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="660" y="770" width="140" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="infra_s3" value="&lt;b&gt;AWS S3&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;Object storage&lt;br&gt;Media upload&lt;/font&gt;" style="shape=cloud;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="850" y="770" width="140" height="70" as="geometry" />
+        </mxCell>
+        <!-- Arrow: Domain interfaces ← Infrastructure implements -->
+        <mxCell id="a_infra_dom" value="implements" style="endArrow=block;endFill=0;html=1;rounded=1;strokeWidth=2;strokeColor=#7B1FA2;dashed=1;dashPattern=8 4;" edge="1" parent="1" source="infra_outer" target="domain_outer">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="routes-map" name="5. API Routes Map">
+    <mxGraphModel dx="1981" dy="1152" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1400" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title5" parent="1" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=18;fontColor=#1a1a1a;" value="&lt;b&gt;API Routes Map&lt;/b&gt;&lt;br&gt;internal/delivery/http/router.go" vertex="1">
+          <mxGeometry height="50" width="400" x="480" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="root_node" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;" value="&lt;b&gt;Gin Router&lt;/b&gt;&lt;br&gt;:8080" vertex="1">
+          <mxGeometry height="60" width="120" x="710" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="public_group" parent="1" style="swimlane;startSize=25;fillColor=#E8F5E9;strokeColor=#2E7D32;rounded=1;fontSize=12;fontColor=#2E7D32;" value="Public Routes (no auth required)" vertex="1">
+          <mxGeometry height="280" width="480" x="60" y="200" as="geometry" />
+        </mxCell>
+        <mxCell id="pub_health" parent="public_group" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;align=left;spacingLeft=8;" value="GET /health" vertex="1">
+          <mxGeometry height="28" width="200" x="15" y="35" as="geometry" />
+        </mxCell>
+        <mxCell id="pub_setup" parent="public_group" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;align=left;spacingLeft=8;" value="GET /auth/setup" vertex="1">
+          <mxGeometry height="28" width="200" x="15" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="pub_register" parent="public_group" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;align=left;spacingLeft=8;" value="POST /auth/register" vertex="1">
+          <mxGeometry height="28" width="200" x="15" y="105" as="geometry" />
+        </mxCell>
+        <mxCell id="pub_login" parent="public_group" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;align=left;spacingLeft=8;" value="POST /auth/login" vertex="1">
+          <mxGeometry height="28" width="200" x="15" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="pub_refresh" parent="public_group" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;align=left;spacingLeft=8;" value="POST /auth/refresh" vertex="1">
+          <mxGeometry height="28" width="200" x="15" y="175" as="geometry" />
+        </mxCell>
+        <mxCell id="pub_logout" parent="public_group" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;align=left;spacingLeft=8;" value="POST /auth/logout" vertex="1">
+          <mxGeometry height="28" width="200" x="15" y="210" as="geometry" />
+        </mxCell>
+        <mxCell id="pub_invite" parent="public_group" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;align=left;spacingLeft=8;" value="POST /auth/invite/:token" vertex="1">
+          <mxGeometry height="28" width="200" x="15" y="245" as="geometry" />
+        </mxCell>
+        <mxCell id="pub_doc" parent="public_group" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;align=left;spacingLeft=8;" value="GET /api/public/document-manager/:slug/:id" vertex="1">
+          <mxGeometry height="28" width="220" x="240" y="35" as="geometry" />
+        </mxCell>
+        <mxCell id="pub_locales" parent="public_group" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;align=left;spacingLeft=8;" value="GET /api/locales" vertex="1">
+          <mxGeometry height="28" width="220" x="240" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="prot_group" parent="1" style="swimlane;startSize=25;fillColor=#FFF3E0;strokeColor=#E65100;rounded=1;fontSize=12;fontColor=#E65100;" value="Protected Routes (auth + permission required)" vertex="1">
+          <mxGeometry height="440" width="1070" x="235" y="540" as="geometry" />
+        </mxCell>
+        <mxCell id="ct_box" parent="prot_group" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;align=left;spacingLeft=5;verticalAlign=top;" value="&lt;b&gt;/api/content-types&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;content_types:read&lt;/font&gt;&lt;hr&gt;&lt;font size=&quot;1&quot;&gt;GET / — List summaries&lt;br&gt;GET /:identifier — Get definition&lt;br&gt;PATCH /:slug/list-fields — Update&lt;/font&gt;" vertex="1">
+          <mxGeometry height="100" width="220" x="15" y="35" as="geometry" />
+        </mxCell>
+        <mxCell id="doc_single_box" parent="prot_group" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;align=left;spacingLeft=5;verticalAlign=top;" value="&lt;b&gt;/api/document-manager/single-type/:slug&lt;/b&gt;&lt;hr&gt;&lt;font size=&quot;1&quot;&gt;GET /:slug — Get (content:read)&lt;br&gt;PUT /:slug — Save (content:update)&lt;br&gt;POST /:slug/publish (content:publish)&lt;br&gt;POST /:slug/unpublish (content:unpublish)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="110" width="270" x="250" y="35" as="geometry" />
+        </mxCell>
+        <mxCell id="doc_coll_box" parent="prot_group" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;align=left;spacingLeft=5;verticalAlign=top;" value="&lt;b&gt;/api/document-manager/collection-type/:slug&lt;/b&gt;&lt;hr&gt;&lt;font size=&quot;1&quot;&gt;GET /:slug — List paginated (content:read)&lt;br&gt;GET /:slug/:id — Get single (content:read)&lt;br&gt;POST /:slug — Create (content:create)&lt;br&gt;PUT /:slug/:id — Update (content:update)&lt;br&gt;DELETE /:slug/:id — Delete (content:delete)&lt;br&gt;POST /:slug/:id/publish (content:publish)&lt;br&gt;POST /:slug/:id/unpublish (content:unpublish)&lt;br&gt;POST /:slug/:id/duplicate (content:create)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="155" width="280" x="535" y="35" as="geometry" />
+        </mxCell>
+        <mxCell id="media_box" parent="prot_group" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;align=left;spacingLeft=5;verticalAlign=top;" value="&lt;b&gt;/api/media&lt;/b&gt;&lt;hr&gt;&lt;font size=&quot;1&quot;&gt;GET / — List (media:read)&lt;br&gt;POST /upload (media:upload)&lt;br&gt;DELETE /:id (media:delete)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="85" width="180" x="830" y="35" as="geometry" />
+        </mxCell>
+        <mxCell id="users_box" parent="prot_group" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;align=left;spacingLeft=5;verticalAlign=top;" value="&lt;b&gt;/api/users&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;users:manage&lt;/font&gt;&lt;hr&gt;&lt;font size=&quot;1&quot;&gt;GET / — List&lt;br&gt;GET /:id — Get single&lt;br&gt;PUT /:id/role — Update role&lt;br&gt;DELETE /:id — Delete&lt;/font&gt;" vertex="1">
+          <mxGeometry height="115" width="180" x="15" y="220" as="geometry" />
+        </mxCell>
+        <mxCell id="invites_box" parent="prot_group" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;align=left;spacingLeft=5;verticalAlign=top;" value="&lt;b&gt;/api/invites&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;users:manage&lt;/font&gt;&lt;hr&gt;&lt;font size=&quot;1&quot;&gt;POST / — Create invite&lt;br&gt;GET / — List invites&lt;br&gt;DELETE /:id — Revoke&lt;/font&gt;" vertex="1">
+          <mxGeometry height="100" width="180" x="210" y="220" as="geometry" />
+        </mxCell>
+        <mxCell id="roles_box" parent="prot_group" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;align=left;spacingLeft=5;verticalAlign=top;" value="&lt;b&gt;/api/roles&lt;/b&gt;&lt;hr&gt;&lt;font size=&quot;1&quot;&gt;GET / — List (no perm)&lt;br&gt;GET /:id — Get (no perm)&lt;br&gt;POST / — Create (roles:manage)&lt;br&gt;PUT /:id — Update (roles:manage)&lt;br&gt;DELETE /:id — Delete (roles:manage)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="115" width="220" x="405" y="220" as="geometry" />
+        </mxCell>
+        <mxCell id="tokens_box" parent="prot_group" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;align=left;spacingLeft=5;verticalAlign=top;" value="&lt;b&gt;/api/access-tokens&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;access_tokens:manage&lt;/font&gt;&lt;hr&gt;&lt;font size=&quot;1&quot;&gt;POST / — Create&lt;br&gt;GET / — List&lt;br&gt;DELETE /:id — Delete&lt;/font&gt;" vertex="1">
+          <mxGeometry height="100" width="180" x="640" y="220" as="geometry" />
+        </mxCell>
+        <mxCell id="locales_box" parent="prot_group" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;align=left;spacingLeft=5;verticalAlign=top;" value="&lt;b&gt;/api/locales&lt;/b&gt;&lt;hr&gt;&lt;font size=&quot;1&quot;&gt;GET / — List (public)&lt;br&gt;POST / — Create (locales:manage)&lt;br&gt;PUT /:code — Update (locales:manage)&lt;br&gt;DELETE /:code — Delete (locales:manage)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="100" width="220" x="840" y="220" as="geometry" />
+        </mxCell>
+        <mxCell id="gql_box" parent="prot_group" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;align=center;verticalAlign=middle;" value="&lt;b&gt;GraphQL Endpoint&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;Configurable path (default: /graphql)&lt;br&gt;Dynamic schema from content-type definitions&lt;br&gt;Supports access token auth for API clients&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="500" x="285" y="360" as="geometry" />
+        </mxCell>
+        <mxCell id="a_root_pub" edge="1" parent="1" source="root_node" style="edgeStyle=orthogonalEdgeStyle;rounded=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;" target="public_group">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="770" y="110" />
+              <mxPoint x="290" y="110" />
+            </Array>
+            <mxPoint x="630" y="110" as="sourcePoint" />
+            <mxPoint x="290" y="180" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a_root_prot" edge="1" parent="1" source="root_node" style="edgeStyle=orthogonalEdgeStyle;rounded=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;exitDx=0;exitDy=0;" target="prot_group">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="content-type-schema" name="6. Content-Type Schema">
+    <mxGraphModel dx="1981" dy="1152" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1400" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="ct_title" parent="1" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=18;fontColor=#1a1a1a;" value="&lt;b&gt;Content-Type Schema File Structure&lt;/b&gt;&lt;br&gt;content-types/*.json" vertex="1">
+          <mxGeometry height="50" width="500" x="400" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="ct_json_struct" parent="1" style="swimlane;startSize=35;fillColor=#E3F2FD;strokeColor=#1565C0;rounded=1;fontSize=13;fontColor=#1565C0;" value="JSON Schema Structure (content-types/*.json)" vertex="1">
+          <mxGeometry height="420" width="520" x="60" y="90" as="geometry" />
+        </mxCell>
+        <mxCell id="ct_schema_code" parent="ct_json_struct" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#1565C0;fontSize=10;align=left;verticalAlign=top;" value="&lt;pre style=&quot;text-align:left;font-size:11px;margin:0;padding:5px;&quot;&gt;{&lt;br&gt;  &quot;slug&quot;: &quot;cv-page&quot;,        // unique identifier&lt;br&gt;  &quot;name&quot;: &quot;CV Page&quot;,        // display name&lt;br&gt;  &quot;kind&quot;: &quot;collection&quot;,     // &quot;single&quot; or &quot;collection&quot;&lt;br&gt;  &quot;fields&quot;: [               // field definitions array&lt;br&gt;    { &quot;name&quot;: &quot;title&quot;, &quot;type&quot;: &quot;text&quot; },&lt;br&gt;    { &quot;name&quot;: &quot;body&quot;, &quot;type&quot;: &quot;richtext&quot; },&lt;br&gt;    { &quot;name&quot;: &quot;count&quot;, &quot;type&quot;: &quot;number&quot; },&lt;br&gt;    { &quot;name&quot;: &quot;active&quot;, &quot;type&quot;: &quot;boolean&quot; },&lt;br&gt;    { &quot;name&quot;: &quot;avatar&quot;, &quot;type&quot;: &quot;media&quot; },&lt;br&gt;    { &quot;name&quot;: &quot;metadata&quot;, &quot;type&quot;: &quot;json&quot; },&lt;br&gt;    {                         // layout: UI grouping&lt;br&gt;      &quot;type&quot;: &quot;layout&quot;,&lt;br&gt;      &quot;fields&quot;: [&lt;br&gt;        { &quot;name&quot;: &quot;phone&quot;, &quot;type&quot;: &quot;text&quot; },&lt;br&gt;        { &quot;name&quot;: &quot;email&quot;, &quot;type&quot;: &quot;text&quot; }&lt;br&gt;      ]&lt;br&gt;    },&lt;br&gt;    {                         // component: repeatable&lt;br&gt;      &quot;name&quot;: &quot;skills&quot;,&lt;br&gt;      &quot;type&quot;: &quot;component&quot;,&lt;br&gt;      &quot;repeatable&quot;: true,&lt;br&gt;      &quot;fields&quot;: [...]         // nested fields&lt;br&gt;    }&lt;br&gt;  ]&lt;br&gt;}&lt;/pre&gt;" vertex="1">
+          <mxGeometry height="380" width="490" x="15" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="ct_field_types" parent="1" style="swimlane;startSize=25;fillColor=#FFF3E0;strokeColor=#E65100;rounded=1;fontSize=12;fontColor=#E65100;" value="Field Types" vertex="1">
+          <mxGeometry height="320" width="430" x="620" y="90" as="geometry" />
+        </mxCell>
+        <mxCell id="ft_text" parent="ct_field_types" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;align=left;spacingLeft=8;" value="&lt;b&gt;text&lt;/b&gt; → TEXT column (PG) / string (Mongo)" vertex="1">
+          <mxGeometry height="25" width="410" x="10" y="35" as="geometry" />
+        </mxCell>
+        <mxCell id="ft_richtext" parent="ct_field_types" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;align=left;spacingLeft=8;" value="&lt;b&gt;richtext&lt;/b&gt; → TEXT column (PG) / string (Mongo)" vertex="1">
+          <mxGeometry height="25" width="410" x="10" y="65" as="geometry" />
+        </mxCell>
+        <mxCell id="ft_number" parent="ct_field_types" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;align=left;spacingLeft=8;" value="&lt;b&gt;number&lt;/b&gt; → REAL column (PG) / number (Mongo)" vertex="1">
+          <mxGeometry height="25" width="410" x="10" y="95" as="geometry" />
+        </mxCell>
+        <mxCell id="ft_boolean" parent="ct_field_types" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;align=left;spacingLeft=8;" value="&lt;b&gt;boolean&lt;/b&gt; → BOOLEAN column (PG) / boolean (Mongo)" vertex="1">
+          <mxGeometry height="25" width="410" x="10" y="125" as="geometry" />
+        </mxCell>
+        <mxCell id="ft_media" parent="ct_field_types" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;align=left;spacingLeft=8;" value="&lt;b&gt;media&lt;/b&gt; → TEXT column (PG, stores documentId) / string (Mongo)" vertex="1">
+          <mxGeometry height="25" width="410" x="10" y="155" as="geometry" />
+        </mxCell>
+        <mxCell id="ft_json" parent="ct_field_types" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;align=left;spacingLeft=8;" value="&lt;b&gt;json&lt;/b&gt; → TEXT column (PG, serialized) / object (Mongo)" vertex="1">
+          <mxGeometry height="25" width="410" x="10" y="185" as="geometry" />
+        </mxCell>
+        <mxCell id="ft_date" parent="ct_field_types" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;align=left;spacingLeft=8;" value="&lt;b&gt;date&lt;/b&gt; → TEXT column (PG) / string (Mongo)" vertex="1">
+          <mxGeometry height="25" width="410" x="10" y="215" as="geometry" />
+        </mxCell>
+        <mxCell id="ft_layout" parent="ct_field_types" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;align=left;spacingLeft=8;" value="&lt;b&gt;layout&lt;/b&gt; → UI-only grouping, children flattened into parent table" vertex="1">
+          <mxGeometry height="25" width="410" x="10" y="250" as="geometry" />
+        </mxCell>
+        <mxCell id="ft_component" parent="ct_field_types" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;align=left;spacingLeft=8;" value="&lt;b&gt;component&lt;/b&gt; → separate table: components_&lt;slug&gt;_&lt;name&gt; (PG) / embedded (Mongo)" vertex="1">
+          <mxGeometry height="25" width="410" x="10" y="280" as="geometry" />
+        </mxCell>
+        <mxCell id="ct_kind_box" parent="1" style="swimlane;startSize=25;fillColor=#E8F5E9;strokeColor=#2E7D32;rounded=1;fontSize=12;fontColor=#2E7D32;" value="Content Kind" vertex="1">
+          <mxGeometry height="110" width="520" x="50" y="540" as="geometry" />
+        </mxCell>
+        <mxCell id="kind_single" parent="ct_kind_box" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;align=left;spacingLeft=8;" value="&lt;b&gt;single&lt;/b&gt; — One document per content-type (e.g. homepage, settings, contact page).&lt;br&gt;Only GET/PUT endpoints, no list/create/delete." vertex="1">
+          <mxGeometry height="35" width="500" x="10" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="kind_collection" parent="ct_kind_box" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;align=left;spacingLeft=8;" value="&lt;b&gt;collection&lt;/b&gt; — Multiple documents per content-type (e.g. blog posts, products).&lt;br&gt;Full CRUD + pagination + publish/unpublish + duplicate." vertex="1">
+          <mxGeometry height="35" width="500" x="10" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="ct_validation" parent="1" style="swimlane;startSize=25;fillColor=#FCE4EC;strokeColor=#C62828;rounded=1;fontSize=12;fontColor=#C62828;" value="Validation Rules (schema_loader.go)" vertex="1">
+          <mxGeometry height="110" width="430" x="620" y="540" as="geometry" />
+        </mxCell>
+        <mxCell id="val1" parent="ct_validation" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;align=left;spacingLeft=8;" value="slug and name are required" vertex="1">
+          <mxGeometry height="22" width="410" x="10" y="28" as="geometry" />
+        </mxCell>
+        <mxCell id="val2" parent="ct_validation" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;align=left;spacingLeft=8;" value="layout fields must have children, cannot contain components" vertex="1">
+          <mxGeometry height="22" width="410" x="10" y="53" as="geometry" />
+        </mxCell>
+        <mxCell id="val3" parent="ct_validation" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;align=left;spacingLeft=8;" value="component nesting depth max = 2 levels (component inside component)" vertex="1">
+          <mxGeometry height="22" width="410" x="10" y="78" as="geometry" />
+        </mxCell>
+        <mxCell id="ct_example_title" parent="1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontSize=14;fontColor=#1565C0;fontStyle=1;" value="&lt;b&gt;Real Example: cv-page.json (collection)&lt;/b&gt;" vertex="1">
+          <mxGeometry height="30" width="500" x="60" y="670" as="geometry" />
+        </mxCell>
+        <mxCell id="ct_example" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#1565C0;fontSize=10;align=left;verticalAlign=top;" value="&lt;pre style=&quot;text-align:left;font-size:10px;margin:0;padding:8px;&quot;&gt;{&lt;br&gt;  &quot;slug&quot;: &quot;cv-page&quot;, &quot;name&quot;: &quot;CV Page&quot;, &quot;kind&quot;: &quot;collection&quot;,&lt;br&gt;  &quot;fields&quot;: [&lt;br&gt;    { &quot;type&quot;: &quot;layout&quot;, &quot;fields&quot;: [            ← layout: groups position+isMain in one row&lt;br&gt;        { &quot;name&quot;: &quot;position&quot;, &quot;type&quot;: &quot;text&quot; },&lt;br&gt;        { &quot;name&quot;: &quot;isMain&quot;, &quot;type&quot;: &quot;boolean&quot; }&lt;br&gt;    ]},&lt;br&gt;    { &quot;name&quot;: &quot;company&quot;, &quot;type&quot;: &quot;text&quot; },&lt;br&gt;    { &quot;name&quot;: &quot;summary&quot;, &quot;type&quot;: &quot;richtext&quot; },&lt;br&gt;    {                                           ← component: creates separate table&lt;br&gt;      &quot;name&quot;: &quot;skills&quot;, &quot;type&quot;: &quot;component&quot;,&lt;br&gt;      &quot;repeatable&quot;: true,&lt;br&gt;      &quot;fields&quot;: [&lt;br&gt;        { &quot;name&quot;: &quot;level&quot;, &quot;type&quot;: &quot;text&quot; },&lt;br&gt;        { &quot;name&quot;: &quot;skill&quot;, &quot;type&quot;: &quot;text&quot; }&lt;br&gt;      ]&lt;br&gt;    },&lt;br&gt;    {&lt;br&gt;      &quot;name&quot;: &quot;experiences&quot;, &quot;type&quot;: &quot;component&quot;,  ← nested components (depth=1)&lt;br&gt;      &quot;repeatable&quot;: true,&lt;br&gt;      &quot;fields&quot;: [&lt;br&gt;        { &quot;type&quot;: &quot;layout&quot;, &quot;fields&quot;: [...] },&lt;br&gt;        {&lt;br&gt;          &quot;name&quot;: &quot;roles&quot;, &quot;type&quot;: &quot;component&quot;,  ← depth=2 (max allowed)&lt;br&gt;          &quot;repeatable&quot;: true,&lt;br&gt;          &quot;fields&quot;: [...]&lt;br&gt;        }&lt;br&gt;      ]&lt;br&gt;    }&lt;br&gt;  ]&lt;br&gt;}&lt;/pre&gt;" vertex="1">
+          <mxGeometry height="415" width="580" x="60" y="720" as="geometry" />
+        </mxCell>
+        <mxCell id="ct_files_list" parent="1" style="swimlane;startSize=25;fillColor=#F3E5F5;strokeColor=#7B1FA2;rounded=1;fontSize=12;fontColor=#7B1FA2;" value="Current Content-Type Files" vertex="1">
+          <mxGeometry height="170" width="380" x="690" y="730" as="geometry" />
+        </mxCell>
+        <mxCell id="cf1" parent="ct_files_list" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;align=left;spacingLeft=8;" value="common-text.json — kind: &lt;b&gt;single&lt;/b&gt;, fields: [json]" vertex="1">
+          <mxGeometry height="25" width="360" x="10" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="cf2" parent="ct_files_list" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;align=left;spacingLeft=8;" value="cv-contact.json — kind: &lt;b&gt;single&lt;/b&gt;, fields: [layouts, media]" vertex="1">
+          <mxGeometry height="25" width="360" x="10" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="cf3" parent="ct_files_list" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;align=left;spacingLeft=8;" value="cv-page.json — kind: &lt;b&gt;collection&lt;/b&gt;, fields: [text, richtext, components]" vertex="1">
+          <mxGeometry height="25" width="360" x="10" y="90" as="geometry" />
+        </mxCell>
+        <mxCell id="cf4" parent="ct_files_list" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;align=left;spacingLeft=8;" value="en-vocab-pack.json — kind: &lt;b&gt;collection&lt;/b&gt;, fields: [text, components]" vertex="1">
+          <mxGeometry height="25" width="360" x="10" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="ct_loading_note" parent="1" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;size=18;fillColor=#FFF9C4;strokeColor=#F9A825;fontSize=11;align=left;spacingLeft=10;" value="&lt;b&gt;Loading Process&lt;/b&gt; (schema_loader.go)&lt;br&gt;&lt;font size=&quot;2&quot;&gt;1. LoadDefinitions(dir) reads all *.json files from CONTENT_TYPES_DIR&lt;br&gt;2. Parses each into ContentTypeDefinition struct&lt;br&gt;3. Validates: required fields, layout rules, component depth ≤ 2&lt;br&gt;4. Returns []ContentTypeDefinition for Syncer to process&lt;/font&gt;" vertex="1">
+          <mxGeometry height="100" width="380" x="690" y="1010" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="content-type-to-db" name="7. Content-Type → DB Flow">
+    <mxGraphModel dx="2201" dy="1280" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1400" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="sync_title" parent="1" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=18;fontColor=#1a1a1a;" value="&lt;b&gt;Content-Type → Database Table Sync Flow&lt;/b&gt;&lt;br&gt;usecase/content_type/sync.go" vertex="1">
+          <mxGeometry height="50" width="500" x="395" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="sync_start" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" value="&lt;b&gt;Startup&lt;/b&gt;&lt;br&gt;main.go calls&lt;br&gt;Syncer.Sync()" vertex="1">
+          <mxGeometry height="55" width="200" x="545" y="90" as="geometry" />
+        </mxCell>
+        <mxCell id="sync_a1" edge="1" parent="1" source="sync_start" style="edgeStyle=orthogonalEdgeStyle;rounded=1;endArrow=block;endFill=1;" target="sync_load">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sync_load" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" value="&lt;b&gt;LoadDefinitions(dir)&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;2&quot;&gt;Read all *.json from&lt;br&gt;content-types/ directory&lt;br&gt;Validate each definition&lt;/font&gt;" vertex="1">
+          <mxGeometry height="70" width="220" x="535" y="175" as="geometry" />
+        </mxCell>
+        <mxCell id="sync_a2" edge="1" parent="1" source="sync_load" style="edgeStyle=orthogonalEdgeStyle;rounded=1;endArrow=block;endFill=1;" target="sync_foreach">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sync_foreach" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" value="&lt;b&gt;For each definition&lt;/b&gt;&lt;br&gt;syncOne(ctx, def)" vertex="1">
+          <mxGeometry height="45" width="180" x="555" y="270" as="geometry" />
+        </mxCell>
+        <mxCell id="sync_a3" edge="1" parent="1" source="sync_foreach" style="edgeStyle=orthogonalEdgeStyle;rounded=1;endArrow=block;endFill=1;" target="sync_exists">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sync_exists" parent="1" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" value="Content-type&lt;br&gt;exists in DB?" vertex="1">
+          <mxGeometry height="80" width="150" x="570" y="430" as="geometry" />
+        </mxCell>
+        <mxCell id="sync_a4_no" edge="1" parent="1" source="sync_exists" style="edgeStyle=orthogonalEdgeStyle;rounded=1;endArrow=block;endFill=1;labelBackgroundColor=#ffffff;" target="sync_create" value="No (new)">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sync_a4_yes" edge="1" parent="1" source="sync_exists" style="edgeStyle=orthogonalEdgeStyle;rounded=1;endArrow=block;endFill=1;labelBackgroundColor=#ffffff;" target="sync_update" value="Yes (existing)">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sync_create" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" value="&lt;b&gt;CREATE new content-type&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;2&quot;&gt;1. Insert ContentType record into DB&lt;br&gt;2. Create document table (see below)&lt;br&gt;3. Create component tables (if any)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="70" width="280" x="235" y="530" as="geometry" />
+        </mxCell>
+        <mxCell id="sync_update" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" value="&lt;b&gt;UPDATE existing content-type&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;2&quot;&gt;1. EnsureCollection (add missing columns)&lt;br&gt;2. Ensure component tables&lt;br&gt;3. Update ContentType record if changed&lt;/font&gt;" vertex="1">
+          <mxGeometry height="70" width="280" x="775" y="530" as="geometry" />
+        </mxCell>
+        <mxCell id="sync_cleanup_title" edge="1" parent="1" source="sync_foreach" style="endArrow=block;endFill=1;html=1;rounded=1;strokeWidth=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" target="sync_cleanup" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="890" y="293" />
+              <mxPoint x="1150" y="293" />
+            </Array>
+            <mxPoint x="630" y="340" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="sync_cleanup" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" value="&lt;b&gt;Cleanup removed types&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;2&quot;&gt;For content-types in DB but&lt;br&gt;NOT in JSON definitions:&lt;br&gt;1. Delete all documents&lt;br&gt;2. Drop component tables&lt;br&gt;3. Drop document table&lt;br&gt;4. Delete ContentType record&lt;/font&gt;" vertex="1">
+          <mxGeometry height="120" width="220" x="1042" y="350" as="geometry" />
+        </mxCell>
+        <mxCell id="n3dLgWy-Eys4LoOQ0Brv-1" edge="1" parent="1" source="pg_title" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="pg_doc_c3" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pg_title" parent="1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontSize=14;fontColor=#7B1FA2;fontStyle=1;" value="&lt;b&gt;PostgreSQL: Dynamic Table Creation&lt;/b&gt;&lt;br&gt;gormdb/document_repository.go" vertex="1">
+          <mxGeometry height="40" width="260" x="175" y="630" as="geometry" />
+        </mxCell>
+        <mxCell id="pg_doc_table" parent="1" style="swimlane;startSize=35;fillColor=#F3E5F5;strokeColor=#7B1FA2;rounded=1;fontSize=11;fontColor=#7B1FA2;" value="Document Table: documents_&lt;slug&gt;&#xa;e.g. documents_cv_page" vertex="1">
+          <mxGeometry height="310" width="460" x="75" y="690" as="geometry" />
+        </mxCell>
+        <mxCell id="pg_doc_sys" parent="pg_doc_table" style="text;html=1;align=left;fontSize=10;fontColor=#7B1FA2;fontStyle=1;" value="&lt;b&gt;System columns (always present):&lt;/b&gt;" vertex="1">
+          <mxGeometry height="18" width="300" x="10" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="pg_doc_c1" parent="pg_doc_table" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=9;align=left;spacingLeft=8;" value="gorm_id SERIAL PRIMARY KEY" vertex="1">
+          <mxGeometry height="20" width="210" x="10" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="pg_doc_c2" parent="pg_doc_table" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=9;align=left;spacingLeft=8;" value="document_id TEXT" vertex="1">
+          <mxGeometry height="20" width="210" x="10" y="82" as="geometry" />
+        </mxCell>
+        <mxCell id="pg_doc_c3" parent="pg_doc_table" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=9;align=left;spacingLeft=8;" value="version TEXT (draft / published)" vertex="1">
+          <mxGeometry height="20" width="210" x="10" y="104" as="geometry" />
+        </mxCell>
+        <mxCell id="pg_doc_c4" parent="pg_doc_table" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=9;align=left;spacingLeft=8;" value="locale TEXT" vertex="1">
+          <mxGeometry height="20" width="210" x="10" y="126" as="geometry" />
+        </mxCell>
+        <mxCell id="pg_doc_c5" parent="pg_doc_table" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=9;align=left;spacingLeft=8;" value="created_at / updated_at / published_at TIMESTAMP" vertex="1">
+          <mxGeometry height="20" width="280" x="10" y="148" as="geometry" />
+        </mxCell>
+        <mxCell id="pg_doc_c6" parent="pg_doc_table" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=9;align=left;spacingLeft=8;" value="created_by / updated_by / published_by TEXT" vertex="1">
+          <mxGeometry height="20" width="280" x="10" y="170" as="geometry" />
+        </mxCell>
+        <mxCell id="pg_doc_dyn" parent="pg_doc_table" style="text;html=1;align=left;fontSize=10;fontColor=#E65100;fontStyle=1;" value="&lt;b&gt;Dynamic columns (from field definitions):&lt;/b&gt;" vertex="1">
+          <mxGeometry height="18" width="300" x="10" y="200" as="geometry" />
+        </mxCell>
+        <mxCell id="pg_doc_d1" parent="pg_doc_table" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#E65100;fontSize=9;align=left;spacingLeft=8;" value="position TEXT         ← from field {name: &quot;position&quot;, type: &quot;text&quot;}" vertex="1">
+          <mxGeometry height="20" width="430" x="10" y="220" as="geometry" />
+        </mxCell>
+        <mxCell id="pg_doc_d2" parent="pg_doc_table" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#E65100;fontSize=9;align=left;spacingLeft=8;" value="is_main BOOLEAN   ← from field {name: &quot;isMain&quot;, type: &quot;boolean&quot;}" vertex="1">
+          <mxGeometry height="20" width="430" x="10" y="242" as="geometry" />
+        </mxCell>
+        <mxCell id="pg_doc_d3" parent="pg_doc_table" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#E65100;fontSize=9;align=left;spacingLeft=8;" value="company TEXT         ← from field {name: &quot;company&quot;, type: &quot;text&quot;}" vertex="1">
+          <mxGeometry height="20" width="430" x="10" y="264" as="geometry" />
+        </mxCell>
+        <mxCell id="pg_doc_d4" parent="pg_doc_table" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#E65100;fontSize=9;align=left;spacingLeft=8;" value="summary TEXT         ← from field {name: &quot;summary&quot;, type: &quot;richtext&quot;}" vertex="1">
+          <mxGeometry height="20" width="430" x="10" y="286" as="geometry" />
+        </mxCell>
+        <mxCell id="pg_comp_table" parent="1" style="swimlane;startSize=40;fillColor=#E8F5E9;strokeColor=#2E7D32;rounded=1;fontSize=11;fontColor=#2E7D32;" value="Component Table:components_&lt;slug&gt;_&lt;component_name&gt;&#xa;e.g. components_cv_page_skills, components_cv_page_experiences" vertex="1">
+          <mxGeometry height="310" width="460" x="585" y="690" as="geometry" />
+        </mxCell>
+        <mxCell id="pg_comp_sys" parent="pg_comp_table" style="text;html=1;align=left;fontSize=10;fontColor=#2E7D32;fontStyle=1;" value="&lt;b&gt;System columns (always present):&lt;/b&gt;" vertex="1">
+          <mxGeometry height="18" width="300" x="10" y="45" as="geometry" />
+        </mxCell>
+        <mxCell id="pg_comp_c1" parent="pg_comp_table" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=9;align=left;spacingLeft=8;" value="gorm_id SERIAL PRIMARY KEY" vertex="1">
+          <mxGeometry height="20" width="210" x="10" y="65" as="geometry" />
+        </mxCell>
+        <mxCell id="pg_comp_c2" parent="pg_comp_table" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=9;align=left;spacingLeft=8;" value="component_id TEXT" vertex="1">
+          <mxGeometry height="20" width="210" x="10" y="87" as="geometry" />
+        </mxCell>
+        <mxCell id="pg_comp_c3" parent="pg_comp_table" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=9;align=left;spacingLeft=8;" value="document_id TEXT (FK → parent document)" vertex="1">
+          <mxGeometry height="20" width="260" x="10" y="109" as="geometry" />
+        </mxCell>
+        <mxCell id="pg_comp_c4" parent="pg_comp_table" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=9;align=left;spacingLeft=8;" value="version TEXT (draft / published)" vertex="1">
+          <mxGeometry height="20" width="210" x="10" y="131" as="geometry" />
+        </mxCell>
+        <mxCell id="pg_comp_c5" parent="pg_comp_table" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=9;align=left;spacingLeft=8;" value="locale TEXT" vertex="1">
+          <mxGeometry height="20" width="210" x="10" y="153" as="geometry" />
+        </mxCell>
+        <mxCell id="pg_comp_c6" parent="pg_comp_table" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=9;align=left;spacingLeft=8;" value="sort_order INTEGER DEFAULT 0" vertex="1">
+          <mxGeometry height="20" width="210" x="10" y="175" as="geometry" />
+        </mxCell>
+        <mxCell id="pg_comp_c7" parent="pg_comp_table" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=9;align=left;spacingLeft=8;" value="created_at / updated_at TIMESTAMP" vertex="1">
+          <mxGeometry height="20" width="260" x="10" y="197" as="geometry" />
+        </mxCell>
+        <mxCell id="pg_comp_dyn" parent="pg_comp_table" style="text;html=1;align=left;fontSize=10;fontColor=#E65100;fontStyle=1;" value="&lt;b&gt;Dynamic columns (from component fields):&lt;/b&gt;" vertex="1">
+          <mxGeometry height="18" width="350" x="10" y="227" as="geometry" />
+        </mxCell>
+        <mxCell id="pg_comp_d1" parent="pg_comp_table" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#E65100;fontSize=9;align=left;spacingLeft=8;" value="level TEXT      ← e.g. skills component field" vertex="1">
+          <mxGeometry height="20" width="300" x="10" y="247" as="geometry" />
+        </mxCell>
+        <mxCell id="pg_comp_d2" parent="pg_comp_table" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#E65100;fontSize=9;align=left;spacingLeft=8;" value="skill TEXT      ← e.g. skills component field" vertex="1">
+          <mxGeometry height="20" width="300" x="10" y="269" as="geometry" />
+        </mxCell>
+        <mxCell id="pg_nested_note" parent="1" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;size=18;fillColor=#FFF9C4;strokeColor=#F9A825;fontSize=11;align=left;spacingLeft=10;" value="&lt;b&gt;Nested Component Tables&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;2&quot;&gt;When a component contains another component,&lt;br&gt;tables are created with path prefix:&lt;br&gt;&lt;br&gt;components_cv_page_&lt;b&gt;skills&lt;/b&gt;&lt;br&gt;components_cv_page_&lt;b&gt;experiences&lt;/b&gt;&lt;br&gt;components_cv_page_&lt;b&gt;experiences_roles&lt;/b&gt; ← nested&lt;/font&gt;" vertex="1">
+          <mxGeometry height="140" width="280" x="1085" y="690" as="geometry" />
+        </mxCell>
+        <mxCell id="mongo_title" parent="1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontSize=14;fontColor=#2E7D32;fontStyle=1;" value="&lt;b&gt;MongoDB: Dynamic Collection Creation&lt;/b&gt;&lt;br&gt;mongodb/document_repository.go" vertex="1">
+          <mxGeometry height="30" width="500" x="75" y="1030" as="geometry" />
+        </mxCell>
+        <mxCell id="mongo_col" parent="1" style="swimlane;startSize=35;fillColor=#E8F5E9;strokeColor=#2E7D32;rounded=1;fontSize=11;fontColor=#2E7D32;" value="Collection: documents_&lt;slug&gt;&#xa;e.g. documents_cv-page" vertex="1">
+          <mxGeometry height="250" width="500" x="75" y="1070" as="geometry" />
+        </mxCell>
+        <mxCell id="mongo_doc" parent="mongo_col" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#2E7D32;fontSize=10;align=left;verticalAlign=top;" value="&lt;pre style=&quot;text-align:left;font-size:10px;margin:0;padding:5px;&quot;&gt;{&lt;br&gt;  &quot;_id&quot;: ObjectId(...),&lt;br&gt;  &quot;documentId&quot;: &quot;uuid-v4&quot;,&lt;br&gt;  &quot;version&quot;: &quot;draft&quot;,          // or &quot;published&quot;&lt;br&gt;  &quot;locale&quot;: &quot;en&quot;,&lt;br&gt;  &quot;data&quot;: {                    // all field values as nested map&lt;br&gt;    &quot;position&quot;: &quot;Senior Dev&quot;,&lt;br&gt;    &quot;isMain&quot;: true,&lt;br&gt;    &quot;company&quot;: &quot;ACME&quot;,&lt;br&gt;    &quot;skills&quot;: [{&quot;level&quot;:&quot;expert&quot;, &quot;skill&quot;:&quot;Go&quot;}, ...]&lt;br&gt;  },&lt;br&gt;  &quot;createdAt&quot;: ISODate(...),&lt;br&gt;  &quot;createdBy&quot;: &quot;user-uuid&quot;&lt;br&gt;}&lt;/pre&gt;" vertex="1">
+          <mxGeometry height="200" width="480" x="10" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="mongo_idx" parent="1" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;size=18;fillColor=#FFF9C4;strokeColor=#F9A825;fontSize=11;align=left;spacingLeft=10;" value="&lt;b&gt;Unique Index&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;2&quot;&gt;{documentId: 1, version: 1, locale: 1}&lt;br&gt;Ensures one draft + one published&lt;br&gt;per document per locale&lt;/font&gt;" vertex="1">
+          <mxGeometry height="90" width="280" x="635" y="1090" as="geometry" />
+        </mxCell>
+        <mxCell id="mongo_diff" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#1565C0;fontSize=11;align=left;spacingLeft=10;" value="&lt;b&gt;Key Difference: MongoDB vs PostgreSQL&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;2&quot;&gt;&lt;b&gt;MongoDB:&lt;/b&gt; All fields stored as nested &lt;b&gt;data&lt;/b&gt; map, schema-less.&lt;br&gt;Components embedded in document, no separate collections.&lt;br&gt;&lt;br&gt;&lt;b&gt;PostgreSQL:&lt;/b&gt; Each field becomes a typed &lt;b&gt;column&lt;/b&gt;.&lt;br&gt;Components get separate tables linked by document_id.&lt;br&gt;Layout fields are flattened into parent table columns.&lt;/font&gt;" vertex="1">
+          <mxGeometry height="120" width="400" x="635" y="1200" as="geometry" />
+        </mxCell>
+        <mxCell id="flattenNote" parent="1" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;size=18;fillColor=#FFF9C4;strokeColor=#F9A825;fontSize=11;align=left;spacingLeft=10;" value="&lt;b&gt;flattenLayoutFields()&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;2&quot;&gt;Layout fields are a UI-only concept.&lt;br&gt;At DB level, layout children are&lt;br&gt;promoted to top-level columns:&lt;br&gt;&lt;br&gt;{type: &quot;layout&quot;, fields: [&lt;br&gt;  {name: &quot;phone&quot;}, {name: &quot;email&quot;}&lt;br&gt;]}  →  phone TEXT, email TEXT&lt;/font&gt;" vertex="1">
+          <mxGeometry height="150" width="280" x="1085" y="870" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="system-tables" name="8. System Tables (ERD)">
+    <mxGraphModel dx="1981" dy="1152" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1400" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="erd_title" parent="1" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=18;fontColor=#1a1a1a;" value="&lt;b&gt;System Tables / Collections (ERD)&lt;/b&gt;&lt;br&gt;internal/domain/entity/" vertex="1">
+          <mxGeometry height="50" width="500" x="400" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="erd_legend" parent="1" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=11;fontColor=#666;" value="&lt;b&gt;Legend:&lt;/b&gt; &lt;font color=&quot;#7B1FA2&quot;&gt;PK&lt;/font&gt; = Primary Key | &lt;font color=&quot;#1565C0&quot;&gt;UK&lt;/font&gt; = Unique Key | &lt;font color=&quot;#E65100&quot;&gt;FK&lt;/font&gt; = Foreign Key | &lt;font color=&quot;#2E7D32&quot;&gt;IDX&lt;/font&gt; = Index" vertex="1">
+          <mxGeometry height="20" width="500" x="400" y="65" as="geometry" />
+        </mxCell>
+        <mxCell id="tbl_users" parent="1" style="swimlane;startSize=22;fillColor=#E3F2FD;strokeColor=#1565C0;rounded=1;fontSize=12;fontColor=#1565C0;fontStyle=1;" value="users" vertex="1">
+          <mxGeometry height="240" width="280" x="60" y="110" as="geometry" />
+        </mxCell>
+        <mxCell id="u1" parent="tbl_users" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="&lt;font color=&quot;#7B1FA2&quot;&gt;PK&lt;/font&gt;  gorm_id SERIAL" vertex="1">
+          <mxGeometry height="18" width="270" x="5" y="25" as="geometry" />
+        </mxCell>
+        <mxCell id="u2" parent="tbl_users" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="&lt;font color=&quot;#1565C0&quot;&gt;UK&lt;/font&gt;  document_id TEXT" vertex="1">
+          <mxGeometry height="18" width="270" x="5" y="45" as="geometry" />
+        </mxCell>
+        <mxCell id="u3" parent="tbl_users" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="&lt;font color=&quot;#1565C0&quot;&gt;UK&lt;/font&gt;  email TEXT" vertex="1">
+          <mxGeometry height="18" width="270" x="5" y="65" as="geometry" />
+        </mxCell>
+        <mxCell id="u4" parent="tbl_users" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="      display_name TEXT" vertex="1">
+          <mxGeometry height="18" width="270" x="5" y="85" as="geometry" />
+        </mxCell>
+        <mxCell id="u5" parent="tbl_users" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="      password_hash TEXT (bcrypt)" vertex="1">
+          <mxGeometry height="18" width="270" x="5" y="105" as="geometry" />
+        </mxCell>
+        <mxCell id="u6" parent="tbl_users" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="      role VARCHAR(20) (legacy)" vertex="1">
+          <mxGeometry height="18" width="270" x="5" y="125" as="geometry" />
+        </mxCell>
+        <mxCell id="u7" parent="tbl_users" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="&lt;font color=&quot;#2E7D32&quot;&gt;IDX&lt;/font&gt; role_id TEXT → roles.document_id" vertex="1">
+          <mxGeometry height="18" width="270" x="5" y="145" as="geometry" />
+        </mxCell>
+        <mxCell id="u8" parent="tbl_users" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="      created_at TIMESTAMP" vertex="1">
+          <mxGeometry height="18" width="270" x="5" y="165" as="geometry" />
+        </mxCell>
+        <mxCell id="tbl_roles" parent="1" style="swimlane;startSize=22;fillColor=#FFF3E0;strokeColor=#E65100;rounded=1;fontSize=12;fontColor=#E65100;fontStyle=1;" value="roles" vertex="1">
+          <mxGeometry height="240" width="320" x="400" y="110" as="geometry" />
+        </mxCell>
+        <mxCell id="r1" parent="tbl_roles" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="&lt;font color=&quot;#7B1FA2&quot;&gt;PK&lt;/font&gt;  gorm_id SERIAL" vertex="1">
+          <mxGeometry height="18" width="310" x="5" y="25" as="geometry" />
+        </mxCell>
+        <mxCell id="r2" parent="tbl_roles" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="&lt;font color=&quot;#1565C0&quot;&gt;UK&lt;/font&gt;  document_id TEXT" vertex="1">
+          <mxGeometry height="18" width="310" x="5" y="45" as="geometry" />
+        </mxCell>
+        <mxCell id="r3" parent="tbl_roles" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="      name TEXT" vertex="1">
+          <mxGeometry height="18" width="310" x="5" y="65" as="geometry" />
+        </mxCell>
+        <mxCell id="r4" parent="tbl_roles" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="&lt;font color=&quot;#1565C0&quot;&gt;UK&lt;/font&gt;  slug TEXT" vertex="1">
+          <mxGeometry height="18" width="310" x="5" y="85" as="geometry" />
+        </mxCell>
+        <mxCell id="r5" parent="tbl_roles" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="      permissions JSON (string array)" vertex="1">
+          <mxGeometry height="18" width="310" x="5" y="105" as="geometry" />
+        </mxCell>
+        <mxCell id="r6" parent="tbl_roles" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="      level INTEGER (1-100, hierarchy)" vertex="1">
+          <mxGeometry height="18" width="310" x="5" y="125" as="geometry" />
+        </mxCell>
+        <mxCell id="r7" parent="tbl_roles" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="      is_default BOOLEAN" vertex="1">
+          <mxGeometry height="18" width="310" x="5" y="145" as="geometry" />
+        </mxCell>
+        <mxCell id="r8" parent="tbl_roles" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="      created_at / updated_at TIMESTAMP" vertex="1">
+          <mxGeometry height="18" width="310" x="5" y="165" as="geometry" />
+        </mxCell>
+        <mxCell id="roles_defaults" parent="1" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;size=18;fillColor=#FFF9C4;strokeColor=#F9A825;fontSize=10;align=left;spacingLeft=8;" value="&lt;b&gt;Default Roles (seeded on startup):&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;2&quot;&gt;super_admin (level=100) — all permissions&lt;br&gt;admin (level=80) — all except roles:manage, locales:manage&lt;br&gt;editor (level=60) — content + media + content_types:read&lt;br&gt;guest (level=20) — content:read, media:read, content_types:read&lt;/font&gt;" vertex="1">
+          <mxGeometry height="130" width="320" x="400" y="354" as="geometry" />
+        </mxCell>
+        <mxCell id="a_user_role" edge="1" parent="1" source="tbl_users" style="endArrow=ERone;startArrow=ERmany;html=1;rounded=1;strokeWidth=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;startFill=0;endFill=0;" target="tbl_roles" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="W2UC54hs88-TtwmswiuU-2" connectable="0" parent="a_user_role" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="N:1" vertex="1">
+          <mxGeometry relative="1" x="0.1333" y="4" as="geometry">
+            <mxPoint y="3" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="tbl_content_types" parent="1" style="swimlane;startSize=22;fillColor=#E8F5E9;strokeColor=#2E7D32;rounded=1;fontSize=12;fontColor=#2E7D32;fontStyle=1;" value="content_types" vertex="1">
+          <mxGeometry height="240" width="320" x="790" y="110" as="geometry" />
+        </mxCell>
+        <mxCell id="ct1" parent="tbl_content_types" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="&lt;font color=&quot;#7B1FA2&quot;&gt;PK&lt;/font&gt;  gorm_id SERIAL" vertex="1">
+          <mxGeometry height="18" width="310" x="5" y="25" as="geometry" />
+        </mxCell>
+        <mxCell id="ct2" parent="tbl_content_types" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="&lt;font color=&quot;#1565C0&quot;&gt;UK&lt;/font&gt;  document_id TEXT" vertex="1">
+          <mxGeometry height="18" width="310" x="5" y="45" as="geometry" />
+        </mxCell>
+        <mxCell id="ct3" parent="tbl_content_types" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="      name TEXT (display name)" vertex="1">
+          <mxGeometry height="18" width="310" x="5" y="65" as="geometry" />
+        </mxCell>
+        <mxCell id="ct4" parent="tbl_content_types" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="&lt;font color=&quot;#1565C0&quot;&gt;UK&lt;/font&gt;  slug TEXT (from JSON filename)" vertex="1">
+          <mxGeometry height="18" width="310" x="5" y="85" as="geometry" />
+        </mxCell>
+        <mxCell id="ct5" parent="tbl_content_types" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="      kind VARCHAR(20) (single | collection)" vertex="1">
+          <mxGeometry height="18" width="310" x="5" y="105" as="geometry" />
+        </mxCell>
+        <mxCell id="ct6" parent="tbl_content_types" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="      fields JSON ([]FieldDefinition, serialized)" vertex="1">
+          <mxGeometry height="18" width="310" x="5" y="125" as="geometry" />
+        </mxCell>
+        <mxCell id="ct7" parent="tbl_content_types" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="      list_fields JSON ([]string, UI column config)" vertex="1">
+          <mxGeometry height="18" width="310" x="5" y="145" as="geometry" />
+        </mxCell>
+        <mxCell id="ct8" parent="tbl_content_types" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="      created_at / updated_at TIMESTAMP" vertex="1">
+          <mxGeometry height="18" width="310" x="5" y="165" as="geometry" />
+        </mxCell>
+        <mxCell id="tbl_media" parent="1" style="swimlane;startSize=22;fillColor=#F3E5F5;strokeColor=#7B1FA2;rounded=1;fontSize=12;fontColor=#7B1FA2;fontStyle=1;" value="media_assets" vertex="1">
+          <mxGeometry height="240" width="280" x="60" y="500" as="geometry" />
+        </mxCell>
+        <mxCell id="m1" parent="tbl_media" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="&lt;font color=&quot;#7B1FA2&quot;&gt;PK&lt;/font&gt;  gorm_id SERIAL" vertex="1">
+          <mxGeometry height="18" width="270" x="5" y="25" as="geometry" />
+        </mxCell>
+        <mxCell id="m2" parent="tbl_media" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="&lt;font color=&quot;#1565C0&quot;&gt;UK&lt;/font&gt;  document_id TEXT" vertex="1">
+          <mxGeometry height="18" width="270" x="5" y="45" as="geometry" />
+        </mxCell>
+        <mxCell id="m3" parent="tbl_media" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="      url TEXT (full URL)" vertex="1">
+          <mxGeometry height="18" width="270" x="5" y="65" as="geometry" />
+        </mxCell>
+        <mxCell id="m4" parent="tbl_media" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="      thumbnail_url TEXT" vertex="1">
+          <mxGeometry height="18" width="270" x="5" y="85" as="geometry" />
+        </mxCell>
+        <mxCell id="m5" parent="tbl_media" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="      public_id TEXT (Cloudinary/S3 ID)" vertex="1">
+          <mxGeometry height="18" width="270" x="5" y="105" as="geometry" />
+        </mxCell>
+        <mxCell id="m6" parent="tbl_media" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="      file_name TEXT / file_ext TEXT / hash TEXT" vertex="1">
+          <mxGeometry height="18" width="270" x="5" y="125" as="geometry" />
+        </mxCell>
+        <mxCell id="m7" parent="tbl_media" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="      width INTEGER / height INTEGER" vertex="1">
+          <mxGeometry height="18" width="270" x="5" y="145" as="geometry" />
+        </mxCell>
+        <mxCell id="m8" parent="tbl_media" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="      created_at TIMESTAMP" vertex="1">
+          <mxGeometry height="18" width="270" x="5" y="165" as="geometry" />
+        </mxCell>
+        <mxCell id="tbl_invites" parent="1" style="swimlane;startSize=22;fillColor=#E3F2FD;strokeColor=#1565C0;rounded=1;fontSize=12;fontColor=#1565C0;fontStyle=1;" value="invites" vertex="1">
+          <mxGeometry height="240" width="280" x="400" y="500" as="geometry" />
+        </mxCell>
+        <mxCell id="i1" parent="tbl_invites" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="&lt;font color=&quot;#7B1FA2&quot;&gt;PK&lt;/font&gt;  gorm_id SERIAL" vertex="1">
+          <mxGeometry height="18" width="270" x="5" y="25" as="geometry" />
+        </mxCell>
+        <mxCell id="i2" parent="tbl_invites" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="&lt;font color=&quot;#1565C0&quot;&gt;UK&lt;/font&gt;  document_id TEXT" vertex="1">
+          <mxGeometry height="18" width="270" x="5" y="45" as="geometry" />
+        </mxCell>
+        <mxCell id="i3" parent="tbl_invites" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="&lt;font color=&quot;#1565C0&quot;&gt;UK&lt;/font&gt;  email TEXT" vertex="1">
+          <mxGeometry height="18" width="270" x="5" y="65" as="geometry" />
+        </mxCell>
+        <mxCell id="i4" parent="tbl_invites" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="      role VARCHAR(20)" vertex="1">
+          <mxGeometry height="18" width="270" x="5" y="85" as="geometry" />
+        </mxCell>
+        <mxCell id="i5" parent="tbl_invites" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="&lt;font color=&quot;#1565C0&quot;&gt;UK&lt;/font&gt;  token_hash TEXT (bcrypt)" vertex="1">
+          <mxGeometry height="18" width="270" x="5" y="105" as="geometry" />
+        </mxCell>
+        <mxCell id="i6" parent="tbl_invites" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="      expires_at TIMESTAMP" vertex="1">
+          <mxGeometry height="18" width="270" x="5" y="125" as="geometry" />
+        </mxCell>
+        <mxCell id="i7" parent="tbl_invites" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="      created_by TEXT / created_at TIMESTAMP" vertex="1">
+          <mxGeometry height="18" width="270" x="5" y="145" as="geometry" />
+        </mxCell>
+        <mxCell id="tbl_access_tokens" parent="1" style="swimlane;startSize=22;fillColor=#FFF3E0;strokeColor=#E65100;rounded=1;fontSize=12;fontColor=#E65100;fontStyle=1;" value="access_tokens" vertex="1">
+          <mxGeometry height="240" width="290" x="740" y="500" as="geometry" />
+        </mxCell>
+        <mxCell id="at1" parent="tbl_access_tokens" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="&lt;font color=&quot;#7B1FA2&quot;&gt;PK&lt;/font&gt;  gorm_id SERIAL" vertex="1">
+          <mxGeometry height="18" width="280" x="5" y="25" as="geometry" />
+        </mxCell>
+        <mxCell id="at2" parent="tbl_access_tokens" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="&lt;font color=&quot;#1565C0&quot;&gt;UK&lt;/font&gt;  document_id TEXT" vertex="1">
+          <mxGeometry height="18" width="280" x="5" y="45" as="geometry" />
+        </mxCell>
+        <mxCell id="at3" parent="tbl_access_tokens" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="      name TEXT (display name)" vertex="1">
+          <mxGeometry height="18" width="280" x="5" y="65" as="geometry" />
+        </mxCell>
+        <mxCell id="at4" parent="tbl_access_tokens" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="&lt;font color=&quot;#1565C0&quot;&gt;UK&lt;/font&gt;  token_hash TEXT" vertex="1">
+          <mxGeometry height="18" width="280" x="5" y="85" as="geometry" />
+        </mxCell>
+        <mxCell id="at5" parent="tbl_access_tokens" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="      prefix TEXT (visible token prefix)" vertex="1">
+          <mxGeometry height="18" width="280" x="5" y="105" as="geometry" />
+        </mxCell>
+        <mxCell id="at6" parent="tbl_access_tokens" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="      scopes JSON (string array)" vertex="1">
+          <mxGeometry height="18" width="280" x="5" y="125" as="geometry" />
+        </mxCell>
+        <mxCell id="at7" parent="tbl_access_tokens" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="      expires_at TIMESTAMP (nullable)" vertex="1">
+          <mxGeometry height="18" width="280" x="5" y="145" as="geometry" />
+        </mxCell>
+        <mxCell id="at8" parent="tbl_access_tokens" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="      last_used_at TIMESTAMP (nullable)" vertex="1">
+          <mxGeometry height="18" width="280" x="5" y="165" as="geometry" />
+        </mxCell>
+        <mxCell id="at9" parent="tbl_access_tokens" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="      created_by TEXT / created_at TIMESTAMP" vertex="1">
+          <mxGeometry height="18" width="280" x="5" y="185" as="geometry" />
+        </mxCell>
+        <mxCell id="tbl_locales" parent="1" style="swimlane;startSize=22;fillColor=#E8F5E9;strokeColor=#2E7D32;rounded=1;fontSize=12;fontColor=#2E7D32;fontStyle=1;" value="locales" vertex="1">
+          <mxGeometry height="180" width="250" x="1210" y="110" as="geometry" />
+        </mxCell>
+        <mxCell id="l1" parent="tbl_locales" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="&lt;font color=&quot;#7B1FA2&quot;&gt;PK&lt;/font&gt;  gorm_id SERIAL" vertex="1">
+          <mxGeometry height="18" width="240" x="5" y="25" as="geometry" />
+        </mxCell>
+        <mxCell id="l2" parent="tbl_locales" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="&lt;font color=&quot;#1565C0&quot;&gt;UK&lt;/font&gt;  code TEXT (en, vi)" vertex="1">
+          <mxGeometry height="18" width="240" x="5" y="45" as="geometry" />
+        </mxCell>
+        <mxCell id="l3" parent="tbl_locales" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="      name TEXT (English, Vietnamese)" vertex="1">
+          <mxGeometry height="18" width="240" x="5" y="65" as="geometry" />
+        </mxCell>
+        <mxCell id="l4" parent="tbl_locales" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="      is_default BOOLEAN" vertex="1">
+          <mxGeometry height="18" width="240" x="5" y="85" as="geometry" />
+        </mxCell>
+        <mxCell id="l5" parent="tbl_locales" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="      created_at / updated_at TIMESTAMP" vertex="1">
+          <mxGeometry height="18" width="240" x="5" y="105" as="geometry" />
+        </mxCell>
+        <mxCell id="dyn_tables_title" parent="1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontSize=14;fontColor=#C62828;fontStyle=1;" value="&lt;b&gt;Dynamic Tables (created per content-type)&lt;/b&gt;" vertex="1">
+          <mxGeometry height="30" width="500" x="60" y="780" as="geometry" />
+        </mxCell>
+        <mxCell id="tbl_dyn_doc" parent="1" style="swimlane;startSize=35;fillColor=#FCE4EC;strokeColor=#C62828;rounded=1;fontSize=12;fontColor=#C62828;fontStyle=1;" value="documents_&lt;slug&gt;&#xa;(one table per content-type)" vertex="1">
+          <mxGeometry height="260" width="360" x="60" y="820" as="geometry" />
+        </mxCell>
+        <mxCell id="dd1" parent="tbl_dyn_doc" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="&lt;font color=&quot;#7B1FA2&quot;&gt;PK&lt;/font&gt;  gorm_id SERIAL" vertex="1">
+          <mxGeometry height="18" width="350" x="5" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="dd2" parent="tbl_dyn_doc" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="      document_id TEXT (UUID)" vertex="1">
+          <mxGeometry height="18" width="350" x="5" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="dd3" parent="tbl_dyn_doc" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="      version TEXT (draft | published)" vertex="1">
+          <mxGeometry height="18" width="350" x="5" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="dd4" parent="tbl_dyn_doc" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="      locale TEXT (en, vi)" vertex="1">
+          <mxGeometry height="18" width="350" x="5" y="100" as="geometry" />
+        </mxCell>
+        <mxCell id="dd5" parent="tbl_dyn_doc" style="text;html=1;align=left;fontSize=10;spacingLeft=5;fontStyle=2;" value="      &lt;font color=&quot;#E65100&quot;&gt;...dynamic field columns (from JSON schema)...&lt;/font&gt;" vertex="1">
+          <mxGeometry height="18" width="350" x="5" y="125" as="geometry" />
+        </mxCell>
+        <mxCell id="dd6" parent="tbl_dyn_doc" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="      created_at / updated_at / published_at TIMESTAMP" vertex="1">
+          <mxGeometry height="18" width="350" x="5" y="150" as="geometry" />
+        </mxCell>
+        <mxCell id="dd7" parent="tbl_dyn_doc" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="      created_by / updated_by / published_by TEXT" vertex="1">
+          <mxGeometry height="18" width="350" x="5" y="170" as="geometry" />
+        </mxCell>
+        <mxCell id="dd_examples" parent="tbl_dyn_doc" style="text;html=1;align=left;fontSize=10;spacingLeft=5;fontColor=#888;" value="&lt;font size=&quot;1&quot;&gt;&lt;b&gt;Examples:&lt;/b&gt; documents_cv_page, documents_common_text,&lt;br&gt;documents_cv_contact, documents_en_vocab_pack&lt;/font&gt;" vertex="1">
+          <mxGeometry height="30" width="350" x="5" y="200" as="geometry" />
+        </mxCell>
+        <mxCell id="tbl_dyn_comp" parent="1" style="swimlane;startSize=35;fillColor=#FCE4EC;strokeColor=#C62828;rounded=1;fontSize=12;fontColor=#C62828;fontStyle=1;" value="components_&lt;slug&gt;_&lt;component_path&gt;&#xa;(one table per component field, PostgreSQL only)" vertex="1">
+          <mxGeometry height="260" width="380" x="480" y="820" as="geometry" />
+        </mxCell>
+        <mxCell id="dc1" parent="tbl_dyn_comp" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="&lt;font color=&quot;#7B1FA2&quot;&gt;PK&lt;/font&gt;  gorm_id SERIAL" vertex="1">
+          <mxGeometry height="18" width="370" x="5" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="dc2" parent="tbl_dyn_comp" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="      component_id TEXT (UUID)" vertex="1">
+          <mxGeometry height="18" width="370" x="5" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="dc3" parent="tbl_dyn_comp" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="&lt;font color=&quot;#E65100&quot;&gt;FK&lt;/font&gt;  document_id TEXT → documents_&lt;slug&gt;.document_id" vertex="1">
+          <mxGeometry height="18" width="370" x="5" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="dc4" parent="tbl_dyn_comp" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="      version TEXT (draft | published)" vertex="1">
+          <mxGeometry height="18" width="370" x="5" y="100" as="geometry" />
+        </mxCell>
+        <mxCell id="dc5" parent="tbl_dyn_comp" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="      locale TEXT / sort_order INTEGER" vertex="1">
+          <mxGeometry height="18" width="370" x="5" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="dc6" parent="tbl_dyn_comp" style="text;html=1;align=left;fontSize=10;spacingLeft=5;fontStyle=2;" value="      &lt;font color=&quot;#E65100&quot;&gt;...dynamic field columns (from component fields)...&lt;/font&gt;" vertex="1">
+          <mxGeometry height="18" width="370" x="5" y="145" as="geometry" />
+        </mxCell>
+        <mxCell id="dc7" parent="tbl_dyn_comp" style="text;html=1;align=left;fontSize=10;spacingLeft=5;" value="      created_at / updated_at TIMESTAMP" vertex="1">
+          <mxGeometry height="18" width="370" x="5" y="170" as="geometry" />
+        </mxCell>
+        <mxCell id="dc_examples" parent="tbl_dyn_comp" style="text;html=1;align=left;fontSize=10;spacingLeft=5;fontColor=#888;" value="&lt;font size=&quot;1&quot;&gt;&lt;b&gt;Examples:&lt;/b&gt; components_cv_page_skills,&lt;br&gt;components_cv_page_experiences,&lt;br&gt;components_cv_page_experiences_roles (nested)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="40" width="370" x="5" y="200" as="geometry" />
+        </mxCell>
+        <mxCell id="a_doc_comp" edge="1" parent="1" source="tbl_dyn_doc" style="endArrow=ERmany;startArrow=ERone;html=1;rounded=1;strokeWidth=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;startFill=0;endFill=0;strokeColor=#C62828;" target="tbl_dyn_comp" value="1:N">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a_ct_doc" edge="1" parent="1" source="tbl_content_types" style="endArrow=ERmany;startArrow=ERone;html=1;rounded=1;strokeWidth=1;startFill=0;endFill=0;strokeColor=#2E7D32;" target="tbl_dyn_doc" value="1:N">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="950" y="400" />
+              <mxPoint x="950" y="770" />
+              <mxPoint x="240" y="770" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="table_summary" parent="1" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;size=18;fillColor=#FFF9C4;strokeColor=#F9A825;fontSize=11;align=left;spacingLeft=10;" value="&lt;b&gt;Table Summary&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;2&quot;&gt;&lt;b&gt;6 system tables&lt;/b&gt; (GORM auto-migrate):&lt;br&gt;users, roles, content_types, media_assets, invites, access_tokens, locales&lt;br&gt;&lt;br&gt;&lt;b&gt;N dynamic tables&lt;/b&gt; (created per content-type on startup sync):&lt;br&gt;documents_&amp;lt;slug&amp;gt; — one per content-type&lt;br&gt;components_&amp;lt;slug&amp;gt;_&amp;lt;path&amp;gt; — one per component field (PostgreSQL only)&lt;br&gt;&lt;br&gt;&lt;b&gt;MongoDB:&lt;/b&gt; System entities use equivalent collections.&lt;br&gt;Documents stored in documents_&amp;lt;slug&amp;gt; collections with schema-less &quot;data&quot; map.&lt;br&gt;Components embedded in document, no separate collections needed.&lt;/font&gt;" vertex="1">
+          <mxGeometry height="250" width="380" x="920" y="820" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
