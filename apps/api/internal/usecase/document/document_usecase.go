@@ -46,51 +46,75 @@ func Status(draft, published *entity.Document) string {
 	return "published"
 }
 
-func componentFieldNames(fields []entity.FieldDefinition) []string {
-	var names []string
+func componentFields(fields []entity.FieldDefinition) []entity.FieldDefinition {
+	var result []entity.FieldDefinition
 	for _, f := range fields {
 		if f.Type == "component" {
-			names = append(names, f.Name)
+			result = append(result, f)
 		}
 	}
-	return names
+	return result
 }
 
 func (uc *UseCase) extractAndSaveComponents(ctx context.Context, slug string, doc *entity.Document, fields []entity.FieldDefinition) error {
 	if uc.compRepo == nil {
 		return nil
 	}
+	return uc.extractAndSaveComponentsRecursive(ctx, slug, "", doc.DocumentID, doc.Locale, doc.Version, doc.Fields, fields)
+}
+
+func (uc *UseCase) extractAndSaveComponentsRecursive(ctx context.Context, slug, prefix, documentID, locale string, version entity.DocumentVersion, data map[string]any, fields []entity.FieldDefinition) error {
 	now := time.Now().UTC()
-	for _, name := range componentFieldNames(fields) {
-		raw, ok := doc.Fields[name]
-		if !ok {
+	for _, field := range componentFields(fields) {
+		raw, ok := data[field.Name]
+		if !ok || raw == nil {
 			continue
 		}
-		delete(doc.Fields, name)
+		delete(data, field.Name)
+
+		path := field.Name
+		if prefix != "" {
+			path = prefix + "_" + field.Name
+		}
 
 		var components []*entity.Component
-		switch v := raw.(type) {
-		case []any:
-			for _, item := range v {
+		if field.Repeatable {
+			arr, ok := raw.([]any)
+			if !ok {
+				return fmt.Errorf("%w: field %q expects an array of components", pkgerrors.ErrValidation, field.Name)
+			}
+			for idx, item := range arr {
 				if m, ok := item.(map[string]any); ok {
+					if err := uc.extractAndSaveComponentsRecursive(ctx, slug, path, documentID, locale, version, m, field.Fields); err != nil {
+						return err
+					}
 					components = append(components, &entity.Component{
 						ComponentID: uuid.New().String(),
+						SortOrder:   idx,
 						Fields:      m,
 						CreatedAt:   now,
 						UpdatedAt:   now,
 					})
 				}
 			}
-		case map[string]any:
+		} else {
+			m, ok := raw.(map[string]any)
+			if !ok {
+				return fmt.Errorf("%w: field %q expects a single component, not an array", pkgerrors.ErrValidation, field.Name)
+			}
+			if err := uc.extractAndSaveComponentsRecursive(ctx, slug, path, documentID, locale, version, m, field.Fields); err != nil {
+				return err
+			}
 			components = append(components, &entity.Component{
 				ComponentID: uuid.New().String(),
-				Fields:      v,
+				SortOrder:   0,
+				Fields:      m,
 				CreatedAt:   now,
 				UpdatedAt:   now,
 			})
 		}
 
-		if err := uc.compRepo.UpsertAll(ctx, slug, name, doc.DocumentID, doc.Locale, doc.Version, components); err != nil {
+		if err := uc.compRepo.UpsertAll(ctx, slug, path, documentID, locale, version, components); err != nil {
 			return err
 		}
 	}
@@ -101,19 +125,74 @@ func (uc *UseCase) mergeComponents(ctx context.Context, slug string, doc *entity
 	if uc.compRepo == nil {
 		return nil
 	}
-	for _, name := range componentFieldNames(fields) {
-		components, err := uc.compRepo.FindByDocumentID(ctx, slug, name, doc.DocumentID, doc.Locale, doc.Version)
+	return uc.mergeComponentsRecursive(ctx, slug, "", doc.DocumentID, doc.Locale, doc.Version, doc.Fields, fields)
+}
+
+func (uc *UseCase) mergeComponentsRecursive(ctx context.Context, slug, prefix, documentID, locale string, version entity.DocumentVersion, data map[string]any, fields []entity.FieldDefinition) error {
+	for _, field := range componentFields(fields) {
+		path := field.Name
+		if prefix != "" {
+			path = prefix + "_" + field.Name
+		}
+
+		components, err := uc.compRepo.FindByDocumentID(ctx, slug, path, documentID, locale, version)
 		if err != nil {
 			return err
 		}
-		if len(components) == 1 {
-			doc.Fields[name] = components[0].Fields
-		} else if len(components) > 1 {
+		if field.Repeatable {
 			arr := make([]map[string]any, len(components))
-			for i, c := range components {
-				arr[i] = c.Fields
+			for i, comp := range components {
+				if err := uc.mergeComponentsRecursive(ctx, slug, path, documentID, locale, version, comp.Fields, field.Fields); err != nil {
+					return err
+				}
+				arr[i] = comp.Fields
 			}
-			doc.Fields[name] = arr
+			data[field.Name] = arr
+		} else {
+			if len(components) >= 1 {
+				if err := uc.mergeComponentsRecursive(ctx, slug, path, documentID, locale, version, components[0].Fields, field.Fields); err != nil {
+					return err
+				}
+				data[field.Name] = components[0].Fields
+			}
+		}
+	}
+	return nil
+}
+
+func (uc *UseCase) publishComponentsRecursive(ctx context.Context, slug, prefix, documentID, locale string, fields []entity.FieldDefinition) error {
+	for _, field := range componentFields(fields) {
+		path := field.Name
+		if prefix != "" {
+			path = prefix + "_" + field.Name
+		}
+		draftComps, err := uc.compRepo.FindByDocumentID(ctx, slug, path, documentID, locale, entity.VersionDraft)
+		if err != nil {
+			return err
+		}
+		if err := uc.compRepo.UpsertAll(ctx, slug, path, documentID, locale, entity.VersionPublished, draftComps); err != nil {
+			return err
+		}
+		if err := uc.publishComponentsRecursive(ctx, slug, path, documentID, locale, field.Fields); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (uc *UseCase) deleteComponentsRecursive(ctx context.Context, slug, prefix, documentID string, fields []entity.FieldDefinition) error {
+	for _, field := range componentFields(fields) {
+		path := field.Name
+		if prefix != "" {
+			path = prefix + "_" + field.Name
+		}
+		if err := uc.deleteComponentsRecursive(ctx, slug, path, documentID, field.Fields); err != nil {
+			return err
+		}
+		for _, locale := range uc.supportedLocales {
+			if err := uc.compRepo.DeleteByDocumentID(ctx, slug, path, documentID, locale); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -300,14 +379,8 @@ func (uc *UseCase) Publish(ctx context.Context, contentTypeSlug, documentID, loc
 	}
 
 	if uc.compRepo != nil {
-		for _, name := range componentFieldNames(fields) {
-			draftComps, err := uc.compRepo.FindByDocumentID(ctx, contentTypeSlug, name, documentID, locale, entity.VersionDraft)
-			if err != nil {
-				return err
-			}
-			if err := uc.compRepo.UpsertAll(ctx, contentTypeSlug, name, documentID, locale, entity.VersionPublished, draftComps); err != nil {
-				return err
-			}
+		if err := uc.publishComponentsRecursive(ctx, contentTypeSlug, "", documentID, locale, fields); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -463,12 +536,8 @@ func (uc *UseCase) Duplicate(ctx context.Context, contentTypeSlug, sourceDocumen
 
 func (uc *UseCase) Delete(ctx context.Context, contentTypeSlug, documentID string, fields []entity.FieldDefinition) error {
 	if uc.compRepo != nil {
-		for _, name := range componentFieldNames(fields) {
-			for _, locale := range uc.supportedLocales {
-				if err := uc.compRepo.DeleteByDocumentID(ctx, contentTypeSlug, name, documentID, locale); err != nil {
-					return err
-				}
-			}
+		if err := uc.deleteComponentsRecursive(ctx, contentTypeSlug, "", documentID, fields); err != nil {
+			return err
 		}
 	}
 	for _, locale := range uc.supportedLocales {

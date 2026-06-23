@@ -796,6 +796,280 @@ func TestDuplicate_InvalidLocale(t *testing.T) {
 
 // ---- Delete ---------------------------------------------------------
 
+// ---- Repeatable Component Validation ----------------------------------------
+
+func TestSave_RepeatableComponent_ArrayData_Success(t *testing.T) {
+	repo := &repomock.DocumentRepository{}
+	repo.FindDraftByDocumentIDFn = func(_ context.Context, _, _, _ string) (*entity.Document, error) {
+		return nil, pkgerrors.ErrNotFound
+	}
+	repo.UpsertDraftFn = func(_ context.Context, _ string, _ *entity.Document) error { return nil }
+
+	var savedComps []*entity.Component
+	compRepo := &repomock.ComponentRepository{}
+	compRepo.UpsertAllFn = func(_ context.Context, _, _, _, _ string, _ entity.DocumentVersion, comps []*entity.Component) error {
+		savedComps = comps
+		return nil
+	}
+
+	fields := []entity.FieldDefinition{
+		{Name: "skills", Type: "component", Repeatable: true},
+	}
+	doc := &entity.Document{
+		Fields: map[string]any{
+			"skills": []any{
+				map[string]any{"category": "Frontend"},
+				map[string]any{"category": "Backend"},
+			},
+		},
+	}
+
+	uc := docuc.New(repo, compRepo, &repomock.MediaAssetRepository{}, supportedLocales)
+	_, err := uc.Save(ctx, testSlug, doc, fields, "user-1")
+	if err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+	if len(savedComps) != 2 {
+		t.Fatalf("saved %d components, want 2", len(savedComps))
+	}
+	if savedComps[0].SortOrder != 0 {
+		t.Errorf("savedComps[0].SortOrder = %d, want 0", savedComps[0].SortOrder)
+	}
+	if savedComps[1].SortOrder != 1 {
+		t.Errorf("savedComps[1].SortOrder = %d, want 1", savedComps[1].SortOrder)
+	}
+}
+
+func TestSave_RepeatableComponent_ObjectData_ReturnsError(t *testing.T) {
+	repo := &repomock.DocumentRepository{}
+	repo.FindDraftByDocumentIDFn = func(_ context.Context, _, _, _ string) (*entity.Document, error) {
+		return nil, pkgerrors.ErrNotFound
+	}
+	repo.UpsertDraftFn = func(_ context.Context, _ string, _ *entity.Document) error { return nil }
+	compRepo := &repomock.ComponentRepository{}
+
+	fields := []entity.FieldDefinition{
+		{Name: "skills", Type: "component", Repeatable: true},
+	}
+	doc := &entity.Document{
+		Fields: map[string]any{
+			"skills": map[string]any{"category": "Frontend"},
+		},
+	}
+
+	uc := docuc.New(repo, compRepo, &repomock.MediaAssetRepository{}, supportedLocales)
+	_, err := uc.Save(ctx, testSlug, doc, fields, "user-1")
+	if !pkgerrors.Is(err, pkgerrors.ErrValidation) {
+		t.Errorf("Save() error = %v, want ErrValidation", err)
+	}
+}
+
+func TestSave_NonRepeatableComponent_ObjectData_Success(t *testing.T) {
+	repo := &repomock.DocumentRepository{}
+	repo.FindDraftByDocumentIDFn = func(_ context.Context, _, _, _ string) (*entity.Document, error) {
+		return nil, pkgerrors.ErrNotFound
+	}
+	repo.UpsertDraftFn = func(_ context.Context, _ string, _ *entity.Document) error { return nil }
+
+	var savedComps []*entity.Component
+	compRepo := &repomock.ComponentRepository{}
+	compRepo.UpsertAllFn = func(_ context.Context, _, _, _, _ string, _ entity.DocumentVersion, comps []*entity.Component) error {
+		savedComps = comps
+		return nil
+	}
+
+	fields := []entity.FieldDefinition{
+		{Name: "banner", Type: "component", Repeatable: false},
+	}
+	doc := &entity.Document{
+		Fields: map[string]any{
+			"banner": map[string]any{"title": "Hello"},
+		},
+	}
+
+	uc := docuc.New(repo, compRepo, &repomock.MediaAssetRepository{}, supportedLocales)
+	_, err := uc.Save(ctx, testSlug, doc, fields, "user-1")
+	if err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+	if len(savedComps) != 1 {
+		t.Fatalf("saved %d components, want 1", len(savedComps))
+	}
+	if savedComps[0].SortOrder != 0 {
+		t.Errorf("savedComps[0].SortOrder = %d, want 0", savedComps[0].SortOrder)
+	}
+}
+
+func TestSave_NonRepeatableComponent_ArrayData_ReturnsError(t *testing.T) {
+	repo := &repomock.DocumentRepository{}
+	repo.FindDraftByDocumentIDFn = func(_ context.Context, _, _, _ string) (*entity.Document, error) {
+		return nil, pkgerrors.ErrNotFound
+	}
+	repo.UpsertDraftFn = func(_ context.Context, _ string, _ *entity.Document) error { return nil }
+	compRepo := &repomock.ComponentRepository{}
+
+	fields := []entity.FieldDefinition{
+		{Name: "banner", Type: "component", Repeatable: false},
+	}
+	doc := &entity.Document{
+		Fields: map[string]any{
+			"banner": []any{map[string]any{"title": "Hello"}},
+		},
+	}
+
+	uc := docuc.New(repo, compRepo, &repomock.MediaAssetRepository{}, supportedLocales)
+	_, err := uc.Save(ctx, testSlug, doc, fields, "user-1")
+	if !pkgerrors.Is(err, pkgerrors.ErrValidation) {
+		t.Errorf("Save() error = %v, want ErrValidation", err)
+	}
+}
+
+func TestSave_RepeatableComponent_EmptyArray_Success(t *testing.T) {
+	repo := &repomock.DocumentRepository{}
+	repo.FindDraftByDocumentIDFn = func(_ context.Context, _, _, _ string) (*entity.Document, error) {
+		return nil, pkgerrors.ErrNotFound
+	}
+	repo.UpsertDraftFn = func(_ context.Context, _ string, _ *entity.Document) error { return nil }
+
+	var savedComps []*entity.Component
+	compRepo := &repomock.ComponentRepository{}
+	compRepo.UpsertAllFn = func(_ context.Context, _, _, _, _ string, _ entity.DocumentVersion, comps []*entity.Component) error {
+		savedComps = comps
+		return nil
+	}
+
+	fields := []entity.FieldDefinition{
+		{Name: "skills", Type: "component", Repeatable: true},
+	}
+	doc := &entity.Document{
+		Fields: map[string]any{
+			"skills": []any{},
+		},
+	}
+
+	uc := docuc.New(repo, compRepo, &repomock.MediaAssetRepository{}, supportedLocales)
+	_, err := uc.Save(ctx, testSlug, doc, fields, "user-1")
+	if err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+	if len(savedComps) != 0 {
+		t.Errorf("saved %d components, want 0", len(savedComps))
+	}
+}
+
+// ---- Merge Component Shape --------------------------------------------------
+
+func TestMergeComponents_Repeatable_SingleItem_ReturnsArray(t *testing.T) {
+	repo := &repomock.DocumentRepository{}
+	compRepo := &repomock.ComponentRepository{}
+	compRepo.FindByDocumentIDFn = func(_ context.Context, _, _, _, _ string, _ entity.DocumentVersion) ([]*entity.Component, error) {
+		return []*entity.Component{
+			{ComponentID: "c1", Fields: map[string]any{"category": "Frontend"}},
+		}, nil
+	}
+
+	fields := []entity.FieldDefinition{
+		{Name: "skills", Type: "component", Repeatable: true},
+	}
+
+	repo.FindDraftByDocumentIDFn = func(_ context.Context, _, _, _ string) (*entity.Document, error) {
+		return &entity.Document{DocumentID: "d1", Locale: "en", Version: entity.VersionDraft, Fields: map[string]any{}, UpdatedAt: time.Now()}, nil
+	}
+	repo.FindPublishedByDocumentIDFn = func(_ context.Context, _, _, _ string) (*entity.Document, error) {
+		return nil, pkgerrors.ErrNotFound
+	}
+
+	uc2 := docuc.New(repo, compRepo, &repomock.MediaAssetRepository{}, supportedLocales)
+	result, _, err := uc2.GetForEdit(ctx, testSlug, "d1", "en", fields)
+	if err != nil {
+		t.Fatalf("GetForEdit() error = %v", err)
+	}
+
+	raw := result.Fields["skills"]
+	arr, ok := raw.([]map[string]any)
+	if !ok {
+		t.Fatalf("skills type = %T, want []map[string]any", raw)
+	}
+	if len(arr) != 1 {
+		t.Fatalf("skills len = %d, want 1", len(arr))
+	}
+	if arr[0]["category"] != "Frontend" {
+		t.Errorf("skills[0].category = %v, want Frontend", arr[0]["category"])
+	}
+}
+
+func TestMergeComponents_Repeatable_ZeroItems_ReturnsEmptyArray(t *testing.T) {
+	repo := &repomock.DocumentRepository{}
+	repo.FindDraftByDocumentIDFn = func(_ context.Context, _, _, _ string) (*entity.Document, error) {
+		return &entity.Document{DocumentID: "d1", Locale: "en", Version: entity.VersionDraft, Fields: map[string]any{}, UpdatedAt: time.Now()}, nil
+	}
+	repo.FindPublishedByDocumentIDFn = func(_ context.Context, _, _, _ string) (*entity.Document, error) {
+		return nil, pkgerrors.ErrNotFound
+	}
+
+	compRepo := &repomock.ComponentRepository{}
+	compRepo.FindByDocumentIDFn = func(_ context.Context, _, _, _, _ string, _ entity.DocumentVersion) ([]*entity.Component, error) {
+		return nil, nil
+	}
+
+	fields := []entity.FieldDefinition{
+		{Name: "skills", Type: "component", Repeatable: true},
+	}
+
+	uc := docuc.New(repo, compRepo, &repomock.MediaAssetRepository{}, supportedLocales)
+	result, _, err := uc.GetForEdit(ctx, testSlug, "d1", "en", fields)
+	if err != nil {
+		t.Fatalf("GetForEdit() error = %v", err)
+	}
+
+	raw := result.Fields["skills"]
+	arr, ok := raw.([]map[string]any)
+	if !ok {
+		t.Fatalf("skills type = %T, want []map[string]any", raw)
+	}
+	if len(arr) != 0 {
+		t.Errorf("skills len = %d, want 0", len(arr))
+	}
+}
+
+func TestMergeComponents_NonRepeatable_SingleItem_ReturnsObject(t *testing.T) {
+	repo := &repomock.DocumentRepository{}
+	repo.FindDraftByDocumentIDFn = func(_ context.Context, _, _, _ string) (*entity.Document, error) {
+		return &entity.Document{DocumentID: "d1", Locale: "en", Version: entity.VersionDraft, Fields: map[string]any{}, UpdatedAt: time.Now()}, nil
+	}
+	repo.FindPublishedByDocumentIDFn = func(_ context.Context, _, _, _ string) (*entity.Document, error) {
+		return nil, pkgerrors.ErrNotFound
+	}
+
+	compRepo := &repomock.ComponentRepository{}
+	compRepo.FindByDocumentIDFn = func(_ context.Context, _, _, _, _ string, _ entity.DocumentVersion) ([]*entity.Component, error) {
+		return []*entity.Component{
+			{ComponentID: "c1", Fields: map[string]any{"title": "Banner Title"}},
+		}, nil
+	}
+
+	fields := []entity.FieldDefinition{
+		{Name: "banner", Type: "component", Repeatable: false},
+	}
+
+	uc := docuc.New(repo, compRepo, &repomock.MediaAssetRepository{}, supportedLocales)
+	result, _, err := uc.GetForEdit(ctx, testSlug, "d1", "en", fields)
+	if err != nil {
+		t.Fatalf("GetForEdit() error = %v", err)
+	}
+
+	raw := result.Fields["banner"]
+	m, ok := raw.(map[string]any)
+	if !ok {
+		t.Fatalf("banner type = %T, want map[string]any", raw)
+	}
+	if m["title"] != "Banner Title" {
+		t.Errorf("banner.title = %v, want Banner Title", m["title"])
+	}
+}
+
+// ---- Delete ---------------------------------------------------------
+
 func TestDelete_DeletesAllLocales(t *testing.T) {
 	var deletedLocales []string
 

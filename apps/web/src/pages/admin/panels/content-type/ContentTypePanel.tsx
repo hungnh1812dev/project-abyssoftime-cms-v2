@@ -16,6 +16,7 @@ import { useState } from 'react';
 import { LocaleSelector } from '@/components/locale/LocaleSelector';
 import { ContentDetailLayout } from './ContentDetailLayout';
 import { ContentTypeBuilder } from './ContentTypeBuilder';
+import type { BreadcrumbItem } from '@/hooks/useBreadcrumbs';
 
 function formatAuditDate(value: unknown): string {
   if (!value) return '';
@@ -65,6 +66,11 @@ export function ContentTypePanel({ contentType, id, isNew }: Props) {
   const publishCollection = usePublishCollectionDocument();
   const unpublishCollection = useUnpublishCollectionDocument();
 
+  const breadcrumbs: BreadcrumbItem[] = [
+    { label: 'Home', to: '/admin' },
+    { label: 'Content Manager' },
+  ];
+
   const isLoading = isSingle ? singleQuery.isLoading : !isNew && collectionQuery.isLoading;
   const doc = isSingle ? singleQuery.data : isNew ? undefined : collectionQuery.data;
 
@@ -94,6 +100,7 @@ export function ContentTypePanel({ contentType, id, isNew }: Props) {
     return (
       <ContentDetailLayout
         title={contentType.Name}
+        breadcrumbs={breadcrumbs}
         backLink={
           isNew ? (
             <Link to=".." relative="path" className="text-muted-foreground text-sm hover:underline">

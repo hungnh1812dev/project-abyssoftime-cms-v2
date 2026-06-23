@@ -82,6 +82,31 @@ Spec: [fix-data-loss-ensure-collection.md](../specs/fix-data-loss-ensure-collect
 
 ---
 
+## Phase RC — Repeatable Components
+
+Spec: [repeatable-components.md](../specs/repeatable-components.md). Plan: [plan.md](plan.md) (Phase RC section).
+
+- [x] T1 Entity: `Repeatable bool` on `FieldDefinition`, `SortOrder int` on `Component`
+- [x] T2 TS type: `repeatable?: boolean` on `FieldDefinition`
+- [x] T3 Component repo: `sort_order` column (create + migrate + serialize + order)
+- [x] T4 Sync: `Repeatable` in `fieldsEqual` comparison
+- [x] ✅ Checkpoint 1: `go test ./...` green, no behavior change
+- [x] T5 Usecase: `extractAndSaveComponents` validates shape + assigns `SortOrder`
+- [x] T6 Usecase: `mergeComponents` uses `Repeatable` flag (array vs object)
+- [x] T7 Usecase tests: 6 new tests (validation + merge shape)
+- [x] ✅ Checkpoint 2: `go test ./...` green, shape enforcement active
+- [x] T8 GraphQL SDL: `[Type!]` for repeatable component fields
+- [x] T9 GraphQL resolver: `NewList(NewNonNull(compType))` for repeatable
+- [x] T10 GraphQL test: repeatable component SDL generation
+- [x] ✅ Checkpoint 3: `go test ./...` green
+- [x] T11 `RepeatableComponentField` React component (useFieldArray + add/remove/reorder)
+- [x] T12 `renderSchemaField`: branch on `field.repeatable`
+- [x] T13 Frontend tests: 5 tests for repeatable component UI
+- [x] T14 Barrel export from `@/components/form`
+- [x] ✅ Checkpoint 4 (Final): `vitest run` 186 pass + `tsc --noEmit` clean
+
+---
+
 ## Archive Index
 
 | Archive | Phases | Status |

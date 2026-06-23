@@ -13,6 +13,7 @@ A lightweight, code-first Personal Headless CMS. Developers define content panel
 | **content** | [specs/content.md](specs/content.md) | Content types, documents, draft/publish, schema sync, pagination, GraphQL |
 | **media** | [specs/media.md](specs/media.md) | Media assets, upload/delete, S3/Cloudinary storage adapters |
 | **admin** | [specs/admin.md](specs/admin.md) | User management, invites, access tokens |
+| **i18n** | [specs/internationalization.md](specs/internationalization.md) | Locale management, language settings, locale selector UI |
 
 ---
 
@@ -27,6 +28,9 @@ core ← admin    (invite/access-token repos)
 auth ← admin    (user usecase uses role usecase for assignment)
 content ← media (document delete cascades to media assets)
 content ← auth  (auth middleware protects content routes)
+core ← i18n     (locale repo, locale entity)
+i18n ← auth     (super_admin guard on write endpoints)
+i18n ← content  (DocumentRepository.CountByLocale for deletion guard)
 ```
 
 All cross-module communication goes through interfaces defined in `core` (`domain/repository/`). No module imports another module's usecase directly.
@@ -121,6 +125,7 @@ The frontend spec is not modularized. Key sections:
 | `/admin/content-type/collection-type/:slug` | CollectionListPage |
 | `/admin/content-type/collection-type/:slug/new` | CollectionDetailPage |
 | `/admin/content-type/collection-type/:slug/:id` | CollectionDetailPage |
+| `/admin/settings/internationalize` | InternationalizePage |
 
 ### Components
 - **ContentTypeLayout**: Layout shell with `renderHeader` / `renderActions` slots
@@ -138,8 +143,9 @@ The frontend spec is not modularized. Key sections:
 | Successful save | `toast.success('Saved')` → invalidate → reset → Save disabled |
 
 ### Locale Switching
-- `useLocales()` fetches available locales on mount
-- `<select>` in `renderActions` only when `locales.length > 1`
+- `useLocales()` fetches `Locale[]` objects (code + name + isDefault) on mount
+- `LocaleSelector` dropdown always visible; displays language **name**, uses **code** as value
+- Default locale pre-selected when no explicit selection exists
 - Locale change → re-fetch document → form reset → `isDirty = false`
 - All mutations forward `locale: activeLocale`
 
@@ -179,3 +185,5 @@ The frontend spec is not modularized. Key sections:
 | Spec ready | core | [Fix Data Loss in EnsureCollection](specs/fix-data-loss-ensure-collection.md) — Non-destructive schema sync to prevent data wipe on cold start |
 | Spec ready | content | [Duplicate Document](specs/duplicate-document.md) — Collection List row action to fully clone a document |
 | Spec ready | content | [Configurable List Columns](specs/configurable-list-columns.md) — UI popup to choose visible columns on CollectionListPage, persisted to DB |
+| Spec ready | i18n | [Internationalization](specs/internationalization.md) — DB-backed locale management, settings page, locale selector in CollectionListPage |
+| Spec ready | content | [Repeatable Components](specs/repeatable-components.md) — Component fields support single-item (non-repeatable) and ordered array (repeatable) modes |

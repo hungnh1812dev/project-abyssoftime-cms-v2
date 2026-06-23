@@ -10,10 +10,11 @@ const (
 )
 
 type FieldDefinition struct {
-	Name   string            `json:"name"             bson:"name"`
-	Type   string            `json:"type"             bson:"type"`
-	Ext    []string          `json:"ext,omitempty"    bson:"ext,omitempty"`
-	Fields []FieldDefinition `json:"fields,omitempty" bson:"fields,omitempty"`
+	Name       string            `json:"name"                    bson:"name"`
+	Type       string            `json:"type"                    bson:"type"`
+	Ext        []string          `json:"ext,omitempty"           bson:"ext,omitempty"`
+	Repeatable bool              `json:"repeatable,omitempty"    bson:"repeatable,omitempty"`
+	Fields     []FieldDefinition `json:"fields,omitempty"        bson:"fields,omitempty"`
 }
 
 type ContentType struct {

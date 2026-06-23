@@ -52,7 +52,7 @@ export function MediaInput({ name, control, ext, 'aria-label': ariaLabel }: Medi
               {displayUrl ? (
                 <>
                   <img src={displayUrl} alt={fileName ?? 'media preview'} className="h-auto max-h-40 w-full object-contain" />
-                  {fileName && <span className="text-muted-foreground block truncate border-t px-2 py-1 text-[11px]">{fileName}</span>}
+                  {fileName && <span className="text-muted-foreground block truncate border-t px-2 py-1 text-center text-[11px]">{fileName}</span>}
                   <button
                     type="button"
                     aria-label="Remove image"

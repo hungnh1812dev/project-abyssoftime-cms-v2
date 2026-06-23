@@ -5,3 +5,4 @@ export { TextInput } from './inputs/TextInput';
 export { NumberInput } from './inputs/NumberInput';
 export { BooleanInput } from './inputs/BooleanInput';
 export { MediaInput } from './inputs/MediaInput';
+export { RepeatableComponentField } from './inputs/RepeatableComponentField';

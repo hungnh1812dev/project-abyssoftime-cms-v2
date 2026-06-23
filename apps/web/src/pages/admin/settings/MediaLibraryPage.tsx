@@ -1,16 +1,18 @@
 import { useState } from 'react';
-import { Trash2 } from 'lucide-react';
+import { Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { useMediaList, useUploadMedia, useDeleteMedia } from '@/hooks/useMedia';
+import type { MediaAsset } from '@/types/cms';
 
 export function MediaLibraryPage() {
   const [page, setPage] = useState(1);
   const [stagedFiles, setStagedFiles] = useState<File[]>([]);
+  const [deleteTarget, setDeleteTarget] = useState<MediaAsset | null>(null);
 
   const { data, isLoading } = useMediaList(page, 20);
   const upload = useUploadMedia();
   const deleteMedia = useDeleteMedia();
-  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const items = data?.items ?? [];
   const total = data?.total ?? 0;
@@ -55,30 +57,49 @@ export function MediaLibraryPage() {
         </div>
       </div>
 
+      {stagedFiles.length > 0 && (
+        <div className="space-y-3 rounded-lg border p-4">
+          <p className="text-muted-foreground text-sm font-medium">Ready to upload</p>
+          <div className="grid grid-cols-5 gap-4">
+            {stagedFiles.map((file, fileIndex) => (
+              <div key={fileIndex} className="group relative">
+                <div className="bg-muted relative aspect-square overflow-hidden rounded border">
+                  <img
+                    src={URL.createObjectURL(file)}
+                    alt={file.name}
+                    className="h-full w-full object-contain"
+                    onLoad={(event) => URL.revokeObjectURL((event.target as HTMLImageElement).src)}
+                  />
+                  <span className="absolute right-0 bottom-0 left-0 truncate bg-black/60 px-1.5 py-0.5 text-[10px] text-white">{file.name}</span>
+                </div>
+                <button
+                  type="button"
+                  aria-label="Remove file"
+                  className="bg-background/80 text-muted-foreground hover:text-destructive absolute top-1 right-1 rounded p-1 opacity-0 transition-colors group-hover:opacity-100"
+                  onClick={() => setStagedFiles((prev) => prev.filter((_, idx) => idx !== fileIndex))}>
+                  <X size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {isLoading ? (
         <p className="text-muted-foreground">Loading…</p>
       ) : (
         <div className="grid grid-cols-5 gap-4">
           {items.map((asset) => (
             <div key={asset.ID} className="group relative">
-              <div className="aspect-square overflow-hidden rounded border">
-                <img src={asset.thumbnailUrl || asset.url} alt={asset.fileName} className="h-full w-full object-cover" />
+              <div className="relative aspect-square overflow-hidden rounded border">
+                <img src={asset.thumbnailUrl || asset.url} alt={asset.fileName} className="h-full w-full object-contain" />
+                <span className="absolute right-0 bottom-0 left-0 truncate bg-black/60 px-1.5 py-0.5 text-[10px] text-white">{asset.fileName}</span>
               </div>
               <button
                 type="button"
-                aria-label={pendingDeleteId === asset.ID ? 'Confirm delete' : 'Delete asset'}
-                className={`bg-background/80 absolute top-1 right-1 rounded p-1 transition-colors ${
-                  pendingDeleteId === asset.ID ? 'text-destructive' : 'text-muted-foreground opacity-0 group-hover:opacity-100'
-                }`}
-                onClick={() => {
-                  if (pendingDeleteId === asset.ID) {
-                    deleteMedia.mutate(asset.ID);
-                    setPendingDeleteId(null);
-                  } else {
-                    setPendingDeleteId(asset.ID);
-                  }
-                }}
-                onMouseLeave={() => setPendingDeleteId(null)}>
+                aria-label="Delete asset"
+                className="bg-background/80 text-muted-foreground absolute top-1 right-1 rounded p-1 opacity-0 transition-colors group-hover:opacity-100"
+                onClick={() => setDeleteTarget(asset)}>
                 <Trash2 size={14} />
               </button>
             </div>
@@ -99,6 +120,33 @@ export function MediaLibraryPage() {
           </Button>
         </div>
       </div>
+
+      <Dialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete media</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete <strong>{deleteTarget?.fileName}</strong>? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              loading={deleteMedia.isPending}
+              onClick={() => {
+                if (!deleteTarget) return;
+                deleteMedia.mutate(deleteTarget.documentId, {
+                  onSuccess: () => setDeleteTarget(null),
+                });
+              }}>
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

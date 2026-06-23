@@ -183,16 +183,24 @@ func (f *ResolverFactory) BuildHandler(defs []contenttype.ContentTypeDefinition)
 }
 
 func (f *ResolverFactory) buildComponentType(parentType string, fd entity.FieldDefinition, jsonSc *graphql.Scalar, mediaType *graphql.Object) *graphql.Object {
+	typeName := parentType + slugToPascalCase(fd.Name)
 	compFields := graphql.Fields{}
-	for _, sub := range fd.Fields {
-		if sub.Type == "media" {
+	for _, sub := range flattenLayoutFieldsDef(fd.Fields) {
+		if sub.Type == "component" {
+			nestedType := f.buildComponentType(typeName, sub, jsonSc, mediaType)
+			if sub.Repeatable {
+				compFields[sub.Name] = &graphql.Field{Type: graphql.NewList(graphql.NewNonNull(nestedType))}
+			} else {
+				compFields[sub.Name] = &graphql.Field{Type: nestedType}
+			}
+		} else if sub.Type == "media" {
 			compFields[sub.Name] = &graphql.Field{Type: mediaType}
 		} else {
 			compFields[sub.Name] = &graphql.Field{Type: gqlScalarFor(sub.Type, jsonSc)}
 		}
 	}
 	return graphql.NewObject(graphql.ObjectConfig{
-		Name:   parentType + slugToPascalCase(fd.Name),
+		Name:   typeName,
 		Fields: compFields,
 	})
 }
@@ -212,7 +220,11 @@ func (f *ResolverFactory) buildObjectType(def contenttype.ContentTypeDefinition,
 		}
 		if fd.Type == "component" {
 			compType := f.buildComponentType(typeName, fd, jsonSc, mediaType)
-			fields[fd.Name] = &graphql.Field{Type: compType}
+			if fd.Repeatable {
+				fields[fd.Name] = &graphql.Field{Type: graphql.NewList(graphql.NewNonNull(compType))}
+			} else {
+				fields[fd.Name] = &graphql.Field{Type: compType}
+			}
 			continue
 		}
 		if fd.Type == "media" {

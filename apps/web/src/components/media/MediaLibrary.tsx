@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import { useMediaList, useUploadMedia, useDeleteMedia } from '@/hooks/useMedia';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import type { MediaAsset } from '@/types/cms';
 
 interface MediaLibraryProps {
@@ -15,7 +16,7 @@ export function MediaLibrary({ isOpen, onClose, onSelect, ext }: MediaLibraryPro
   const [page, setPage] = useState(1);
   const [showUpload, setShowUpload] = useState(false);
   const [stagedFiles, setStagedFiles] = useState<File[]>([]);
-  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<MediaAsset | null>(null);
 
   const { data, isLoading } = useMediaList(page, 20);
   const upload = useUploadMedia();
@@ -46,7 +47,7 @@ export function MediaLibrary({ isOpen, onClose, onSelect, ext }: MediaLibraryPro
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}>
-      <div className="bg-background flex max-h-[80vh] w-[720px] flex-col overflow-hidden rounded-lg shadow-lg">
+      <div className="bg-background flex max-h-[80vh] w-3xl flex-col overflow-hidden rounded-lg shadow-lg">
         <div className="flex items-center justify-between border-b p-4">
           <h2 className="font-semibold">Media Library</h2>
           <div className="flex gap-2">
@@ -135,7 +136,7 @@ export function MediaLibrary({ isOpen, onClose, onSelect, ext }: MediaLibraryPro
                 <div key={asset.ID} className="group relative">
                   <button
                     type="button"
-                    className={`aspect-square w-full overflow-hidden rounded-lg border-2 transition-all ${
+                    className={`relative aspect-square w-full overflow-hidden rounded-lg border-2 transition-all ${
                       ext && !ext.includes(asset.fileExt) ? 'border-muted opacity-40' : 'border-border hover:border-primary hover:ring-primary/20 hover:shadow-md hover:ring-2'
                     }`}
                     disabled={deleteMedia.isPending}
@@ -143,25 +144,17 @@ export function MediaLibrary({ isOpen, onClose, onSelect, ext }: MediaLibraryPro
                       onSelect(asset);
                       onClose();
                     }}>
-                    <img src={asset.thumbnailUrl || asset.url} alt={asset.fileName} className="h-full w-full object-cover" />
-                    <span className="absolute right-0 bottom-0 left-0 truncate bg-black/60 px-1.5 py-0.5 text-[10px] text-white">{asset.fileName}</span>
+                    <img src={asset.thumbnailUrl || asset.url} alt={asset.fileName} className="h-full w-full object-contain" />
+                    <span className="absolute right-0 bottom-0 left-0 truncate bg-black/60 px-1.5 py-0.5 text-center text-[10px] text-white">{asset.fileName}</span>
                   </button>
                   <button
                     type="button"
-                    aria-label={pendingDeleteId === asset.ID ? 'Confirm delete' : 'Delete asset'}
-                    className={`bg-background/80 absolute top-1 right-1 rounded p-0.5 transition-colors ${
-                      pendingDeleteId === asset.ID ? 'text-red-500' : 'text-muted-foreground opacity-0 group-hover:opacity-100'
-                    }`}
+                    aria-label="Delete asset"
+                    className="bg-background/80 text-muted-foreground absolute top-1 right-1 rounded p-0.5 opacity-0 transition-colors group-hover:opacity-100"
                     onClick={(event) => {
                       event.stopPropagation();
-                      if (pendingDeleteId === asset.ID) {
-                        deleteMedia.mutate(asset.ID);
-                        setPendingDeleteId(null);
-                      } else {
-                        setPendingDeleteId(asset.ID);
-                      }
-                    }}
-                    onMouseLeave={() => setPendingDeleteId(null)}>
+                      setDeleteTarget(asset);
+                    }}>
                     <Trash2 size={14} />
                   </button>
                 </div>
@@ -184,6 +177,33 @@ export function MediaLibrary({ isOpen, onClose, onSelect, ext }: MediaLibraryPro
           </div>
         </div>
       </div>
+
+      <Dialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete media</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete <strong>{deleteTarget?.fileName}</strong>? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              loading={deleteMedia.isPending}
+              onClick={() => {
+                if (!deleteTarget) return;
+                deleteMedia.mutate(deleteTarget.documentId, {
+                  onSuccess: () => setDeleteTarget(null),
+                });
+              }}>
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

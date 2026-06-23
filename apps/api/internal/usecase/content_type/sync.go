@@ -98,12 +98,45 @@ func (s *Syncer) syncOne(ctx context.Context, def ContentTypeDefinition) error {
 }
 
 func (s *Syncer) ensureComponentTables(ctx context.Context, slug string, fields []entity.FieldDefinition) error {
+	return s.ensureComponentTablesRecursive(ctx, slug, "", fields)
+}
+
+func (s *Syncer) ensureComponentTablesRecursive(ctx context.Context, slug, prefix string, fields []entity.FieldDefinition) error {
 	if s.compRepo == nil {
 		return nil
 	}
 	for _, f := range fields {
 		if f.Type == "component" {
-			if err := s.compRepo.EnsureCollection(ctx, slug, f.Name, f.Fields); err != nil {
+			path := f.Name
+			if prefix != "" {
+				path = prefix + "_" + f.Name
+			}
+			if err := s.compRepo.EnsureCollection(ctx, slug, path, f.Fields); err != nil {
+				return err
+			}
+			if err := s.ensureComponentTablesRecursive(ctx, slug, path, f.Fields); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (s *Syncer) dropComponentTables(ctx context.Context, slug string, fields []entity.FieldDefinition) error {
+	return s.dropComponentTablesRecursive(ctx, slug, "", fields)
+}
+
+func (s *Syncer) dropComponentTablesRecursive(ctx context.Context, slug, prefix string, fields []entity.FieldDefinition) error {
+	for _, f := range fields {
+		if f.Type == "component" {
+			path := f.Name
+			if prefix != "" {
+				path = prefix + "_" + f.Name
+			}
+			if err := s.dropComponentTablesRecursive(ctx, slug, path, f.Fields); err != nil {
+				return err
+			}
+			if err := s.compRepo.DropCollection(ctx, slug, path); err != nil {
 				return err
 			}
 		}
@@ -128,7 +161,7 @@ func fieldsEqual(a, b []entity.FieldDefinition) bool {
 		return false
 	}
 	for i := range a {
-		if a[i].Name != b[i].Name || a[i].Type != b[i].Type {
+		if a[i].Name != b[i].Name || a[i].Type != b[i].Type || a[i].Repeatable != b[i].Repeatable {
 			return false
 		}
 		if !fieldsEqual(a[i].Fields, b[i].Fields) {
@@ -149,12 +182,8 @@ func (s *Syncer) removeContentType(ctx context.Context, ct *entity.ContentType) 
 		}
 	}
 	if s.compRepo != nil {
-		for _, f := range ct.Fields {
-			if f.Type == "component" {
-				if err := s.compRepo.DropCollection(ctx, ct.Slug, f.Name); err != nil {
-					return err
-				}
-			}
+		if err := s.dropComponentTables(ctx, ct.Slug, ct.Fields); err != nil {
+			return err
 		}
 	}
 	if err := s.docRepo.DropCollection(ctx, ct.Slug); err != nil {
