@@ -16,6 +16,10 @@ const (
 	refreshCookieMaxAgeRemember = 30 * 24 * 60 * 60 // 30 days
 )
 
+func noStoreHeader(ginCtx *gin.Context) {
+	ginCtx.Header("Cache-Control", "no-store")
+}
+
 type authUseCase interface {
 	Register(ctx context.Context, email, password, displayName string) (*entity.User, error)
 	Login(ctx context.Context, email, password string) (accessToken, refreshToken string, err error)
@@ -83,6 +87,7 @@ func (h *AuthHandler) Login(ginCtx *gin.Context) {
 	ginCtx.SetSameSite(h.cookieSameSite)
 	ginCtx.SetCookie(RefreshCookieName, refresh, maxAge, "/", "", h.cookieSecure, true)
 
+	noStoreHeader(ginCtx)
 	ginCtx.JSON(http.StatusOK, gin.H{
 		"accessToken": access,
 	})
@@ -104,6 +109,7 @@ func (h *AuthHandler) Refresh(ginCtx *gin.Context) {
 	ginCtx.SetSameSite(h.cookieSameSite)
 	ginCtx.SetCookie(RefreshCookieName, refresh, refreshCookieMaxAgeRemember, "/", "", h.cookieSecure, true)
 
+	noStoreHeader(ginCtx)
 	ginCtx.JSON(http.StatusOK, gin.H{
 		"accessToken": access,
 	})
@@ -123,5 +129,7 @@ func (h *AuthHandler) SetupStatus(ginCtx *gin.Context) {
 func (h *AuthHandler) Logout(ginCtx *gin.Context) {
 	ginCtx.SetSameSite(h.cookieSameSite)
 	ginCtx.SetCookie(RefreshCookieName, "", -1, "/", "", h.cookieSecure, true)
-	ginCtx.Status(http.StatusOK)
+
+	noStoreHeader(ginCtx)
+	ginCtx.JSON(http.StatusOK, gin.H{"ok": true})
 }

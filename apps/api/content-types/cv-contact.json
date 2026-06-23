@@ -1,0 +1,29 @@
+{
+  "slug": "cv-contact",
+  "name": "Contact Information",
+  "kind": "single",
+  "fields": [
+    {
+      "type": "layout",
+      "fields": [
+        { "name": "name", "type": "text" },
+        { "name": "address", "type": "text" }
+      ]
+    },
+    {
+      "type": "layout",
+      "fields": [
+        { "name": "phone", "type": "text" },
+        { "name": "email", "type": "text" }
+      ]
+    },
+    {
+      "type": "layout",
+      "fields": [
+        { "name": "linkedin", "type": "text" },
+        { "name": "github", "type": "text" }
+      ]
+    },
+    { "name": "avatar", "type": "media" }
+  ]
+}

@@ -71,7 +71,11 @@ func (b *SchemaBuilder) BuildContentTypeSDL(def contenttype.ContentTypeDefinitio
 		}
 		if f.Type == "component" {
 			compType := typeName + slugToPascalCase(f.Name)
-			fmt.Fprintf(&sb, "  %s: %s\n", f.Name, compType)
+			if f.Repeatable {
+				fmt.Fprintf(&sb, "  %s: [%s!]\n", f.Name, compType)
+			} else {
+				fmt.Fprintf(&sb, "  %s: %s\n", f.Name, compType)
+			}
 			continue
 		}
 		fmt.Fprintf(&sb, "  %s: %s\n", f.Name, fieldTypeToGraphQL(f.Type))
@@ -132,11 +136,39 @@ func (b *SchemaBuilder) BuildContentTypeSDL(def contenttype.ContentTypeDefinitio
 
 func writeComponentType(sb *strings.Builder, parentType string, f entity.FieldDefinition) {
 	compType := parentType + slugToPascalCase(f.Name)
-	fmt.Fprintf(sb, "type %s {\n", compType)
+
 	for _, sub := range f.Fields {
+		if sub.Type == "component" {
+			writeComponentType(sb, compType, sub)
+		}
+	}
+
+	fmt.Fprintf(sb, "type %s {\n", compType)
+	for _, sub := range flattenLayoutFieldsDef(f.Fields) {
+		if sub.Type == "component" {
+			nestedType := compType + slugToPascalCase(sub.Name)
+			if sub.Repeatable {
+				fmt.Fprintf(sb, "  %s: [%s!]\n", sub.Name, nestedType)
+			} else {
+				fmt.Fprintf(sb, "  %s: %s\n", sub.Name, nestedType)
+			}
+			continue
+		}
 		fmt.Fprintf(sb, "  %s: %s\n", sub.Name, fieldTypeToGraphQL(sub.Type))
 	}
 	sb.WriteString("}\n\n")
+}
+
+func flattenLayoutFieldsDef(fields []entity.FieldDefinition) []entity.FieldDefinition {
+	var result []entity.FieldDefinition
+	for _, f := range fields {
+		if f.Type == "layout" {
+			result = append(result, f.Fields...)
+		} else {
+			result = append(result, f)
+		}
+	}
+	return result
 }
 
 func writeFilterType(sb *strings.Builder, typeName string, fields []entity.FieldDefinition) {

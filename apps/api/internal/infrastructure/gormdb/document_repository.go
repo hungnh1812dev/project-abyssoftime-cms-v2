@@ -475,6 +475,26 @@ func toUint(v any) uint {
 	}
 }
 
+func toInt(v any) int {
+	if v == nil {
+		return 0
+	}
+	switch val := v.(type) {
+	case int:
+		return val
+	case int32:
+		return int(val)
+	case int64:
+		return int(val)
+	case float64:
+		return int(val)
+	case uint:
+		return int(val)
+	default:
+		return 0
+	}
+}
+
 func toTime(v any) time.Time {
 	if v == nil {
 		return time.Time{}

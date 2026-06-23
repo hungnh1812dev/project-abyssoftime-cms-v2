@@ -1,0 +1,157 @@
+{
+  "slug": "cv-page",
+  "name": "CV Page",
+  "kind": "collection",
+  "fields": [
+    {
+      "type": "layout",
+      "fields": [
+        { "name": "position", "type": "text" },
+        { "name": "isMain", "type": "boolean" }
+      ]
+    },
+    { "name": "company", "type": "text" },
+    { "name": "summary", "type": "richtext" },
+    {
+      "name": "skills",
+      "type": "component",
+      "component": "skill",
+      "repeatable": true,
+      "fields": [
+        { "name": "level", "type": "text" },
+        { "name": "skill", "type": "text" }
+      ]
+    },
+    {
+      "name": "experiences",
+      "type": "component",
+      "component": "experience",
+      "repeatable": true,
+      "fields": [
+        {
+          "type": "layout",
+          "fields": [
+            { "name": "company", "type": "text" },
+            { "name": "location", "type": "text" }
+          ]
+        },
+        {
+          "name": "roles",
+          "type": "component",
+          "component": "role",
+          "repeatable": true,
+          "fields": [
+            {
+              "type": "layout",
+              "fields": [
+                { "name": "position", "type": "text" },
+                { "name": "period", "type": "text" }
+              ]
+            },
+            {
+              "type": "layout",
+              "fields": [
+                { "name": "teamSize", "type": "number" },
+                { "name": "projects", "type": "text" }
+              ]
+            },
+
+            { "name": "techStack", "type": "json" },
+            { "name": "responsibilities", "type": "richtext" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "projects",
+      "type": "component",
+      "component": "project",
+      "repeatable": true,
+      "fields": [
+        { "name": "name", "type": "text" },
+        { "name": "techStack", "type": "json" },
+        {
+          "type": "layout",
+          "fields": [
+            { "name": "teamSize", "type": "number" },
+            { "name": "role", "type": "text" }
+          ]
+        },
+        {
+          "type": "layout",
+          "fields": [
+            { "name": "liveLink", "type": "text" },
+            { "name": "responsitoryLink", "type": "text" }
+          ]
+        },
+        {
+          "name": "roles",
+          "type": "component",
+          "component": "role",
+          "repeatable": true,
+          "fields": [
+            {
+              "type": "layout",
+              "fields": [
+                { "name": "position", "type": "text" },
+                { "name": "period", "type": "text" }
+              ]
+            },
+            { "name": "projects", "type": "text" },
+            { "name": "techStack", "type": "json" },
+            { "name": "responsibilities", "type": "richtext" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "educations",
+      "type": "component",
+      "component": "education",
+      "repeatable": true,
+      "fields": [
+        {
+          "type": "layout",
+          "fields": [
+            { "name": "degree", "type": "text" },
+            { "name": "institution", "type": "text" }
+          ]
+        },
+        {
+          "type": "layout",
+          "fields": [
+            { "name": "period", "type": "text" },
+            { "name": "location", "type": "text" }
+          ]
+        },
+        { "name": "description", "type": "richtext" }
+      ]
+    },
+    {
+      "name": "languages",
+      "type": "component",
+      "component": "language",
+      "repeatable": true,
+      "fields": [
+        {
+          "type": "layout",
+          "fields": [
+            { "name": "language", "type": "text" },
+            { "name": "level", "type": "text" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "references",
+      "type": "component",
+      "component": "reference",
+      "repeatable": true,
+      "fields": [
+        { "name": "name", "type": "text" },
+        { "name": "phone", "type": "text" },
+        { "name": "location", "type": "text" }
+      ]
+    }
+  ]
+}

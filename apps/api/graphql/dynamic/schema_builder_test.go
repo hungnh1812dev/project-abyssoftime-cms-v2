@@ -208,6 +208,42 @@ func TestBuildContentTypeSDL_Component(t *testing.T) {
 	}
 }
 
+func TestBuildContentTypeSDL_RepeatableComponent(t *testing.T) {
+	def := contenttype.ContentTypeDefinition{
+		Slug: "cv-page",
+		Name: "CV Page",
+		Kind: "collection",
+		Fields: []entity.FieldDefinition{
+			{Name: "position", Type: "text"},
+			{Name: "skills", Type: "component", Repeatable: true, Fields: []entity.FieldDefinition{
+				{Name: "category", Type: "text"},
+				{Name: "skill", Type: "text"},
+			}},
+			{Name: "banner", Type: "component", Repeatable: false, Fields: []entity.FieldDefinition{
+				{Name: "title", Type: "text"},
+			}},
+		},
+	}
+	b := NewSchemaBuilder(nil)
+	sdl := b.BuildContentTypeSDL(def)
+
+	for _, want := range []string{
+		"type CvPageSkills {",
+		"category: String",
+		"skills: [CvPageSkills!]",
+		"type CvPageBanner {",
+		"banner: CvPageBanner",
+	} {
+		if !strings.Contains(sdl, want) {
+			t.Errorf("repeatable component SDL missing %q\n\nFull SDL:\n%s", want, sdl)
+		}
+	}
+
+	if strings.Contains(sdl, "banner: [CvPageBanner") {
+		t.Errorf("non-repeatable banner should not be a list type\n\nFull SDL:\n%s", sdl)
+	}
+}
+
 func TestBuildSDL_MergesAllDefinitions(t *testing.T) {
 	defs := []contenttype.ContentTypeDefinition{
 		{

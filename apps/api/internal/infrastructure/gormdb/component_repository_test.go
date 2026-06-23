@@ -289,3 +289,90 @@ func TestComponentRepository_EnsureCollection_IgnoresRemovedField(t *testing.T) 
 		t.Error("expected 'keywords' column to still exist after reducing fields")
 	}
 }
+
+func TestComponentRepository_EnsureCollection_CreatesSortOrderColumn(t *testing.T) {
+	db, err := NewClient("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	repo := &componentRepository{database: db}
+	ctx := context.Background()
+
+	if err := repo.EnsureCollection(ctx, "blog", "seo", compTestFields); err != nil {
+		t.Fatalf("EnsureCollection: %v", err)
+	}
+
+	cols, err := existingColumns(db, componentTableName("blog", "seo"))
+	if err != nil {
+		t.Fatalf("existingColumns: %v", err)
+	}
+	if !cols["sort_order"] {
+		t.Error("expected 'sort_order' column to exist in new table")
+	}
+}
+
+func TestComponentRepository_EnsureCollection_AddsSortOrderToExistingTable(t *testing.T) {
+	db, err := NewClient("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	repo := &componentRepository{database: db}
+	ctx := context.Background()
+	table := componentTableName("blog", "seo")
+
+	// Create table WITHOUT sort_order (simulating legacy schema)
+	sql := "CREATE TABLE " + table + " (gorm_id INTEGER PRIMARY KEY AUTOINCREMENT, component_id TEXT, document_id TEXT, version TEXT, locale TEXT, title TEXT, description TEXT, created_at TIMESTAMP, updated_at TIMESTAMP)"
+	if err := db.Exec(sql).Error; err != nil {
+		t.Fatalf("create legacy table: %v", err)
+	}
+
+	// EnsureCollection should add the missing sort_order column
+	if err := repo.EnsureCollection(ctx, "blog", "seo", compTestFields); err != nil {
+		t.Fatalf("EnsureCollection: %v", err)
+	}
+
+	cols, err := existingColumns(db, table)
+	if err != nil {
+		t.Fatalf("existingColumns: %v", err)
+	}
+	if !cols["sort_order"] {
+		t.Error("expected 'sort_order' column to be added to existing table")
+	}
+}
+
+func TestComponentRepository_SortOrder_PreservedThroughUpsert(t *testing.T) {
+	repo := setupCompDB(t, "blog", "seo")
+	ctx := context.Background()
+	now := time.Now().UTC()
+
+	components := []*entity.Component{
+		{ComponentID: "c1", SortOrder: 1, Fields: map[string]any{"title": "Second"}, CreatedAt: now, UpdatedAt: now},
+		{ComponentID: "c2", SortOrder: 0, Fields: map[string]any{"title": "First"}, CreatedAt: now, UpdatedAt: now},
+	}
+
+	if err := repo.UpsertAll(ctx, "blog", "seo", "d1", "en", entity.VersionDraft, components); err != nil {
+		t.Fatalf("UpsertAll: %v", err)
+	}
+
+	found, err := repo.FindByDocumentID(ctx, "blog", "seo", "d1", "en", entity.VersionDraft)
+	if err != nil {
+		t.Fatalf("FindByDocumentID: %v", err)
+	}
+	if len(found) != 2 {
+		t.Fatalf("count = %d, want 2", len(found))
+	}
+	if found[0].SortOrder != 0 {
+		t.Errorf("found[0].SortOrder = %d, want 0", found[0].SortOrder)
+	}
+	if found[1].SortOrder != 1 {
+		t.Errorf("found[1].SortOrder = %d, want 1", found[1].SortOrder)
+	}
+	title0, _ := found[0].Fields["title"].(string)
+	if title0 != "First" {
+		t.Errorf("found[0].title = %q, want %q", title0, "First")
+	}
+	title1, _ := found[1].Fields["title"].(string)
+	if title1 != "Second" {
+		t.Errorf("found[1].title = %q, want %q", title1, "Second")
+	}
+}

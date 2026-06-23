@@ -16,6 +16,12 @@ export function getAccessToken(): string | null {
   return _accessToken;
 }
 
+let _onSessionExpired: (() => void) | null = null;
+
+export function onSessionExpired(callback: (() => void) | null) {
+  _onSessionExpired = callback;
+}
+
 api.interceptors.request.use((config) => {
   const token = getAccessToken();
   if (token) {
@@ -30,10 +36,15 @@ let _refreshPromise: Promise<string> | null = null;
 async function refreshAccessToken(): Promise<string> {
   if (_refreshPromise) return _refreshPromise;
 
-  // Use api instance so interceptors apply, but mark _retried=true to
-  // prevent the 401 interceptor from recursing into another refresh.
   _refreshPromise = api
-    .post<{ accessToken: string }>('/auth/refresh', {}, { _retried: true } as object)
+    .post<{ accessToken: string }>(
+      '/auth/refresh',
+      {},
+      {
+        _retried: true,
+        headers: { 'Cache-Control': 'no-cache, no-store' },
+      } as object,
+    )
     .then((res) => {
       const newToken = res.data.accessToken;
       setAccessToken(newToken);
@@ -59,6 +70,7 @@ api.interceptors.response.use(
         return api(original);
       } catch {
         setAccessToken(null);
+        _onSessionExpired?.();
         return Promise.reject(error);
       }
     }

@@ -4,8 +4,10 @@
   "kind": "single",
   "fields": [
     { "name": "outer", "type": "component", "fields": [
-      { "name": "inner", "type": "component", "fields": [
-        { "name": "title", "type": "text" }
+      { "name": "middle", "type": "component", "fields": [
+        { "name": "inner", "type": "component", "fields": [
+          { "name": "title", "type": "text" }
+        ]}
       ]}
     ]}
   ]

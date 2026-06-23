@@ -37,7 +37,7 @@ func (a *adapter) Upload(ctx context.Context, file io.Reader, filename string, g
 		UniqueFilename: boolPtr(false),
 	}
 	if generateThumbnail {
-		params.Eager = "c_thumb,w_300,h_300"
+		params.Eager = "c_fit,w_300,h_300"
 		params.EagerAsync = boolPtr(false)
 	}
 	res, err := a.cld.Upload.Upload(ctx, file, params)

@@ -1,0 +1,338 @@
+# SPEC — internationalization Module
+
+## 1. Overview
+
+The internationalization module manages locale (language) configuration through a database-backed admin UI, replacing the current environment-variable-driven approach. Super admins can add, edit, and delete locales via a dedicated settings page. Each locale has a `code` (the relate key used across documents) and a `name` (human-readable display label). One locale is always marked as the default. The language dropdown throughout the app displays language names instead of raw codes, and a locale selector appears on the CollectionListPage toolbar.
+
+---
+
+## 2. File Map
+
+All paths relative to project root.
+
+### Backend (`apps/api/`)
+
+```
+internal/domain/entity/locale.go                          # Locale entity
+internal/domain/repository/locale_repository.go           # LocaleRepository interface
+internal/domain/repository/mock/locale_repository.go      # Mock for testing
+internal/usecase/locale/locale_usecase.go                 # Locale CRUD + default logic
+internal/usecase/locale/locale_usecase_test.go
+internal/infrastructure/gormdb/locale_repository.go       # GORM Locale repo
+internal/infrastructure/gormdb/locale_repository_test.go
+internal/infrastructure/mongodb/locale_repository.go      # MongoDB Locale repo
+internal/infrastructure/mongodb/locale_repository_test.go
+internal/delivery/http/handler/locale_handler.go          # Updated: full CRUD handlers
+internal/delivery/http/handler/locale_handler_test.go     # Updated: new test cases
+```
+
+### Frontend (`apps/web/`)
+
+```
+src/types/cms.ts                                          # Updated: add Locale type
+src/hooks/useLocales.ts                                   # Updated: return Locale[] instead of string[]
+src/hooks/useLocalesMutations.ts                          # Create/update/delete locale mutations
+src/pages/admin/settings/InternationalizePage.tsx         # Locale management settings page
+src/pages/admin/settings/__tests__/InternationalizePage.test.tsx
+src/components/locale/LocaleSelector.tsx                  # Reusable locale dropdown (shows name)
+src/components/locale/__tests__/LocaleSelector.test.tsx
+src/components/sidebar/Sidebar.tsx                        # Updated: add Internationalize link
+src/router.tsx                                            # Updated: add route
+```
+
+---
+
+## 3. Entities
+
+### Locale
+
+```go
+type Locale struct {
+    ID        uint      `bson:"_id,omitempty"  gorm:"column:gorm_id;primaryKey;autoIncrement"`
+    Code      string    `bson:"code"           gorm:"column:code;uniqueIndex"   json:"code"`
+    Name      string    `bson:"name"           gorm:"column:name"               json:"name"`
+    IsDefault bool      `bson:"isDefault"      gorm:"column:is_default"         json:"isDefault"`
+    CreatedAt time.Time `bson:"createdAt"      gorm:"column:created_at"         json:"createdAt"`
+    UpdatedAt time.Time `bson:"updatedAt"      gorm:"column:updated_at"         json:"updatedAt"`
+}
+```
+
+- `Code`: BCP 47 language tag (e.g., `"en"`, `"vi"`, `"ja"`). Unique. Used as the relate key across all documents — the `locale` field in `Document` stores this value.
+- `Name`: Human-readable label (e.g., `"English"`, `"Tiếng Việt"`). Displayed in dropdowns and the settings table.
+- `IsDefault`: Exactly one locale must be `true`. When a user visits a page without selecting a locale, this one is pre-selected.
+- `CreatedAt`, `UpdatedAt`: System-managed timestamps.
+
+### Frontend type
+
+```typescript
+export interface Locale {
+  code: string
+  name: string
+  isDefault: boolean
+  createdAt: string
+  updatedAt: string
+}
+```
+
+---
+
+## 4. Domain Rules
+
+### Locale Management
+
+- **Database is the sole source of truth.** The `SUPPORTED_LOCALES` env var is removed. Locales are fully managed via the admin UI.
+- **At least one locale must exist.** The system must not enter a state with zero locales. The last remaining locale cannot be deleted.
+- **Exactly one default locale.** Setting a new locale as default automatically clears the previous default (done in usecase layer, not DB trigger).
+- **Code is immutable after creation.** Renaming a code would orphan all documents referencing the old code. Name can be updated freely.
+- **Code format:** Lowercase, 2–5 characters, letters and hyphens only (e.g., `en`, `vi`, `zh-cn`). Validated at usecase layer.
+- **Deletion guard:** A locale cannot be deleted if documents reference it. The usecase checks `DocumentRepository.CountByLocale(ctx, code)` before allowing deletion. Returns a 409 Conflict with a message indicating how many documents use the locale.
+
+### Default Locale Behavior
+
+- When a page loads without an explicit locale selection (e.g., first visit to CollectionListPage), the default locale's code is used.
+- The `LocaleSelector` dropdown pre-selects the default locale on mount.
+- If no default is set (edge case during migration), fall back to the first locale in alphabetical order by code.
+
+### Migration from Env Var
+
+- On first startup after deploying this feature, if the `locales` table/collection is empty, the system seeds it from the `SUPPORTED_LOCALES` env var (if present). The first code becomes the default. After seeding, the env var is ignored.
+- If the env var is absent and the table is empty, seed with a single `{ code: "en", name: "English", isDefault: true }` record.
+
+---
+
+## 5. Repository Interfaces
+
+### LocaleRepository
+
+```go
+type LocaleRepository interface {
+    Create(ctx context.Context, locale *entity.Locale) error
+    FindByCode(ctx context.Context, code string) (*entity.Locale, error)
+    FindAll(ctx context.Context) ([]*entity.Locale, error)
+    FindDefault(ctx context.Context) (*entity.Locale, error)
+    Update(ctx context.Context, locale *entity.Locale) error
+    Delete(ctx context.Context, code string) error
+    ClearDefault(ctx context.Context) error
+}
+```
+
+- `FindByCode`: Returns the locale with the given code, or `ErrNotFound`.
+- `FindDefault`: Returns the locale with `isDefault == true`. Returns `ErrNotFound` if none set.
+- `ClearDefault`: Sets `is_default = false` for all locales. Called before setting a new default.
+
+### DocumentRepository (extended)
+
+```go
+CountByLocale(ctx context.Context, locale string) (int64, error)
+```
+
+Added to the existing `DocumentRepository` interface for deletion guard checks.
+
+---
+
+## 6. API Endpoints
+
+All locale endpoints require authentication. Write operations require `super_admin` role.
+
+### `GET /api/locales` (updated)
+
+**Auth:** Public (no change — needed by frontend before auth context loads)
+**Response:** `200 OK`
+```json
+[
+  { "code": "en", "name": "English", "isDefault": true, "createdAt": "...", "updatedAt": "..." },
+  { "code": "vi", "name": "Tiếng Việt", "isDefault": false, "createdAt": "...", "updatedAt": "..." }
+]
+```
+
+**Breaking change:** Previously returned `string[]` (e.g., `["en","vi"]`). Now returns `Locale[]`. Frontend `useLocales` hook must update its type accordingly.
+
+### `POST /api/locales`
+
+**Auth:** `super_admin`
+**Request:**
+```json
+{ "code": "ja", "name": "日本語", "isDefault": false }
+```
+**Validation:**
+- `code`: required, 2–5 chars, lowercase letters + hyphens, unique
+- `name`: required, 1–100 chars
+- `isDefault`: optional, defaults to `false`
+
+**Response:** `201 Created` → created Locale object
+**Errors:** `409 Conflict` if code already exists, `422` if validation fails
+
+### `PUT /api/locales/:code`
+
+**Auth:** `super_admin`
+**Request:**
+```json
+{ "name": "Japanese", "isDefault": true }
+```
+**Rules:**
+- `code` cannot be changed (path param only, not in body)
+- Setting `isDefault: true` clears the previous default
+- Setting `isDefault: false` is rejected if this is the only default (409)
+
+**Response:** `200 OK` → updated Locale object
+
+### `DELETE /api/locales/:code`
+
+**Auth:** `super_admin`
+**Rules:**
+- Cannot delete the last locale (409)
+- Cannot delete if documents reference this code (409, includes count in message)
+- If deleting the default locale, the next locale (alphabetically) becomes the new default
+
+**Response:** `204 No Content`
+**Errors:** `409 Conflict` with reason
+
+---
+
+## 7. Frontend Components
+
+### `InternationalizePage`
+
+**Route:** `/admin/settings/internationalize`
+**Access:** `super_admin` only (wrapped in `ProtectedRoute`)
+**Sidebar:** Listed under Settings group as "Internationalize"
+
+**Layout:**
+```
+┌─────────────────────────────────────────────────┐
+│  Internationalize                               │
+│  Manage the locales for your content.           │
+│                                           [Add] │
+├──────┬──────────────┬─────────┬─────────────────┤
+│ Code │ Name         │ Default │ Actions         │
+├──────┼──────────────┼─────────┼─────────────────┤
+│ en   │ English      │   ★     │ [Edit] [Delete] │
+│ vi   │ Tiếng Việt   │         │ [Edit] [Delete] │
+└──────┴──────────────┴─────────┴─────────────────┘
+```
+
+**Behaviors:**
+- **Add:** Opens a Dialog with fields: Code (text input), Name (text input), Default (checkbox). Code input is enabled.
+- **Edit:** Opens the same Dialog with Code input disabled (read-only). Name and Default are editable.
+- **Delete:** Confirmation dialog. If locale has documents, show error toast with count (from 409 response).
+- **Default star:** Clicking sets the locale as default (PUT with `isDefault: true`). The current default star moves.
+- The last remaining locale's Delete button is disabled.
+
+### `LocaleSelector`
+
+**Reusable dropdown component** used in CollectionListPage and potentially other pages.
+
+```typescript
+interface LocaleSelectorProps {
+  value: string
+  onChange: (code: string) => void
+}
+```
+
+**Display:**
+- Uses Shadcn `Select` component
+- Each option shows: **language name** (e.g., "English", "Tiếng Việt")
+- Compact styling, fits in a toolbar row
+- Pre-selects the default locale when `value` is empty
+
+### CollectionListPage Integration
+
+**Placement:** In the toolbar row, between the page title and the action buttons.
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  Vocab Packs         [English ▾]      [⚙] [Add new item]│
+└──────────────────────────────────────────────────────────┘
+```
+
+**Behavior:**
+- Always visible (even with one locale, per requirement)
+- Changing the locale:
+  1. Updates `activeLocale` state
+  2. Resets pagination to `start = 0`
+  3. Refetches documents with the new locale
+- Default locale is pre-selected on mount
+- The selected locale is passed to all document operations (create, duplicate, delete)
+
+---
+
+## 8. State Management
+
+### Query Keys
+
+```typescript
+// Locale queries
+['locales']                              // list all locales (updated: Locale[] not string[])
+
+// Document queries (unchanged, locale already parameterized)
+['documents', 'collection-type', slug]   // invalidated on locale change
+```
+
+### Hooks
+
+**`useLocales`** (updated):
+```typescript
+export function useLocales() {
+  return useQuery({
+    queryKey: ['locales'] as const,
+    queryFn: () => api.get<Locale[]>('/api/locales').then((response) => response.data),
+  })
+}
+```
+
+**`useCreateLocale`**, **`useUpdateLocale`**, **`useDeleteLocale`**:
+- Each invalidates `['locales']` on success
+- `useDeleteLocale` shows error toast on 409
+
+---
+
+## 9. Testing Strategy
+
+### Backend
+
+- **Usecase tests**: Mock `LocaleRepository` + `DocumentRepository.CountByLocale`. Cover:
+  - CRUD happy paths
+  - Default-swap logic (set new default clears old)
+  - Deletion guards (last locale, locale with documents)
+  - Code validation (format, uniqueness)
+  - Seed-from-env-var logic
+- **Handler tests**: `httptest` + `gin.TestMode`. Cover:
+  - Auth: 401 for unauthenticated, 403 for non-super_admin on write ops
+  - Validation: 422 for invalid code format
+  - Conflict: 409 for duplicate code, delete with documents, unset only default
+  - GET /api/locales returns Locale objects (not strings)
+- **Repository tests (GORM)**: In-memory SQLite. Cover:
+  - `ClearDefault` + `Create` with `IsDefault`
+  - `FindDefault` when no default set
+  - Unique constraint on code
+
+### Frontend
+
+- **InternationalizePage**: Vitest + React Testing Library + MSW
+  - Renders locale table with name, code, default indicator
+  - Add dialog: submits POST, new locale appears in table
+  - Edit dialog: code field is disabled, name is editable
+  - Delete: confirmation shown, last locale's delete is disabled
+  - Error states: duplicate code shows toast
+- **LocaleSelector**: Renders options with names, calls onChange with code
+- **CollectionListPage**: Locale dropdown visible, changing locale resets pagination and refetches
+
+---
+
+## 10. Boundaries
+
+### Always
+- `code` is the relate key — it is what `Document.Locale` stores and what API query params use
+- Display language `name` in all user-facing dropdowns and tables
+- Validate locale code format at usecase layer (not just frontend)
+- Invalidate `['locales']` cache after any mutation
+
+### Ask First
+- Before deleting a locale that is referenced by documents — show the count
+- Before changing the default locale — confirmation in the UI
+
+### Never
+- Never allow editing a locale's code after creation
+- Never allow zero locales in the system
+- Never store locale name in documents — only the code
+- Never hardcode locale lists in frontend — always fetch from API

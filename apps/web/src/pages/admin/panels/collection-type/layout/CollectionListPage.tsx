@@ -13,6 +13,7 @@ import { ColumnChooserDialog } from '@/components/collection/ColumnChooserDialog
 import { LocaleSelector } from '@/components/locale/LocaleSelector';
 import { flattenFields, type ContentType, type Document, type FieldDefinition } from '@/types/cms';
 import { Pencil, Trash2, Copy, ArrowUpDown, ArrowUp, ArrowDown, Settings2 } from 'lucide-react';
+import { Breadcrumb } from '@/components/ui/breadcrumb';
 
 interface Props {
   contentType: ContentType;
@@ -210,7 +211,15 @@ export function CollectionListPage({ contentType }: Props) {
   return (
     <div className="space-y-4 p-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">{contentType.Name}</h1>
+        <div className="flex flex-col gap-0.5">
+          <Breadcrumb
+            items={[
+              { label: 'Home', to: '/admin' },
+              { label: 'Content Manager' },
+            ]}
+          />
+          <h1 className="text-xl font-semibold">{contentType.Name}</h1>
+        </div>
         <div className="flex items-center gap-2">
           <LocaleSelector
             value={activeLocale}

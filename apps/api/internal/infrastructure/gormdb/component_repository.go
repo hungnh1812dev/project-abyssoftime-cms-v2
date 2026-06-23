@@ -48,7 +48,11 @@ func (r *componentRepository) createComponentTable(ctx context.Context, table st
 	cols = append(cols, "document_id TEXT")
 	cols = append(cols, "version TEXT")
 	cols = append(cols, "locale TEXT")
-	for _, f := range fields {
+	cols = append(cols, "sort_order INTEGER DEFAULT 0")
+	for _, f := range flattenLayoutFields(fields) {
+		if f.Type == "component" {
+			continue
+		}
 		cols = append(cols, fmt.Sprintf("%s %s", toSnakeCase(f.Name), fieldColumnType(f.Type)))
 	}
 	cols = append(cols, "created_at TIMESTAMP")
@@ -63,7 +67,16 @@ func (r *componentRepository) addMissingComponentColumns(ctx context.Context, ta
 	if err != nil {
 		return err
 	}
-	for _, f := range fields {
+	if !cols["sort_order"] {
+		sql := fmt.Sprintf("ALTER TABLE %s ADD COLUMN sort_order INTEGER DEFAULT 0", table)
+		if err := r.database.WithContext(ctx).Exec(sql).Error; err != nil {
+			return err
+		}
+	}
+	for _, f := range flattenLayoutFields(fields) {
+		if f.Type == "component" {
+			continue
+		}
 		col := toSnakeCase(f.Name)
 		if cols[col] {
 			continue
@@ -87,6 +100,7 @@ func compToRow(c *entity.Component) map[string]any {
 		"document_id":  c.DocumentID,
 		"version":      string(c.Version),
 		"locale":       c.Locale,
+		"sort_order":   c.SortOrder,
 		"created_at":   c.CreatedAt,
 		"updated_at":   c.UpdatedAt,
 	}
@@ -113,6 +127,9 @@ func rowToComp(row map[string]any) *entity.Component {
 	if v, ok := row["locale"]; ok {
 		comp.Locale = toString(v)
 	}
+	if v, ok := row["sort_order"]; ok {
+		comp.SortOrder = toInt(v)
+	}
 	if v, ok := row["created_at"]; ok {
 		comp.CreatedAt = toTime(v)
 	}
@@ -122,7 +139,7 @@ func rowToComp(row map[string]any) *entity.Component {
 
 	systemCols := map[string]bool{
 		"gorm_id": true, "component_id": true, "document_id": true,
-		"version": true, "locale": true, "created_at": true, "updated_at": true,
+		"version": true, "locale": true, "sort_order": true, "created_at": true, "updated_at": true,
 	}
 	fields := make(map[string]any)
 	for k, v := range row {
@@ -140,7 +157,7 @@ func (r *componentRepository) FindByDocumentID(ctx context.Context, contentTypeS
 	var rows []map[string]any
 	err := r.table(contentTypeSlug, componentName).WithContext(ctx).
 		Where("document_id = ? AND version = ? AND locale = ?", documentID, version, locale).
-		Order("gorm_id ASC").
+		Order("sort_order ASC, gorm_id ASC").
 		Find(&rows).Error
 	if err != nil {
 		return nil, err
