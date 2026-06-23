@@ -1,52 +1,46 @@
 /* eslint-disable react-refresh/only-export-components */
-import { lazy, Suspense } from "react";
-import {
-  FormField,
-  TextInput,
-  BooleanInput,
-  NumberInput,
-  MediaInput,
-} from "@/components/form";
-import type { FieldDefinition } from "@/types/cms";
+import { lazy, Suspense } from 'react';
+import { FormField, TextInput, BooleanInput, NumberInput, MediaInput } from '@/components/form';
+import type { FieldDefinition } from '@/types/cms';
 
 const RichTextInput = lazy(() =>
-  import("@/components/form/inputs/RichTextInput").then((m) => ({
-    default: m.RichTextInput,
+  import('@/components/form/inputs/RichTextInput').then((mod) => ({
+    default: mod.RichTextInput,
   })),
 );
 
 const JsonInput = lazy(() =>
-  import("@/components/form/inputs/JsonInput").then((m) => ({
-    default: m.JsonInput,
+  import('@/components/form/inputs/JsonInput').then((mod) => ({
+    default: mod.JsonInput,
   })),
 );
 
 function primitiveInput(field: FieldDefinition): React.ReactElement<Record<string, unknown>> {
   switch (field.type) {
-    case "number":
+    case 'number':
       return <NumberInput aria-label={field.name} />;
-    case "boolean":
+    case 'boolean':
       return <BooleanInput aria-label={field.name} />;
     default:
       return <TextInput aria-label={field.name} placeholder={field.name} />;
   }
 }
 
-function renderField(field: FieldDefinition, prefix = ""): React.ReactNode {
+function renderField(field: FieldDefinition, prefix = ''): React.ReactNode {
   const fieldName = prefix + field.name;
 
-  if (field.type === "layout") {
+  if (field.type === 'layout') {
     return (
-      <div key={fieldName} className="grid md:grid-cols-2 gap-4">
+      <div key={fieldName} className="grid gap-4 md:grid-cols-2">
         {(field.fields ?? []).map((child) => renderField(child, prefix))}
       </div>
     );
   }
 
-  if (field.type === "component") {
-    const childPrefix = fieldName + ".";
+  if (field.type === 'component') {
+    const childPrefix = fieldName + '.';
     return (
-      <fieldset key={fieldName} className="border rounded-md p-4">
+      <fieldset key={fieldName} className="rounded-md border p-4">
         <legend className="px-1 text-sm font-medium">{field.name}</legend>
         {(field.fields ?? []).map((child) => renderField(child, childPrefix))}
       </fieldset>
@@ -56,8 +50,8 @@ function renderField(field: FieldDefinition, prefix = ""): React.ReactNode {
   if (field.type === 'json') {
     return (
       <div key={fieldName}>
-        <label className="block text-sm font-medium mb-1">{field.name}</label>
-        <Suspense fallback={<div className="h-48 animate-pulse rounded-md bg-muted" />}>
+        <label className="mb-1 block text-sm font-medium">{field.name}</label>
+        <Suspense fallback={<div className="bg-muted h-48 animate-pulse rounded-md" />}>
           <JsonInput name={fieldName} />
         </Suspense>
       </div>
@@ -67,8 +61,8 @@ function renderField(field: FieldDefinition, prefix = ""): React.ReactNode {
   if (field.type === 'richtext') {
     return (
       <div key={fieldName}>
-        <label className="block text-sm font-medium mb-1">{field.name}</label>
-        <Suspense fallback={<div className="h-48 animate-pulse rounded-md bg-muted" />}>
+        <label className="mb-1 block text-sm font-medium">{field.name}</label>
+        <Suspense fallback={<div className="bg-muted h-48 animate-pulse rounded-md" />}>
           <RichTextInput name={fieldName} />
         </Suspense>
       </div>
@@ -78,7 +72,7 @@ function renderField(field: FieldDefinition, prefix = ""): React.ReactNode {
   if (field.type === 'media') {
     return (
       <div key={fieldName}>
-        <label className="block text-sm font-medium mb-1">{field.name}</label>
+        <label className="mb-1 block text-sm font-medium">{field.name}</label>
         <MediaInput name={fieldName} ext={field.ext} />
       </div>
     );
@@ -86,15 +80,12 @@ function renderField(field: FieldDefinition, prefix = ""): React.ReactNode {
 
   return (
     <div key={fieldName}>
-      <label className="block text-sm font-medium mb-1">{field.name}</label>
+      <label className="mb-1 block text-sm font-medium">{field.name}</label>
       <FormField name={fieldName}>{primitiveInput(field)}</FormField>
     </div>
   );
 }
 
-export function renderSchemaField(
-  field: FieldDefinition,
-  prefix = "",
-): React.ReactNode {
+export function renderSchemaField(field: FieldDefinition, prefix = ''): React.ReactNode {
   return renderField(field, prefix);
 }

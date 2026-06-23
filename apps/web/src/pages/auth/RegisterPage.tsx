@@ -1,78 +1,72 @@
-import { useState } from 'react'
-import { useForm } from 'react-hook-form'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useNavigate, Navigate, Link } from 'react-router-dom'
-import { api } from '@/lib/api'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate, Navigate, Link } from 'react-router-dom';
+import { api } from '@/lib/api';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 interface RegisterFields {
-  displayName: string
-  email: string
-  password: string
+  displayName: string;
+  email: string;
+  password: string;
 }
 
 export function RegisterPage() {
-  const navigate = useNavigate()
-  const queryClient = useQueryClient()
-  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const { data: setupData, isLoading: setupLoading } = useQuery({
     queryKey: ['auth-setup'],
-    queryFn: () =>
-      api.get<{ adminExists: boolean }>('/auth/setup').then((response) => response.data),
+    queryFn: () => api.get<{ adminExists: boolean }>('/auth/setup').then((response) => response.data),
     retry: false,
-  })
+  });
 
-  const adminExists = setupData?.adminExists ?? false
+  const adminExists = setupData?.adminExists ?? false;
 
   const {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<RegisterFields>()
+  } = useForm<RegisterFields>();
 
   const mutation = useMutation({
-    mutationFn: (data: RegisterFields) =>
-      api.post('/auth/register', data).then((response) => response.data),
+    mutationFn: (data: RegisterFields) => api.post('/auth/register', data).then((response) => response.data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['auth-setup'] })
-      navigate('/login')
+      queryClient.invalidateQueries({ queryKey: ['auth-setup'] });
+      navigate('/login');
     },
     onError: () => {
-      setErrorMsg('Registration failed. The email may already be in use.')
+      setErrorMsg('Registration failed. The email may already be in use.');
     },
-  })
+  });
 
   if (setupLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <p className="text-muted-foreground text-sm">Loading…</p>
       </div>
-    )
+    );
   }
 
   if (adminExists) {
-    return <Navigate to="/login" replace />
+    return <Navigate to="/login" replace />;
   }
 
   return (
     <div className="flex min-h-screen items-center justify-center">
       <div className="w-full max-w-sm space-y-6 px-4">
         <div className="space-y-1 text-center">
-          <h1 className="text-2xl font-semibold">
-            {adminExists ? 'Create guest account' : 'Set up admin account'}
-          </h1>
+          <h1 className="text-2xl font-semibold">{adminExists ? 'Create guest account' : 'Set up admin account'}</h1>
           <p className="text-muted-foreground text-sm">
-            {adminExists
-              ? 'Register a guest account to access the CMS'
-              : 'No admin account exists yet — the first account will be an admin'}
+            {adminExists ? 'Register a guest account to access the CMS' : 'No admin account exists yet — the first account will be an admin'}
           </p>
         </div>
 
         {errorMsg && (
-          <div role="alert" className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <div role="alert" className="border-destructive/50 bg-destructive/10 text-destructive rounded-md border px-4 py-3 text-sm">
             {errorMsg}
           </div>
         )}
@@ -124,11 +118,7 @@ export function RegisterPage() {
           </div>
 
           <Button type="submit" className="w-full" disabled={mutation.isPending}>
-            {mutation.isPending
-              ? 'Creating account…'
-              : adminExists
-                ? 'Create guest account'
-                : 'Create admin account'}
+            {mutation.isPending ? 'Creating account…' : adminExists ? 'Create guest account' : 'Create admin account'}
           </Button>
         </form>
 
@@ -140,5 +130,5 @@ export function RegisterPage() {
         </p>
       </div>
     </div>
-  )
+  );
 }

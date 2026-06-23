@@ -1,26 +1,24 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
-import type { ContentType, ContentTypeSummary } from "@/types/cms";
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { api } from '@/lib/api';
+import type { ContentType, ContentTypeSummary } from '@/types/cms';
 
 const KEYS = {
-  all: ["content-types"] as const,
-  detail: (id: string) => ["content-types", id] as const,
-  bySlug: (slug: string) => ["content-types", "by-slug", slug] as const,
+  all: ['content-types'] as const,
+  detail: (id: string) => ['content-types', id] as const,
+  bySlug: (slug: string) => ['content-types', 'by-slug', slug] as const,
 };
 
 export function useContentTypes() {
   return useQuery({
     queryKey: KEYS.all,
-    queryFn: () =>
-      api.get<ContentTypeSummary[]>("/api/content-types").then((response) => response.data),
+    queryFn: () => api.get<ContentTypeSummary[]>('/api/content-types').then((response) => response.data),
   });
 }
 
 export function useContentType(id: string) {
   return useQuery({
     queryKey: KEYS.detail(id),
-    queryFn: () =>
-      api.get<ContentType>(`/api/content-types/${id}`).then((response) => response.data),
+    queryFn: () => api.get<ContentType>(`/api/content-types/${id}`).then((response) => response.data),
     enabled: Boolean(id),
   });
 }
@@ -28,8 +26,7 @@ export function useContentType(id: string) {
 export function useContentTypeBySlug(slug: string) {
   return useQuery({
     queryKey: KEYS.bySlug(slug),
-    queryFn: () =>
-      api.get<ContentType>(`/api/content-types/${slug}`).then((response) => response.data),
+    queryFn: () => api.get<ContentType>(`/api/content-types/${slug}`).then((response) => response.data),
     enabled: Boolean(slug),
   });
 }
@@ -38,9 +35,7 @@ export function useUpdateListFields() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ slug, listFields }: { slug: string; listFields: string[] }) =>
-      api
-        .patch<{ listFields: string[] }>(`/api/content-types/${slug}/list-fields`, { listFields })
-        .then((response) => response.data),
+      api.patch<{ listFields: string[] }>(`/api/content-types/${slug}/list-fields`, { listFields }).then((response) => response.data),
     onSuccess: (_, { slug }) => {
       queryClient.invalidateQueries({ queryKey: KEYS.bySlug(slug) });
       queryClient.invalidateQueries({ queryKey: KEYS.all });

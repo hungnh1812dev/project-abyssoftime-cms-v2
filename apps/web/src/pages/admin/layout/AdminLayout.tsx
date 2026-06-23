@@ -1,13 +1,13 @@
-import { Outlet } from 'react-router-dom'
-import { SidebarShell, SidebarProvider } from '@/components/sidebar'
-import { TopBar } from './TopBar'
+import { Outlet } from 'react-router-dom';
+import { SidebarShell, SidebarProvider } from '@/components/sidebar';
+import { TopBar } from './TopBar';
 
 export function AdminLayout() {
   return (
     <SidebarProvider>
       <div className="flex h-screen overflow-hidden">
         <SidebarShell />
-        <div className="flex flex-col flex-1 min-w-0">
+        <div className="flex min-w-0 flex-1 flex-col">
           <TopBar />
           <main className="flex-1 overflow-y-auto">
             <Outlet />
@@ -15,5 +15,5 @@ export function AdminLayout() {
         </div>
       </div>
     </SidebarProvider>
-  )
+  );
 }

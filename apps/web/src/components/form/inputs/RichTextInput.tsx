@@ -1,43 +1,38 @@
-import { Controller, type Control } from 'react-hook-form'
-import { CKEditor } from '@ckeditor/ckeditor5-react'
-import {
-  ClassicEditor,
-  Essentials,
-  Paragraph,
-  Bold,
-  Italic,
-  Heading,
-  Link,
-  List,
-  BlockQuote,
-  Indent,
-  MediaEmbed,
-  Table,
-  TableToolbar,
-} from 'ckeditor5'
-import 'ckeditor5/ckeditor5.css'
+import { Controller, type Control } from 'react-hook-form';
+import { CKEditor } from '@ckeditor/ckeditor5-react';
+import { ClassicEditor, Essentials, Paragraph, Bold, Italic, Heading, Link, List, BlockQuote, Indent, MediaEmbed, Table, TableToolbar } from 'ckeditor5';
+import 'ckeditor5/ckeditor5.css';
 
 interface RichTextInputProps {
-  name?: string
-  control?: Control
-  toolbar?: string[]
+  name?: string;
+  control?: Control;
+  toolbar?: string[];
 }
 
 const DEFAULT_TOOLBAR = [
-  'heading', '|',
-  'bold', 'italic', 'link', '|',
-  'bulletedList', 'numberedList', '|',
-  'outdent', 'indent', '|',
-  'blockQuote', 'insertTable', 'mediaEmbed', '|',
-  'undo', 'redo',
-]
+  'heading',
+  '|',
+  'bold',
+  'italic',
+  'link',
+  '|',
+  'bulletedList',
+  'numberedList',
+  '|',
+  'outdent',
+  'indent',
+  '|',
+  'blockQuote',
+  'insertTable',
+  'mediaEmbed',
+  '|',
+  'undo',
+  'redo',
+];
 
-const PLUGINS = [
-  Essentials, Paragraph, Bold, Italic, Heading, Link,
-  List, BlockQuote, Indent, MediaEmbed, Table, TableToolbar,
-]
+const PLUGINS = [Essentials, Paragraph, Bold, Italic, Heading, Link, List, BlockQuote, Indent, MediaEmbed, Table, TableToolbar];
 
-const minHeightStyle = '.ck-editor__editable_inline { min-height: 12em; }'
+const minHeightStyle = '.ck-editor__editable_inline { min-height: 12em; }';
 
 export function RichTextInput({ name, control, toolbar }: RichTextInputProps) {
   return (
@@ -57,11 +52,11 @@ export function RichTextInput({ name, control, toolbar }: RichTextInputProps) {
               toolbar: toolbar ?? DEFAULT_TOOLBAR,
             }}
             onChange={(_event, editor) => {
-              field.onChange(editor.getData())
+              field.onChange(editor.getData());
             }}
           />
         </>
       )}
     />
-  )
+  );
 }

@@ -1,10 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import { SidebarProvider, useSidebar } from '../SidebarContext'
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { SidebarProvider, useSidebar } from '../SidebarContext';
 
 function TestConsumer() {
-  const { collapsed, toggle, isMobile, mobileOpen, setMobileOpen } = useSidebar()
+  const { collapsed, toggle, isMobile, mobileOpen, setMobileOpen } = useSidebar();
   return (
     <div>
       <span data-testid="collapsed">{String(collapsed)}</span>
@@ -14,12 +14,12 @@ function TestConsumer() {
       <button onClick={() => setMobileOpen(true)}>Open Mobile</button>
       <button onClick={() => setMobileOpen(false)}>Close Mobile</button>
     </div>
-  )
+  );
 }
 
 beforeEach(() => {
-  localStorage.clear()
-})
+  localStorage.clear();
+});
 
 describe('SidebarContext', () => {
   it('provides default collapsed=false', () => {
@@ -27,52 +27,52 @@ describe('SidebarContext', () => {
       <SidebarProvider>
         <TestConsumer />
       </SidebarProvider>,
-    )
-    expect(screen.getByTestId('collapsed')).toHaveTextContent('false')
-  })
+    );
+    expect(screen.getByTestId('collapsed')).toHaveTextContent('false');
+  });
 
   it('toggles collapsed state', async () => {
     render(
       <SidebarProvider>
         <TestConsumer />
       </SidebarProvider>,
-    )
-    await userEvent.click(screen.getByRole('button', { name: 'Toggle' }))
-    expect(screen.getByTestId('collapsed')).toHaveTextContent('true')
-  })
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Toggle' }));
+    expect(screen.getByTestId('collapsed')).toHaveTextContent('true');
+  });
 
   it('persists collapsed state to localStorage', async () => {
     render(
       <SidebarProvider>
         <TestConsumer />
       </SidebarProvider>,
-    )
-    await userEvent.click(screen.getByRole('button', { name: 'Toggle' }))
-    expect(localStorage.getItem('sidebar-collapsed')).toBe('true')
-  })
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Toggle' }));
+    expect(localStorage.getItem('sidebar-collapsed')).toBe('true');
+  });
 
   it('reads initial collapsed state from localStorage', () => {
-    localStorage.setItem('sidebar-collapsed', 'true')
+    localStorage.setItem('sidebar-collapsed', 'true');
     render(
       <SidebarProvider>
         <TestConsumer />
       </SidebarProvider>,
-    )
-    expect(screen.getByTestId('collapsed')).toHaveTextContent('true')
-  })
+    );
+    expect(screen.getByTestId('collapsed')).toHaveTextContent('true');
+  });
 
   it('provides mobileOpen state and setter', async () => {
     render(
       <SidebarProvider>
         <TestConsumer />
       </SidebarProvider>,
-    )
-    expect(screen.getByTestId('mobile-open')).toHaveTextContent('false')
-    await userEvent.click(screen.getByRole('button', { name: 'Open Mobile' }))
-    expect(screen.getByTestId('mobile-open')).toHaveTextContent('true')
-    await userEvent.click(screen.getByRole('button', { name: 'Close Mobile' }))
-    expect(screen.getByTestId('mobile-open')).toHaveTextContent('false')
-  })
+    );
+    expect(screen.getByTestId('mobile-open')).toHaveTextContent('false');
+    await userEvent.click(screen.getByRole('button', { name: 'Open Mobile' }));
+    expect(screen.getByTestId('mobile-open')).toHaveTextContent('true');
+    await userEvent.click(screen.getByRole('button', { name: 'Close Mobile' }));
+    expect(screen.getByTestId('mobile-open')).toHaveTextContent('false');
+  });
 
   it('detects isMobile from matchMedia', () => {
     Object.defineProperty(window, 'matchMedia', {
@@ -87,13 +87,13 @@ describe('SidebarContext', () => {
         removeEventListener: vi.fn(),
         dispatchEvent: vi.fn(),
       })),
-    })
+    });
 
     render(
       <SidebarProvider>
         <TestConsumer />
       </SidebarProvider>,
-    )
-    expect(screen.getByTestId('is-mobile')).toHaveTextContent('true')
-  })
-})
+    );
+    expect(screen.getByTestId('is-mobile')).toHaveTextContent('true');
+  });
+});

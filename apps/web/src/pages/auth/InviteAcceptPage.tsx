@@ -1,42 +1,42 @@
-import { useState } from 'react'
-import { useForm, useWatch } from 'react-hook-form'
-import { useParams, useNavigate, Link } from 'react-router-dom'
-import { useAcceptInvite } from '@/hooks/useInvites'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { useState } from 'react';
+import { useForm, useWatch } from 'react-hook-form';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useAcceptInvite } from '@/hooks/useInvites';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 interface AcceptFields {
-  displayName: string
-  password: string
-  confirmPassword: string
+  displayName: string;
+  password: string;
+  confirmPassword: string;
 }
 
 export function InviteAcceptPage() {
-  const { token } = useParams<{ token: string }>()
-  const navigate = useNavigate()
-  const [errorMsg, setErrorMsg] = useState<string | null>(null)
-  const acceptInvite = useAcceptInvite()
+  const { token } = useParams<{ token: string }>();
+  const navigate = useNavigate();
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const acceptInvite = useAcceptInvite();
 
   const {
     register,
     handleSubmit,
     control,
     formState: { errors },
-  } = useForm<AcceptFields>()
+  } = useForm<AcceptFields>();
 
-  const password = useWatch({ control, name: 'password' })
+  const password = useWatch({ control, name: 'password' });
 
   function onSubmit(data: AcceptFields) {
-    if (!token) return
-    setErrorMsg(null)
+    if (!token) return;
+    setErrorMsg(null);
     acceptInvite.mutate(
       { token, password: data.password, displayName: data.displayName },
       {
         onSuccess: () => navigate('/login'),
         onError: () => setErrorMsg('This invite link is invalid or has expired.'),
       },
-    )
+    );
   }
 
   return (
@@ -44,16 +44,11 @@ export function InviteAcceptPage() {
       <div className="w-full max-w-sm space-y-6 px-4">
         <div className="space-y-1 text-center">
           <h1 className="text-2xl font-semibold">Accept Invite</h1>
-          <p className="text-muted-foreground text-sm">
-            Set your password to complete your account setup.
-          </p>
+          <p className="text-muted-foreground text-sm">Set your password to complete your account setup.</p>
         </div>
 
         {errorMsg && (
-          <div
-            role="alert"
-            className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-          >
+          <div role="alert" className="border-destructive/50 bg-destructive/10 text-destructive rounded-md border px-4 py-3 text-sm">
             {errorMsg}
           </div>
         )}
@@ -71,9 +66,7 @@ export function InviteAcceptPage() {
                 maxLength: { value: 100, message: 'Display name must be at most 100 characters' },
               })}
             />
-            {errors.displayName && (
-              <p className="text-destructive text-xs">{errors.displayName.message}</p>
-            )}
+            {errors.displayName && <p className="text-destructive text-xs">{errors.displayName.message}</p>}
           </div>
 
           <div className="space-y-1">
@@ -88,9 +81,7 @@ export function InviteAcceptPage() {
                 minLength: { value: 8, message: 'Password must be at least 8 characters' },
               })}
             />
-            {errors.password && (
-              <p className="text-destructive text-xs">{errors.password.message}</p>
-            )}
+            {errors.password && <p className="text-destructive text-xs">{errors.password.message}</p>}
           </div>
 
           <div className="space-y-1">
@@ -105,9 +96,7 @@ export function InviteAcceptPage() {
                 validate: (value) => value === password || 'Passwords do not match',
               })}
             />
-            {errors.confirmPassword && (
-              <p className="text-destructive text-xs">{errors.confirmPassword.message}</p>
-            )}
+            {errors.confirmPassword && <p className="text-destructive text-xs">{errors.confirmPassword.message}</p>}
           </div>
 
           <Button type="submit" className="w-full" disabled={acceptInvite.isPending}>
@@ -123,5 +112,5 @@ export function InviteAcceptPage() {
         </p>
       </div>
     </div>
-  )
+  );
 }

@@ -16,9 +16,7 @@ export function LocaleSelector({ value, onChange }: LocaleSelectorProps) {
   return (
     <Select value={resolvedValue} onValueChange={(code) => onChange(code || '')}>
       <SelectTrigger size="sm" className="w-40">
-        <SelectValue placeholder="Select locale">
-          {locales.find((loc) => loc.code === resolvedValue)?.name ?? resolvedValue}
-        </SelectValue>
+        <SelectValue placeholder="Select locale">{locales.find((loc) => loc.code === resolvedValue)?.name ?? resolvedValue}</SelectValue>
       </SelectTrigger>
       <SelectContent>
         {locales.map((locale) => (
