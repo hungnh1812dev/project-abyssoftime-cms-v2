@@ -89,18 +89,28 @@ func (h *AuthHandler) Login(ginCtx *gin.Context) {
 
 	noStoreHeader(ginCtx)
 	ginCtx.JSON(http.StatusOK, gin.H{
-		"accessToken": access,
+		"accessToken":  access,
+		"refreshToken": refresh,
 	})
 }
 
 func (h *AuthHandler) Refresh(ginCtx *gin.Context) {
-	cookieVal, err := ginCtx.Cookie(RefreshCookieName)
-	if err != nil {
-		ginWriteError(ginCtx, http.StatusUnauthorized, "missing refresh token")
-		return
+	var req struct {
+		RefreshToken string `json:"refreshToken"`
+	}
+	_ = ginCtx.ShouldBindJSON(&req)
+
+	tokenVal := req.RefreshToken
+	if tokenVal == "" {
+		cookieVal, err := ginCtx.Cookie(RefreshCookieName)
+		if err != nil {
+			ginWriteError(ginCtx, http.StatusUnauthorized, "missing refresh token")
+			return
+		}
+		tokenVal = cookieVal
 	}
 
-	access, refresh, err := h.usecase.RefreshToken(ginCtx.Request.Context(), cookieVal)
+	access, refresh, err := h.usecase.RefreshToken(ginCtx.Request.Context(), tokenVal)
 	if err != nil {
 		ginWriteErr(ginCtx, err)
 		return
@@ -111,7 +121,8 @@ func (h *AuthHandler) Refresh(ginCtx *gin.Context) {
 
 	noStoreHeader(ginCtx)
 	ginCtx.JSON(http.StatusOK, gin.H{
-		"accessToken": access,
+		"accessToken":  access,
+		"refreshToken": refresh,
 	})
 }
 

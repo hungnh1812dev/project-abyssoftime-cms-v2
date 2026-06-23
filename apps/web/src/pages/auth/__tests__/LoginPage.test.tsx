@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import MockAdapter from 'axios-mock-adapter';
-import { api, getAccessToken, setAccessToken } from '@/lib/api';
+import { api, getAccessToken, setAccessToken, clearRefreshToken } from '@/lib/api';
 import { renderWithProviders } from '@/test-utils';
 import { AuthProvider } from '@/context/AuthContext';
 import { LoginPage } from '@/pages/auth/LoginPage';
@@ -19,8 +19,8 @@ let mock: MockAdapter;
 
 beforeEach(() => {
   mock = new MockAdapter(api);
-  mock.onPost('/auth/refresh').reply(401); // not logged in at page load
   setAccessToken(null);
+  clearRefreshToken();
 });
 
 afterEach(() => {
@@ -72,9 +72,9 @@ describe('LoginPage', () => {
     });
   });
 
-  it('calls POST /auth/login and stores token on success', async () => {
+  it('calls POST /auth/login and stores access + refresh tokens on success', async () => {
     const user = userEvent.setup();
-    mock.onPost('/auth/login').reply(200, { accessToken: ADMIN_TOKEN });
+    mock.onPost('/auth/login').reply(200, { accessToken: ADMIN_TOKEN, refreshToken: 'login-refresh-tok' });
     renderLogin();
 
     await waitFor(() => expect(screen.getByLabelText(/email/i)).toBeInTheDocument());
@@ -85,6 +85,7 @@ describe('LoginPage', () => {
     await waitFor(() => {
       expect(getAccessToken()).toBe(ADMIN_TOKEN);
     });
+    expect(sessionStorage.getItem('refresh_token')).toBe('login-refresh-tok');
   });
 
   it('shows error message when login fails', async () => {
