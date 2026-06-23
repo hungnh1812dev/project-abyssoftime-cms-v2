@@ -29,12 +29,12 @@ export function ContentTypeBuilder({ schema, query, mutationFn, renderActions }:
   return (
     <FormProvider query={query} mutationFn={mutationFn}>
       <div className="space-y-6">
+        <FormActions renderActions={renderActions} />
         <Card>
           <CardContent>
             <div className="space-y-4">{schema.map((field) => renderSchemaField(field))}</div>
           </CardContent>
         </Card>
-        <FormActions renderActions={renderActions} />
       </div>
     </FormProvider>
   );
