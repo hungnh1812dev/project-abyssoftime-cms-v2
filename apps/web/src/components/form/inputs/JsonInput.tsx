@@ -32,11 +32,12 @@ function InnerJsonInput({ field }: { field: { value: unknown; onChange: (value: 
 
   return (
     <div>
-      <div data-testid="json-editor-wrapper" className="border-input min-h-[15em] overflow-hidden rounded-md border">
+      <div data-testid="json-editor-wrapper" className="border-input min-h-[15em] max-h-112.5 overflow-auto rounded-md border">
         <CodeMirror
           value={rawValue}
           extensions={[json()]}
           minHeight="15em"
+          maxHeight="450px"
           onChange={(val) => {
             setRawValue(val);
             setEditCount((count) => count + 1);
