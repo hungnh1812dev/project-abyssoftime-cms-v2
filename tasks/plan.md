@@ -210,6 +210,100 @@ Update the `fakeDocRepository` mock in `sync_test.go` with a no-op `TableInfo`.
 
 ---
 
+## Current: Phase AX — Fix Cross-Origin Auth (Production F5 Redirect)
+
+### Context
+
+After logging in with rememberMe=true, refreshing (F5) redirects to login on **production (Render)** with `COOKIE_SECURE=true; COOKIE_SAMESITE=none`. On Render, frontend and API are separate services on different domains. Since `onrender.com` is on the Public Suffix List, these are **different sites**. Browsers (Safari ITP, Chrome third-party cookie deprecation) block the refresh token cookie as a third-party cookie. The fix from Phase Z (cookie defaults + re-issue) only works for same-origin deployments (docker-compose with nginx proxy).
+
+### Fix: Token-based refresh (body transport)
+
+Return refresh token in the response body AND accept it from the request body. Frontend stores in localStorage (rememberMe) or sessionStorage (!rememberMe). Cookie still set for backward compat.
+
+### Dependency Graph
+
+```
+T1 (BE: Refresh accepts body token)      ←── independent
+T2 (BE: Login+Refresh return refreshToken in body) ← T1
+T3 (BE: Update handler tests)            ← T1+T2
+    ↓
+[Checkpoint 1: go test ./... green]
+    ↓
+T4 (FE: Token storage helpers in api.ts) ←── independent
+T5 (FE: AuthContext — login/mount/logout) ← T4
+T6 (FE: LoginPage — pass rememberMe+refreshToken) ← T5
+T7 (FE: api.ts — interceptor sends body token) ← T4
+T8 (FE: Update tests)                    ← T5+T6+T7
+    ↓
+[Checkpoint 2: vitest run + tsc --noEmit green]
+    ↓
+[Checkpoint 3: Manual E2E cross-origin test]
+```
+
+### T1: Backend — Refresh handler accepts token from request body
+
+**File:** `apps/api/internal/delivery/http/handler/auth_handler.go`
+
+Change `Refresh()` to read refresh token from JSON body first, falling back to cookie. Use `ShouldBindJSON` (ignore error — body is optional for backward compat).
+
+**Verify:** Existing tests still pass + new body-based flow works.
+
+### T2: Backend — Return refreshToken in response body
+
+**File:** `apps/api/internal/delivery/http/handler/auth_handler.go`
+
+Add `"refreshToken": refresh` to Login and Refresh JSON responses. Cookie still set alongside.
+
+### T3: Backend — Update handler tests
+
+**File:** `apps/api/internal/delivery/http/handler/auth_handler_test.go`
+
+- Login success: assert `refreshToken` in body
+- Refresh: add "success with body token" test case (JSON body, no cookie)
+- Refresh: assert `refreshToken` in response body
+
+**Checkpoint 1:** `cd apps/api && go test ./... -count=1`
+
+### T4: Frontend — Refresh token storage helpers
+
+**File:** `apps/web/src/lib/api.ts`
+
+Add `storeRefreshToken(token, remember?)`, `getRefreshToken()`, `clearRefreshToken()`. Uses localStorage for rememberMe=true, sessionStorage for false. When `remember` is omitted (during refresh), preserves current storage location.
+
+### T5: Frontend — AuthContext updates
+
+**File:** `apps/web/src/context/AuthContext.tsx`
+
+- `login()` accepts `(accessToken, refreshToken, rememberMe)` — stores refresh token
+- Mount effect: read stored refresh token → if absent, set LOGGED_OUT; if present, send in body to `/auth/refresh`
+- `logout()`: call `clearRefreshToken()`
+
+### T6: Frontend — LoginPage passes rememberMe + refreshToken
+
+**File:** `apps/web/src/pages/auth/LoginPage.tsx`
+
+- Update `LoginResponse` to include `refreshToken`
+- `onSuccess`: call `login(data.accessToken, data.refreshToken, variables.rememberMe)`
+
+### T7: Frontend — api.ts interceptor sends body token
+
+**File:** `apps/web/src/lib/api.ts`
+
+- `refreshAccessToken()`: send stored token in body, store new token from response
+- 401 catch: call `clearRefreshToken()`
+
+### T8: Frontend — Update tests
+
+Update `AuthContext.test.tsx`, `LoginPage.test.tsx` for new `login()` signature and `refreshToken` in responses.
+
+**Checkpoint 2:** `cd apps/web && bun run test && npx tsc --noEmit`
+
+### Checkpoint 3: Manual E2E
+
+Cross-origin test: run API on :8080, web on :5173 with `VITE_API_URL=http://localhost:8080` (bypasses vite proxy). Login → F5 → stays on admin. Close browser → reopen → stays if rememberMe, redirects if not.
+
+---
+
 ## Upcoming
 
 *(Add new plans here as they are defined.)*

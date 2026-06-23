@@ -1,12 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import MockAdapter from 'axios-mock-adapter';
-import { api, getAccessToken, setAccessToken } from '@/lib/api';
+import { api, getAccessToken, setAccessToken, clearRefreshToken } from '@/lib/api';
 
 let mock: MockAdapter;
 
 beforeEach(() => {
   mock = new MockAdapter(api);
   setAccessToken(null);
+  clearRefreshToken();
 });
 
 afterEach(() => {
@@ -54,9 +55,10 @@ describe('api request interceptor', () => {
 describe('api 401 response interceptor', () => {
   it('calls POST /auth/refresh and retries original request on 401', async () => {
     setAccessToken('expired-token');
+    localStorage.setItem('refresh_token', 'stored-refresh');
     let callCount = 0;
 
-    mock.onPost('/auth/refresh').reply(200, { accessToken: 'new-token' });
+    mock.onPost('/auth/refresh').reply(200, { accessToken: 'new-token', refreshToken: 'new-refresh' });
     mock.onGet('/protected').reply(() => {
       callCount++;
       if (callCount === 1) return [401, { message: 'Unauthorized' }];
@@ -72,11 +74,12 @@ describe('api 401 response interceptor', () => {
 
   it('does not retry more than once (prevents infinite loop)', async () => {
     setAccessToken('expired-token');
+    localStorage.setItem('refresh_token', 'stored-refresh');
     let refreshCallCount = 0;
 
     mock.onPost('/auth/refresh').reply(() => {
       refreshCallCount++;
-      return [200, { accessToken: 'new-token' }];
+      return [200, { accessToken: 'new-token', refreshToken: 'new-refresh' }];
     });
     mock.onGet('/protected').reply(401, { message: 'Unauthorized' });
 
@@ -86,11 +89,13 @@ describe('api 401 response interceptor', () => {
 
   it('rejects with 401 error when refresh itself fails', async () => {
     setAccessToken('expired-token');
+    localStorage.setItem('refresh_token', 'stored-refresh');
 
     mock.onPost('/auth/refresh').reply(401, { message: 'Refresh token expired' });
     mock.onGet('/protected').reply(401, { message: 'Unauthorized' });
 
     await expect(api.get('/protected')).rejects.toMatchObject({ response: { status: 401 } });
     expect(getAccessToken()).toBeNull();
+    expect(localStorage.getItem('refresh_token')).toBeNull();
   });
 });

@@ -5,7 +5,7 @@ export const api = axios.create({
   withCredentials: true,
 });
 
-// Token storage — in-memory only; populated by auth context (T1.7)
+// Access token — in-memory only; populated by auth context
 let _accessToken: string | null = null;
 
 export function setAccessToken(token: string | null) {
@@ -14,6 +14,25 @@ export function setAccessToken(token: string | null) {
 
 export function getAccessToken(): string | null {
   return _accessToken;
+}
+
+// Refresh token — localStorage (rememberMe) or sessionStorage (session-only)
+const REFRESH_KEY = 'refresh_token';
+
+export function storeRefreshToken(token: string, remember?: boolean) {
+  const useLocal = remember ?? localStorage.getItem(REFRESH_KEY) !== null;
+  const [target, other] = useLocal ? [localStorage, sessionStorage] : [sessionStorage, localStorage];
+  target.setItem(REFRESH_KEY, token);
+  other.removeItem(REFRESH_KEY);
+}
+
+export function getRefreshToken(): string | null {
+  return localStorage.getItem(REFRESH_KEY) || sessionStorage.getItem(REFRESH_KEY);
+}
+
+export function clearRefreshToken() {
+  localStorage.removeItem(REFRESH_KEY);
+  sessionStorage.removeItem(REFRESH_KEY);
 }
 
 let _onSessionExpired: (() => void) | null = null;
@@ -36,19 +55,22 @@ let _refreshPromise: Promise<string> | null = null;
 async function refreshAccessToken(): Promise<string> {
   if (_refreshPromise) return _refreshPromise;
 
+  const stored = getRefreshToken();
+
   _refreshPromise = api
-    .post<{ accessToken: string }>(
+    .post<{ accessToken: string; refreshToken: string }>(
       '/auth/refresh',
-      {},
+      { refreshToken: stored },
       {
         _retried: true,
         headers: { 'Cache-Control': 'no-cache, no-store' },
       } as object,
     )
     .then((res) => {
-      const newToken = res.data.accessToken;
-      setAccessToken(newToken);
-      return newToken;
+      const { accessToken, refreshToken } = res.data;
+      setAccessToken(accessToken);
+      if (refreshToken) storeRefreshToken(refreshToken);
+      return accessToken;
     })
     .finally(() => {
       _refreshPromise = null;
@@ -70,6 +92,7 @@ api.interceptors.response.use(
         return api(original);
       } catch {
         setAccessToken(null);
+        clearRefreshToken();
         _onSessionExpired?.();
         return Promise.reject(error);
       }

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import MockAdapter from 'axios-mock-adapter';
-import { api, setAccessToken } from '@/lib/api';
+import { api, setAccessToken, clearRefreshToken } from '@/lib/api';
 import { renderWithProviders } from '@/test-utils';
 import { AuthProvider } from '@/context/AuthContext';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
@@ -22,6 +22,7 @@ let mock: MockAdapter;
 beforeEach(() => {
   mock = new MockAdapter(api);
   setAccessToken(null);
+  clearRefreshToken();
 });
 
 afterEach(() => {
@@ -42,9 +43,7 @@ function wrap(ui: React.ReactNode, initialEntries = ['/']) {
 }
 
 describe('ProtectedRoute', () => {
-  it('redirects to /login when not authenticated', async () => {
-    mock.onPost('/auth/refresh').reply(401);
-
+  it('redirects to /login when not authenticated (no stored token)', async () => {
     wrap(
       <Route
         path="/"
@@ -61,7 +60,8 @@ describe('ProtectedRoute', () => {
   });
 
   it('renders children when authenticated', async () => {
-    mock.onPost('/auth/refresh').reply(200, { accessToken: ADMIN_TOKEN });
+    localStorage.setItem('refresh_token', 'valid-refresh');
+    mock.onPost('/auth/refresh').reply(200, { accessToken: ADMIN_TOKEN, refreshToken: 'new-refresh' });
 
     wrap(
       <Route
@@ -79,9 +79,7 @@ describe('ProtectedRoute', () => {
 });
 
 describe('AdminRoute', () => {
-  it('redirects to /login when not authenticated', async () => {
-    mock.onPost('/auth/refresh').reply(401);
-
+  it('redirects to /login when not authenticated (no stored token)', async () => {
     wrap(
       <Route
         path="/"
@@ -97,7 +95,8 @@ describe('AdminRoute', () => {
   });
 
   it('shows 403 when role is not admin', async () => {
-    mock.onPost('/auth/refresh').reply(200, { accessToken: GUEST_TOKEN });
+    localStorage.setItem('refresh_token', 'valid-refresh');
+    mock.onPost('/auth/refresh').reply(200, { accessToken: GUEST_TOKEN, refreshToken: 'new-refresh' });
 
     wrap(
       <Route
@@ -115,7 +114,8 @@ describe('AdminRoute', () => {
   });
 
   it('renders children when role is admin', async () => {
-    mock.onPost('/auth/refresh').reply(200, { accessToken: ADMIN_TOKEN });
+    localStorage.setItem('refresh_token', 'valid-refresh');
+    mock.onPost('/auth/refresh').reply(200, { accessToken: ADMIN_TOKEN, refreshToken: 'new-refresh' });
 
     wrap(
       <Route

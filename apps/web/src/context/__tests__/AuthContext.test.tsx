@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { screen, waitFor, act } from '@testing-library/react';
 import MockAdapter from 'axios-mock-adapter';
-import { api, getAccessToken, setAccessToken } from '@/lib/api';
+import { api, getAccessToken, setAccessToken, clearRefreshToken } from '@/lib/api';
 import { renderWithProviders } from '@/test-utils';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 
@@ -14,12 +14,14 @@ function makeToken(payload: Record<string, unknown>) {
 
 const ADMIN_TOKEN = makeToken({ userId: 'u1', role: 'admin', exp: 9999999999 });
 const GUEST_TOKEN = makeToken({ userId: 'u2', role: 'guest', exp: 9999999999 });
+const FAKE_REFRESH = 'fake-refresh-token';
 
 let mock: MockAdapter;
 
 beforeEach(() => {
   mock = new MockAdapter(api);
   setAccessToken(null);
+  clearRefreshToken();
 });
 
 afterEach(() => {
@@ -41,7 +43,19 @@ function AuthDisplay() {
 }
 
 describe('AuthProvider', () => {
-  it('starts in loading state then resolves when refresh fails (unauthenticated)', async () => {
+  it('immediately resolves as unauthenticated when no stored refresh token', async () => {
+    renderWithProviders(
+      <AuthProvider>
+        <AuthDisplay />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('token')).toHaveTextContent('none'));
+    expect(screen.getByTestId('role')).toHaveTextContent('none');
+  });
+
+  it('starts in loading state then resolves when refresh fails', async () => {
+    localStorage.setItem('refresh_token', FAKE_REFRESH);
     mock.onPost('/auth/refresh').reply(401);
 
     renderWithProviders(
@@ -55,8 +69,9 @@ describe('AuthProvider', () => {
     expect(screen.getByTestId('role')).toHaveTextContent('none');
   });
 
-  it('hydrates token + role from refresh cookie on mount', async () => {
-    mock.onPost('/auth/refresh').reply(200, { accessToken: ADMIN_TOKEN });
+  it('hydrates token + role from stored refresh token on mount', async () => {
+    localStorage.setItem('refresh_token', FAKE_REFRESH);
+    mock.onPost('/auth/refresh').reply(200, { accessToken: ADMIN_TOKEN, refreshToken: 'new-refresh' });
 
     renderWithProviders(
       <AuthProvider>
@@ -69,15 +84,13 @@ describe('AuthProvider', () => {
     expect(getAccessToken()).toBe(ADMIN_TOKEN);
   });
 
-  it('login() updates context and sets api token', async () => {
-    mock.onPost('/auth/refresh').reply(401);
-
+  it('login() updates context, sets api token, and stores refresh token', async () => {
     function LoginTrigger() {
       const { login, token } = useAuth();
       return (
         <div>
           <span data-testid="token">{token ?? 'none'}</span>
-          <button onClick={() => login(ADMIN_TOKEN)}>login</button>
+          <button onClick={() => login(ADMIN_TOKEN, FAKE_REFRESH, true)}>login</button>
         </div>
       );
     }
@@ -93,10 +106,12 @@ describe('AuthProvider', () => {
 
     expect(screen.getByTestId('token')).toHaveTextContent(ADMIN_TOKEN);
     expect(getAccessToken()).toBe(ADMIN_TOKEN);
+    expect(localStorage.getItem('refresh_token')).toBe(FAKE_REFRESH);
   });
 
-  it('logout() clears context and calls POST /auth/logout', async () => {
-    mock.onPost('/auth/refresh').reply(200, { accessToken: ADMIN_TOKEN });
+  it('logout() clears context, stored refresh token, and calls POST /auth/logout', async () => {
+    localStorage.setItem('refresh_token', FAKE_REFRESH);
+    mock.onPost('/auth/refresh').reply(200, { accessToken: ADMIN_TOKEN, refreshToken: 'new-refresh' });
     let logoutCalled = false;
     mock.onPost('/auth/logout').reply(() => {
       logoutCalled = true;
@@ -125,12 +140,14 @@ describe('AuthProvider', () => {
     await waitFor(() => expect(screen.getByTestId('token')).toHaveTextContent('none'));
     expect(logoutCalled).toBe(true);
     expect(getAccessToken()).toBeNull();
+    expect(localStorage.getItem('refresh_token')).toBeNull();
   });
 });
 
 describe('useAuth (context access)', () => {
   it('provides correct role from token', async () => {
-    mock.onPost('/auth/refresh').reply(200, { accessToken: GUEST_TOKEN });
+    localStorage.setItem('refresh_token', FAKE_REFRESH);
+    mock.onPost('/auth/refresh').reply(200, { accessToken: GUEST_TOKEN, refreshToken: 'new-refresh' });
 
     renderWithProviders(
       <AuthProvider>

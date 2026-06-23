@@ -107,6 +107,24 @@ Spec: [repeatable-components.md](../specs/repeatable-components.md). Plan: [plan
 
 ---
 
+## Phase AX — Fix Cross-Origin Auth (Production F5 Redirect)
+
+Spec: [bugfix-auth-and-naming.md](bugfix-auth-and-naming.md) (B2 follow-up). Plan: [plan.md](plan.md) (Phase AX section).
+
+- [x] T1 BE: Refresh handler accepts token from request body (fallback to cookie)
+- [x] T2 BE: Login + Refresh return `refreshToken` in response body
+- [x] T3 BE: Update auth handler tests (body-based refresh, refreshToken in response)
+- [x] ✅ Checkpoint 1: `go test ./... -count=1` green
+- [x] T4 FE: Refresh token storage helpers (localStorage/sessionStorage)
+- [x] T5 FE: AuthContext — login/mount/logout use stored refresh token
+- [x] T6 FE: LoginPage passes rememberMe + refreshToken to login()
+- [x] T7 FE: api.ts interceptor sends stored refresh token in body
+- [x] T8 FE: Update frontend tests
+- [x] ✅ Checkpoint 2: `vitest run` (187 pass) + `tsc --noEmit` + lint green
+- [ ] ✅ Checkpoint 3: Manual E2E cross-origin test
+
+---
+
 ## Archive Index
 
 | Archive | Phases | Status |

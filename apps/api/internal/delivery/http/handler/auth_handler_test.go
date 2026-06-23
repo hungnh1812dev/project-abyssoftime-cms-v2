@@ -188,6 +188,9 @@ func TestLoginHandler(t *testing.T) {
 				if out["accessToken"] == nil {
 					t.Errorf("response missing accessToken: %v", out)
 				}
+				if out["refreshToken"] == nil {
+					t.Errorf("response missing refreshToken: %v", out)
+				}
 			}
 			if tc.wantCookie {
 				resp := w.Result()
@@ -207,30 +210,64 @@ func TestLoginHandler(t *testing.T) {
 func TestRefreshHandler(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
+	successUC := &mockAuthUC{
+		refreshTokenFn: func(_ context.Context, token string) (string, string, error) {
+			return "new-access-tok", "new-refresh-tok", nil
+		},
+	}
+
 	tests := []struct {
 		name       string
 		cookie     *http.Cookie
+		body       string
 		uc         *mockAuthUC
 		wantStatus int
 	}{
 		{
-			name:   "success → 200 with new access token and refresh cookie",
+			name:   "success with cookie → 200",
 			cookie: &http.Cookie{Name: handler.RefreshCookieName, Value: "valid-refresh"},
+			uc:     successUC,
+
+			wantStatus: http.StatusOK,
+		},
+		{
+			name:       "success with body token → 200",
+			body:       `{"refreshToken":"valid-refresh"}`,
+			uc:         successUC,
+			wantStatus: http.StatusOK,
+		},
+		{
+			name:   "body token takes precedence over cookie",
+			cookie: &http.Cookie{Name: handler.RefreshCookieName, Value: "cookie-tok"},
+			body:   `{"refreshToken":"body-tok"}`,
 			uc: &mockAuthUC{
-				refreshTokenFn: func(_ context.Context, _ string) (string, string, error) {
+				refreshTokenFn: func(_ context.Context, token string) (string, string, error) {
+					if token != "body-tok" {
+						return "", "", pkgerrors.ErrUnauthorized
+					}
 					return "new-access-tok", "new-refresh-tok", nil
 				},
 			},
 			wantStatus: http.StatusOK,
 		},
 		{
-			name:       "missing cookie → 401",
+			name:       "no cookie and no body → 401",
 			uc:         &mockAuthUC{},
 			wantStatus: http.StatusUnauthorized,
 		},
 		{
-			name:   "invalid refresh token → 401",
+			name:   "invalid refresh token via cookie → 401",
 			cookie: &http.Cookie{Name: handler.RefreshCookieName, Value: "bad"},
+			uc: &mockAuthUC{
+				refreshTokenFn: func(_ context.Context, _ string) (string, string, error) {
+					return "", "", pkgerrors.ErrUnauthorized
+				},
+			},
+			wantStatus: http.StatusUnauthorized,
+		},
+		{
+			name: "invalid refresh token via body → 401",
+			body: `{"refreshToken":"bad"}`,
 			uc: &mockAuthUC{
 				refreshTokenFn: func(_ context.Context, _ string) (string, string, error) {
 					return "", "", pkgerrors.ErrUnauthorized
@@ -247,7 +284,14 @@ func TestRefreshHandler(t *testing.T) {
 			_, r := gin.CreateTestContext(w)
 			r.POST("/auth/refresh", h.Refresh)
 
-			req := httptest.NewRequest(http.MethodPost, "/auth/refresh", nil)
+			var bodyReader *bytes.Buffer
+			if tc.body != "" {
+				bodyReader = bytes.NewBufferString(tc.body)
+			} else {
+				bodyReader = &bytes.Buffer{}
+			}
+			req := httptest.NewRequest(http.MethodPost, "/auth/refresh", bodyReader)
+			req.Header.Set("Content-Type", "application/json")
 			if tc.cookie != nil {
 				req.AddCookie(tc.cookie)
 			}
@@ -261,12 +305,15 @@ func TestRefreshHandler(t *testing.T) {
 				if out["accessToken"] == nil {
 					t.Errorf("response missing accessToken: %v", out)
 				}
+				if out["refreshToken"] == nil {
+					t.Errorf("response missing refreshToken: %v", out)
+				}
 				resp := w.Result()
-				c := cookieByName(resp, handler.RefreshCookieName)
-				if c == nil {
+				cookie := cookieByName(resp, handler.RefreshCookieName)
+				if cookie == nil {
 					t.Error("expected refresh_token cookie to be re-issued")
-				} else if c.Value != "new-refresh-tok" {
-					t.Errorf("cookie value = %q, want %q", c.Value, "new-refresh-tok")
+				} else if cookie.Value != "new-refresh-tok" {
+					t.Errorf("cookie value = %q, want %q", cookie.Value, "new-refresh-tok")
 				}
 			}
 		})
