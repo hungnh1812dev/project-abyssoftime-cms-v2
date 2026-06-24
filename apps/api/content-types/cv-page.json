@@ -84,24 +84,7 @@
             { "name": "responsitoryLink", "type": "text" }
           ]
         },
-        {
-          "name": "roles",
-          "type": "component",
-          "component": "role",
-          "repeatable": true,
-          "fields": [
-            {
-              "type": "layout",
-              "fields": [
-                { "name": "position", "type": "text" },
-                { "name": "period", "type": "text" }
-              ]
-            },
-            { "name": "projects", "type": "text" },
-            { "name": "techStack", "type": "json" },
-            { "name": "responsibilities", "type": "richtext" }
-          ]
-        }
+        { "name": "responsibilities", "type": "richtext" }
       ]
     },
     {
