@@ -20,8 +20,8 @@ export function ContentTypePage() {
   }
 
   if (contentType.Kind === 'single') {
-    return <ContentTypePanel contentType={contentType} />;
+    return <ContentTypePanel key={contentType.Slug} contentType={contentType} />;
   }
 
-  return <CollectionListPage contentType={contentType} />;
+  return <CollectionListPage key={contentType.Slug} contentType={contentType} />;
 }

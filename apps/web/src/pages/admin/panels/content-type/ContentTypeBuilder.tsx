@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { renderSchemaField } from './renderSchemaField';
 
 interface ContentTypeBuilderProps {
+  contentTypeSlug: string;
   schema: FieldDefinition[];
   query?: UseQueryOptions;
   mutationFn: (data: Record<string, unknown>) => Promise<unknown>;
@@ -25,14 +26,15 @@ function FormActions({ renderActions }: { renderActions?: ContentTypeBuilderProp
   );
 }
 
-export function ContentTypeBuilder({ schema, query, mutationFn, renderActions }: ContentTypeBuilderProps) {
+export function ContentTypeBuilder({ contentTypeSlug, schema, query, mutationFn, renderActions }: ContentTypeBuilderProps) {
+  const keyPrefix = `${contentTypeSlug}_`;
   return (
     <FormProvider query={query} mutationFn={mutationFn}>
       <div className="space-y-6">
         <FormActions renderActions={renderActions} />
         <Card>
           <CardContent>
-            <div className="space-y-4">{schema.map((field) => renderSchemaField(field))}</div>
+            <div className="space-y-4">{schema.map((field, index) => renderSchemaField(field, '', keyPrefix, index))}</div>
           </CardContent>
         </Card>
       </div>

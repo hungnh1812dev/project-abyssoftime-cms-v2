@@ -33,43 +33,46 @@ const depthStyles = [
   { border: 'border-amber-300 dark:border-amber-700', bg: 'bg-amber-50/50 dark:bg-amber-950/20', legend: 'text-amber-700 dark:text-amber-300' },
 ] as const;
 
-function renderField(field: FieldDefinition, prefix = '', depth = 0): React.ReactNode {
+function renderField(field: FieldDefinition, prefix: string, keyPrefix: string, depth: number, index: number): React.ReactNode {
   const fieldName = prefix + field.name;
+  const fieldKey = field.name ? `${keyPrefix}${field.name}` : `${keyPrefix}layout_${index}`;
 
   if (field.type === 'layout') {
     return (
-      <div key={fieldName} className="grid gap-4 md:grid-cols-2">
-        {(field.fields ?? []).map((child) => renderField(child, prefix, depth))}
+      <div key={fieldKey} className="grid gap-4 md:grid-cols-2">
+        {(field.fields ?? []).map((child, childIndex) => renderField(child, prefix, keyPrefix, depth, childIndex))}
       </div>
     );
   }
 
   if (field.type === 'component') {
+    const childKeyPrefix = `${fieldKey}_`;
     if (field.repeatable) {
       return (
         <RepeatableComponentField
-          key={fieldName}
+          key={fieldKey}
           name={fieldName}
           label={field.name}
           depth={depth}
+          keyPrefix={childKeyPrefix}
           fields={field.fields ?? []}
-          renderField={(child, childPrefix, childDepth) => renderField(child, childPrefix, childDepth)}
+          renderField={(child: FieldDefinition, childPrefix: string, childDepth: number, childIndex: number) => renderField(child, childPrefix, childKeyPrefix, childDepth, childIndex)}
         />
       );
     }
     const childPrefix = fieldName + '.';
     const style = depthStyles[depth % depthStyles.length];
     return (
-      <fieldset key={fieldName} className={`rounded-md border p-4 ${style.border} ${style.bg}`}>
+      <fieldset key={fieldKey} className={`rounded-md border p-4 ${style.border} ${style.bg}`}>
         <legend className={`px-1 text-sm font-medium ${style.legend}`}>{field.name}</legend>
-        {(field.fields ?? []).map((child) => renderField(child, childPrefix, depth + 1))}
+        {(field.fields ?? []).map((child, childIndex) => renderField(child, childPrefix, childKeyPrefix, depth + 1, childIndex))}
       </fieldset>
     );
   }
 
   if (field.type === 'json') {
     return (
-      <div key={fieldName}>
+      <div key={fieldKey}>
         <label className="mb-1 block text-sm font-medium">{field.name}</label>
         <Suspense fallback={<div className="bg-muted h-48 animate-pulse rounded-md" />}>
           <JsonInput name={fieldName} />
@@ -80,7 +83,7 @@ function renderField(field: FieldDefinition, prefix = '', depth = 0): React.Reac
 
   if (field.type === 'richtext') {
     return (
-      <div key={fieldName}>
+      <div key={fieldKey}>
         <label className="mb-1 block text-sm font-medium">{field.name}</label>
         <Suspense fallback={<div className="bg-muted h-48 animate-pulse rounded-md" />}>
           <RichTextInput name={fieldName} />
@@ -91,7 +94,7 @@ function renderField(field: FieldDefinition, prefix = '', depth = 0): React.Reac
 
   if (field.type === 'media') {
     return (
-      <div key={fieldName}>
+      <div key={fieldKey}>
         <label className="mb-1 block text-sm font-medium">{field.name}</label>
         <MediaInput name={fieldName} ext={field.ext} />
       </div>
@@ -99,13 +102,13 @@ function renderField(field: FieldDefinition, prefix = '', depth = 0): React.Reac
   }
 
   return (
-    <div key={fieldName}>
+    <div key={fieldKey}>
       <label className="mb-1 block text-sm font-medium">{field.name}</label>
       <FormField name={fieldName}>{primitiveInput(field)}</FormField>
     </div>
   );
 }
 
-export function renderSchemaField(field: FieldDefinition, prefix = ''): React.ReactNode {
-  return renderField(field, prefix);
+export function renderSchemaField(field: FieldDefinition, prefix: string, keyPrefix: string, index: number): React.ReactNode {
+  return renderField(field, prefix, keyPrefix, 0, index);
 }

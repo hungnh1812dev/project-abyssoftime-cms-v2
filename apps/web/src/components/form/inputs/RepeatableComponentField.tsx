@@ -17,11 +17,12 @@ interface RepeatableComponentFieldProps {
   name: string;
   label: string;
   depth?: number;
+  keyPrefix: string;
   fields: FieldDefinition[];
-  renderField: (field: FieldDefinition, prefix: string, depth: number) => React.ReactNode;
+  renderField: (field: FieldDefinition, prefix: string, depth: number, index: number) => React.ReactNode;
 }
 
-export function RepeatableComponentField({ name, label, depth = 0, fields: childFields, renderField }: RepeatableComponentFieldProps) {
+export function RepeatableComponentField({ name, label, depth = 0, keyPrefix, fields: childFields, renderField }: RepeatableComponentFieldProps) {
   const { control } = useFormContext();
   const { fields, append, remove, swap } = useFieldArray({ control, name });
   const style = getDepthStyle(depth);
@@ -70,7 +71,7 @@ export function RepeatableComponentField({ name, label, depth = 0, fields: child
               </div>
             </div>
             <div className="space-y-4">
-              {childFields.map((child) => renderField(child, `${name}.${index}.`, depth + 1))}
+              {childFields.map((child, childIndex) => renderField(child, `${name}.${index}.`, depth + 1, childIndex))}
             </div>
           </div>
         ))}
