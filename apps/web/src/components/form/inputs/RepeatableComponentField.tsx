@@ -22,7 +22,7 @@ interface RepeatableComponentFieldProps {
   renderField: (field: FieldDefinition, prefix: string, depth: number, index: number) => React.ReactNode;
 }
 
-export function RepeatableComponentField({ name, label, depth = 0, keyPrefix, fields: childFields, renderField }: RepeatableComponentFieldProps) {
+export function RepeatableComponentField({ name, label, depth = 0, keyPrefix: _keyPrefix, fields: childFields, renderField }: RepeatableComponentFieldProps) {
   const { control } = useFormContext();
   const { fields, append, remove, swap } = useFieldArray({ control, name });
   const style = getDepthStyle(depth);
