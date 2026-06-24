@@ -61,10 +61,7 @@ async function refreshAccessToken(): Promise<string> {
     .post<{ accessToken: string; refreshToken: string }>(
       '/auth/refresh',
       { refreshToken: stored },
-      {
-        _retried: true,
-        headers: { 'Cache-Control': 'no-cache, no-store' },
-      } as object,
+      { _retried: true } as object,
     )
     .then((res) => {
       const { accessToken, refreshToken } = res.data;
