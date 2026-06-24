@@ -216,3 +216,34 @@ Whenever a code change, new feature, bug fix, spec update, or refactor introduce
 - Rules must always reflect the **current** state of the codebase — never lag behind
 - A PR that changes behavior without updating the corresponding rule is incomplete
 - When in doubt about whether a change warrants a rule update, update it — over-documenting is better than stale rules
+
+---
+
+## 13. Pre-Commit Verification (Mandatory)
+
+After completing all tasks in a build phase, or after any short code-editing task, **always** run the verification pipeline for each service that has code changes before considering the work done.
+
+### 13.1 Which Services to Verify
+
+Only verify services that have changed files:
+- **`apps/api/`** changed → run API checks
+- **`apps/web/`** changed → run Web checks
+- Both changed → run both
+
+### 13.2 API Checks (`apps/api/`)
+
+1. **Lint** — `cd apps/api && go vet ./...`
+2. **Unit tests** — `make test-api`
+3. **Build** — `cd apps/api && go build ./...`
+
+### 13.3 Web Checks (`apps/web/`)
+
+1. **Lint** — `cd apps/web && npm run lint`
+2. **Unit tests** — `make test-web`
+3. **Build** — `cd apps/web && npm run build`
+
+### 13.4 Invariants
+
+- All steps for affected services must pass
+- If any step fails, fix the issue before committing or reporting the task as complete
+- This prevents CI failures after push
