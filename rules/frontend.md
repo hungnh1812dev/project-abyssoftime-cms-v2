@@ -155,8 +155,14 @@ apps/web/src/
 ['access-tokens']
 ```
 
-### 5.4 Invariants
-- **NEVER** use raw `useEffect` + `useState` for API calls — use TanStack Query
+### 5.4 Health Ping (Exception to TanStack Query Rule)
+- `HealthProvider` in `src/context/HealthContext.tsx` uses standalone `fetch` with `setTimeout` loop — NOT TanStack Query
+- This is intentional: the ping is a side-effect loop with custom 10s/14m timing, not request-response data fetching
+- Uses standalone `fetch` — **NEVER** the `api` axios instance (avoids auth interceptor)
+- `useHealthStatus()` hook exposes `{ isApiHealthy: boolean }`
+
+### 5.5 Invariants
+- **NEVER** use raw `useEffect` + `useState` for API calls — use TanStack Query (exception: health ping loop)
 - **ALWAYS** invalidate queries after mutations
 - **ALWAYS** use query key constants (not string literals)
 
