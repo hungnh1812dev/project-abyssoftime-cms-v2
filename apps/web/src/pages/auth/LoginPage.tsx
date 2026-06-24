@@ -16,6 +16,7 @@ interface LoginFields {
 
 interface LoginResponse {
   accessToken: string;
+  refreshToken: string;
 }
 
 export function LoginPage() {
@@ -37,8 +38,8 @@ export function LoginPage() {
 
   const mutation = useMutation({
     mutationFn: (data: LoginFields) => api.post<LoginResponse>('/auth/login', data).then((response) => response.data),
-    onSuccess: (data) => {
-      login(data.accessToken);
+    onSuccess: (data, variables) => {
+      login(data.accessToken, data.refreshToken, variables.rememberMe);
       navigate('/admin');
     },
     onError: () => {

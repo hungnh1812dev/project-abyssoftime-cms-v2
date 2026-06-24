@@ -12,6 +12,7 @@ const mediaResponse = {
   items: [
     {
       ID: 'a1',
+      documentId: 'a1',
       url: 'https://cdn/a1.jpg',
       thumbnailUrl: 'https://cdn/a1.jpg',
       publicId: 'p1',
@@ -24,6 +25,7 @@ const mediaResponse = {
     },
     {
       ID: 'a2',
+      documentId: 'a2',
       url: 'https://cdn/a2.jpg',
       thumbnailUrl: 'https://cdn/a2.jpg',
       publicId: 'p2',
@@ -100,7 +102,7 @@ describe('MediaLibrary', () => {
     expect(screen.getAllByRole('button', { name: 'Delete asset' })).toHaveLength(2);
   });
 
-  it('arms confirm state on first delete click (does not call API)', async () => {
+  it('opens confirm dialog on delete click (does not call API)', async () => {
     mock.onGet('/api/media?page=1&limit=20').reply(200, mediaResponse);
     let deleteCalled = false;
     mock.onDelete('/api/media/a1').reply(() => {
@@ -114,11 +116,12 @@ describe('MediaLibrary', () => {
     const [firstDeleteBtn] = screen.getAllByRole('button', { name: 'Delete asset' });
     await userEvent.click(firstDeleteBtn);
 
-    expect(screen.getByRole('button', { name: 'Confirm delete' })).toBeInTheDocument();
+    expect(screen.getByText(/are you sure you want to delete/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
     expect(deleteCalled).toBe(false);
   });
 
-  it('fires DELETE on second click and invalidates the list', async () => {
+  it('fires DELETE on confirm and invalidates the list', async () => {
     mock.onGet('/api/media?page=1&limit=20').reply(200, mediaResponse);
     mock.onDelete('/api/media/a1').reply(204);
 
@@ -128,14 +131,14 @@ describe('MediaLibrary', () => {
     const [firstDeleteBtn] = screen.getAllByRole('button', { name: 'Delete asset' });
     await userEvent.click(firstDeleteBtn);
 
-    const confirmBtn = screen.getByRole('button', { name: 'Confirm delete' });
+    const confirmBtn = screen.getByRole('button', { name: 'Delete' });
     await userEvent.click(confirmBtn);
 
     await waitFor(() => expect(mock.history.delete).toHaveLength(1));
     expect(mock.history.delete[0].url).toBe('/api/media/a1');
   });
 
-  it('disarms confirm state on mouse-leave', async () => {
+  it('closes confirm dialog on cancel click', async () => {
     mock.onGet('/api/media?page=1&limit=20').reply(200, mediaResponse);
 
     renderWithProviders(<MediaLibrary isOpen onClose={vi.fn()} onSelect={vi.fn()} />);
@@ -144,10 +147,10 @@ describe('MediaLibrary', () => {
     const [firstDeleteBtn] = screen.getAllByRole('button', { name: 'Delete asset' });
     await userEvent.click(firstDeleteBtn);
 
-    expect(screen.getByRole('button', { name: 'Confirm delete' })).toBeInTheDocument();
+    expect(screen.getByText(/are you sure you want to delete/i)).toBeInTheDocument();
 
-    await userEvent.unhover(firstDeleteBtn);
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'Confirm delete' })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText(/are you sure you want to delete/i)).not.toBeInTheDocument());
   });
 });

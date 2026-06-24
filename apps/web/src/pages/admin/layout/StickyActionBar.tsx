@@ -22,7 +22,7 @@ export function StickyActionBar({ title, status, breadcrumbs, renderActions }: S
       <div className="flex flex-col justify-center gap-0.5">
         {breadcrumbs && breadcrumbs.length > 0 && <Breadcrumb items={breadcrumbs} />}
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold">{title}</h1>
+          <h1 className="text-xl font-bold">{title}</h1>
           {status && (
             <Badge data-testid="status-badge" variant={STATUS_VARIANT[status] ?? 'secondary'} className="capitalize">
               {status}
