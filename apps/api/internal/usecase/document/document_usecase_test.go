@@ -376,7 +376,7 @@ func TestUnpublish_DeletesPublishedRecord(t *testing.T) {
 	}
 	uc := docuc.New(repo, nil, &repomock.MediaAssetRepository{}, supportedLocales)
 
-	if err := uc.Unpublish(ctx, testSlug, "e1", "en"); err != nil {
+	if err := uc.Unpublish(ctx, testSlug, "e1", "en", nil); err != nil {
 		t.Fatalf("Unpublish() error = %v", err)
 	}
 	if deletedDocID != "e1" {
@@ -395,7 +395,7 @@ func TestUnpublish_RejectsUnsupportedLocale(t *testing.T) {
 	}
 	uc := docuc.New(repo, nil, &repomock.MediaAssetRepository{}, supportedLocales)
 
-	if err := uc.Unpublish(ctx, testSlug, "e1", "fr"); !pkgerrors.Is(err, pkgerrors.ErrValidation) {
+	if err := uc.Unpublish(ctx, testSlug, "e1", "fr", nil); !pkgerrors.Is(err, pkgerrors.ErrValidation) {
 		t.Errorf("Unpublish() error = %v, want ErrValidation", err)
 	}
 }
@@ -552,7 +552,7 @@ func TestUnpublishSingleType_Delegates(t *testing.T) {
 	}
 	uc := docuc.New(repo, nil, &repomock.MediaAssetRepository{}, supportedLocales)
 
-	if err := uc.UnpublishSingleType(ctx, testSlug, "en"); err != nil {
+	if err := uc.UnpublishSingleType(ctx, testSlug, "en", nil); err != nil {
 		t.Fatalf("UnpublishSingleType() error = %v", err)
 	}
 	if deletedDocID != "e1" {
@@ -567,7 +567,7 @@ func TestUnpublishSingleType_NoDocument(t *testing.T) {
 	}
 	uc := docuc.New(repo, nil, &repomock.MediaAssetRepository{}, supportedLocales)
 
-	if err := uc.UnpublishSingleType(ctx, testSlug, "en"); !pkgerrors.Is(err, pkgerrors.ErrNotFound) {
+	if err := uc.UnpublishSingleType(ctx, testSlug, "en", nil); !pkgerrors.Is(err, pkgerrors.ErrNotFound) {
 		t.Errorf("UnpublishSingleType() error = %v, want ErrNotFound", err)
 	}
 }

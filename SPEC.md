@@ -187,3 +187,4 @@ The frontend spec is not modularized. Key sections:
 | Spec ready | content | [Configurable List Columns](specs/configurable-list-columns.md) — UI popup to choose visible columns on CollectionListPage, persisted to DB |
 | Spec ready | i18n | [Internationalization](specs/internationalization.md) — DB-backed locale management, settings page, locale selector in CollectionListPage |
 | Spec ready | content | [Repeatable Components](specs/repeatable-components.md) — Component fields support single-item (non-repeatable) and ordered array (repeatable) modes |
+| Spec ready | content | [Nested Component Tables](specs/nested-component-tables.md) — Nested components use `parent_component_id` FK instead of `document_id`; max depth increased to 3 levels |

@@ -1,43 +1,76 @@
-# AbyssOfTime CMS Project - agent-skills
+# AbyssOfTime CMS v2
 
-This is the agent-skills project — a collection of production-grade engineering skills for AI coding agents.
+A lightweight, code-first Personal Headless CMS. Go backend (Clean Architecture) + React frontend (TypeScript strict, TanStack Query, Shadcn UI). Content types defined as JSON schema files; the API syncs them on startup. Every entry follows a draft → publish workflow.
+
+## Module Rules (MANDATORY)
+
+**Before writing any spec, plan, or code**, read the relevant rule files from `rules/`:
+
+| Rule File | When to Read |
+|-----------|-------------|
+| `rules/GLOBAL.md` | **Always** — applies to every task |
+| `rules/core.md` | Touching entities, repos, errors, config, middleware, router, DB clients |
+| `rules/auth.md` | Touching auth, JWT, passwords, roles, permissions, rate limiting |
+| `rules/content.md` | Touching content types, documents, schema sync, GraphQL, components |
+| `rules/media.md` | Touching media assets, upload/delete, storage adapters |
+| `rules/admin.md` | Touching user management, invites, access tokens |
+| `rules/i18n.md` | Touching locales, language settings, locale selector |
+| `rules/frontend.md` | Touching any React/TypeScript code in `apps/web/` |
+| `rules/mongodb.md` | Touching any MongoDB repo in `infrastructure/mongodb/` |
+| `rules/postgresql.md` | Touching any GORM repo in `infrastructure/gormdb/` |
+| `rules/content-type-parsing.md` | Touching schema loader, sync engine, or content-type JSON files |
+
+**Conflict resolution:** If a rule conflicts with a spec, plan, or instruction → **ask the user** before proceeding.
+
+See `rules/README.md` for the full index and priority system.
 
 ## Project Structure
 
 ```
-skills/       → Core skills (SKILL.md per directory)
-agents/       → Reusable agent personas (code-reviewer, test-engineer, security-auditor)
-hooks/        → Session lifecycle hooks
-.claude/commands/ → Slash commands (/spec, /plan, /build, /test, /review, /code-simplify, /ship)
-references/   → Supplementary checklists (testing, performance, security, accessibility)
-docs/         → Setup guides for different tools
+apps/api/          → Go backend (Clean Architecture)
+apps/web/          → React frontend (Vite + TypeScript)
+specs/             → Module specs (source of truth for rules)
+rules/             → Per-module rules (derived from specs + docs)
+docs/              → Technical overview, guide, local dev
+content-types/     → JSON schema-as-code definitions (→ apps/api/content-types/)
 ```
-
-## Skills by Phase
-
-**Define:** interview-me, idea-refine, spec-driven-development
-**Plan:** planning-and-task-breakdown
-**Build:** incremental-implementation, test-driven-development, context-engineering, source-driven-development, doubt-driven-development, frontend-ui-engineering, api-and-interface-design
-**Verify:** browser-testing-with-devtools, debugging-and-error-recovery
-**Review:** code-review-and-quality, code-simplification, security-and-hardening, performance-optimization
-**Ship:** git-workflow-and-versioning, ci-cd-and-automation, deprecation-and-migration, documentation-and-adrs, shipping-and-launch
-
-## Conventions
-
-- Every skill lives in `skills/<name>/SKILL.md`
-- YAML frontmatter with `name` and `description` fields
-- Description starts with what the skill does (third person), followed by trigger conditions ("Use when...")
-- Every skill has: Overview, When to Use, Process, Common Rationalizations, Red Flags, Verification
-- References are in `references/`, not inside skill directories
-- Supporting files only created when content exceeds 100 lines
 
 ## Commands
 
-- `npm test` — Not applicable (this is a documentation project)
-- Validate: Check that all SKILL.md files have valid YAML frontmatter with name and description
+| Command | Description |
+|---|---|
+| `make dev` | Start API + web in parallel |
+| `make dev-api` | Start Go API server only |
+| `make dev-web` | Start Vite dev server only |
+| `make test-api` | `go test ./...` inside `apps/api` |
+| `make test-web` | `vitest run` inside `apps/web` |
+| `make mongo-start` | Start MongoDB container |
 
 ## Boundaries
 
-- Always: Follow the skill-anatomy.md format for new skills
-- Never: Add skills that are vague advice instead of actionable processes
-- Never: Duplicate content between skills — reference other skills instead
+### Always
+- Read `rules/GLOBAL.md` + relevant module rule before any work
+- Confirm scope and approach before starting new coding tasks
+- Present options when multiple valid approaches exist
+- Follow Clean Architecture: usecase imports only domain; no cross-layer leakage
+- Use TanStack Query for all server state (frontend)
+- Every `useMutation` must invalidate affected query keys on success
+
+### Ask Before
+- Starting any new coding task — confirm scope and approach
+- Multiple valid approaches — present options
+- Choosing storage adapter per environment
+- Adding new permission actions or roles
+- Any change that crosses module boundaries
+
+### Never
+- Read, edit, create, or expose `.env` files
+- Use drag-and-drop or dynamic form engine
+- Use `React.Children.map` or recursive child scanning in `FormProvider`
+- Couple usecase logic to a specific database
+- Auto-choose implementation path when multiple options exist
+- Let public read API return draft data
+- Use `any` type in TypeScript
+- Use `export default` in frontend code
+- Use `Access-Control-Allow-Origin: *`
+- Drop tables in `EnsureCollection` (causes production data loss)

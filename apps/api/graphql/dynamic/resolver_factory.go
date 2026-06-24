@@ -24,12 +24,12 @@ type DocumentUseCase interface {
 	GetForEdit(ctx context.Context, contentTypeSlug, documentID, locale string, fields []entity.FieldDefinition) (*entity.Document, string, error)
 	GetPublished(ctx context.Context, contentTypeSlug, documentID, locale string, fields []entity.FieldDefinition) (*entity.Document, error)
 	Publish(ctx context.Context, contentTypeSlug, documentID, locale string, fields []entity.FieldDefinition, userID string) error
-	Unpublish(ctx context.Context, contentTypeSlug, documentID, locale string) error
+	Unpublish(ctx context.Context, contentTypeSlug, documentID, locale string, fields []entity.FieldDefinition) error
 	Delete(ctx context.Context, contentTypeSlug, documentID string, fields []entity.FieldDefinition) error
 	GetSingleType(ctx context.Context, contentTypeSlug, locale string, fields []entity.FieldDefinition) (*entity.Document, string, error)
 	SaveSingleType(ctx context.Context, contentTypeSlug string, data map[string]any, locale string, fields []entity.FieldDefinition, userID string) (*entity.Document, error)
 	PublishSingleType(ctx context.Context, contentTypeSlug, locale string, fields []entity.FieldDefinition, userID string) error
-	UnpublishSingleType(ctx context.Context, contentTypeSlug, locale string) error
+	UnpublishSingleType(ctx context.Context, contentTypeSlug, locale string, fields []entity.FieldDefinition) error
 	GetAllPaginated(ctx context.Context, contentTypeSlug string, start, size int, locale string, fields []entity.FieldDefinition, orderBy string, sortDir int) ([]*entity.Document, []string, int64, error)
 	GetPublishedPaginated(ctx context.Context, contentTypeSlug string, start, size int, locale string, fields []entity.FieldDefinition) ([]*entity.Document, int64, error)
 	GetPublishedSingleType(ctx context.Context, contentTypeSlug, locale string, fields []entity.FieldDefinition) (*entity.Document, error)
@@ -401,7 +401,7 @@ func (f *ResolverFactory) addCollectionFields(
 		Resolve: f.authRequired(func(p graphql.ResolveParams) (any, error) {
 			docID := p.Args[camel+"Id"].(string)
 			locale, _ := p.Args["locale"].(string)
-			if err := f.docUC.Unpublish(p.Context, slug, docID, locale); err != nil {
+			if err := f.docUC.Unpublish(p.Context, slug, docID, locale, fields); err != nil {
 				return nil, err
 			}
 			doc, _, err := f.docUC.GetForEdit(p.Context, slug, docID, locale, fields)
@@ -494,7 +494,7 @@ func (f *ResolverFactory) addSingleFields(
 		},
 		Resolve: f.authRequired(func(p graphql.ResolveParams) (any, error) {
 			locale, _ := p.Args["locale"].(string)
-			if err := f.docUC.UnpublishSingleType(p.Context, slug, locale); err != nil {
+			if err := f.docUC.UnpublishSingleType(p.Context, slug, locale, fields); err != nil {
 				return nil, err
 			}
 			doc, _, err := f.docUC.GetSingleType(p.Context, slug, locale, fields)

@@ -98,23 +98,24 @@ func (s *Syncer) syncOne(ctx context.Context, def ContentTypeDefinition) error {
 }
 
 func (s *Syncer) ensureComponentTables(ctx context.Context, slug string, fields []entity.FieldDefinition) error {
-	return s.ensureComponentTablesRecursive(ctx, slug, "", fields)
+	return s.ensureComponentTablesRecursive(ctx, slug, "", fields, 0)
 }
 
-func (s *Syncer) ensureComponentTablesRecursive(ctx context.Context, slug, prefix string, fields []entity.FieldDefinition) error {
+func (s *Syncer) ensureComponentTablesRecursive(ctx context.Context, slug, prefix string, fields []entity.FieldDefinition, depth int) error {
 	if s.compRepo == nil {
 		return nil
 	}
-	for _, f := range fields {
-		if f.Type == "component" {
-			path := f.Name
+	for _, field := range fields {
+		if field.Type == "component" {
+			path := field.Name
 			if prefix != "" {
-				path = prefix + "_" + f.Name
+				path = prefix + "_" + field.Name
 			}
-			if err := s.compRepo.EnsureCollection(ctx, slug, path, f.Fields); err != nil {
+			isNested := depth > 0
+			if err := s.compRepo.EnsureCollection(ctx, slug, path, field.Fields, isNested); err != nil {
 				return err
 			}
-			if err := s.ensureComponentTablesRecursive(ctx, slug, path, f.Fields); err != nil {
+			if err := s.ensureComponentTablesRecursive(ctx, slug, path, field.Fields, depth+1); err != nil {
 				return err
 			}
 		}
