@@ -108,7 +108,7 @@ export function ContentTypePanel({ contentType, id, isNew }: Props) {
             </Link>
           ) : undefined
         }>
-        <ContentTypeBuilder schema={schema} mutationFn={handleFirstSave} />
+        <ContentTypeBuilder contentTypeSlug={contentType.Slug} schema={schema} mutationFn={handleFirstSave} />
       </ContentDetailLayout>
     );
   }
@@ -177,6 +177,7 @@ export function ContentTypePanel({ contentType, id, isNew }: Props) {
         </>
       )}>
       <ContentTypeBuilder
+        contentTypeSlug={contentType.Slug}
         schema={schema}
         query={{
           queryKey: ['documents', isSingle ? 'single-type' : 'collection-type', 'detail', contentType.Slug, doc.data.documentId as string, activeLocale, 'data'],
