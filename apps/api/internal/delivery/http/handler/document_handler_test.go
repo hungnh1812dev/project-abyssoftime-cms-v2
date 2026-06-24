@@ -42,7 +42,7 @@ func (m *mockDocumentUC) GetPublished(ctx context.Context, s, d, l string, _ []e
 func (m *mockDocumentUC) Publish(ctx context.Context, s, d, l string, _ []entity.FieldDefinition, u string) error {
 	return m.publishFn(ctx, s, d, l, u)
 }
-func (m *mockDocumentUC) Unpublish(ctx context.Context, s, d, l string) error {
+func (m *mockDocumentUC) Unpublish(ctx context.Context, s, d, l string, _ []entity.FieldDefinition) error {
 	return m.unpublishFn(ctx, s, d, l)
 }
 func (m *mockDocumentUC) Delete(ctx context.Context, s, d string, _ []entity.FieldDefinition) error {
@@ -57,7 +57,7 @@ func (m *mockDocumentUC) SaveSingleType(ctx context.Context, s string, data map[
 func (m *mockDocumentUC) PublishSingleType(ctx context.Context, s, l string, _ []entity.FieldDefinition, u string) error {
 	return m.publishSingleTypeFn(ctx, s, l, u)
 }
-func (m *mockDocumentUC) UnpublishSingleType(ctx context.Context, s, l string) error {
+func (m *mockDocumentUC) UnpublishSingleType(ctx context.Context, s, l string, _ []entity.FieldDefinition) error {
 	return m.unpublishSingleTypeFn(ctx, s, l)
 }
 func (m *mockDocumentUC) GetAllPaginated(ctx context.Context, s string, start, size int, l string, _ []entity.FieldDefinition, orderBy string, sortDir int) ([]*entity.Document, []string, int64, error) {

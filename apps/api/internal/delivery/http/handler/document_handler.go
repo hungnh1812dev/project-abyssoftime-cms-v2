@@ -17,14 +17,14 @@ type documentUseCase interface {
 	GetForEdit(ctx context.Context, contentTypeSlug, documentID, locale string, fields []entity.FieldDefinition) (*entity.Document, string, error)
 	GetPublished(ctx context.Context, contentTypeSlug, documentID, locale string, fields []entity.FieldDefinition) (*entity.Document, error)
 	Publish(ctx context.Context, contentTypeSlug, documentID, locale string, fields []entity.FieldDefinition, userID string) error
-	Unpublish(ctx context.Context, contentTypeSlug, documentID, locale string) error
+	Unpublish(ctx context.Context, contentTypeSlug, documentID, locale string, fields []entity.FieldDefinition) error
 	Delete(ctx context.Context, contentTypeSlug, documentID string, fields []entity.FieldDefinition) error
 	Duplicate(ctx context.Context, contentTypeSlug, sourceDocumentID, locale string, fields []entity.FieldDefinition, userID string) (*entity.Document, error)
 
 	GetSingleType(ctx context.Context, contentTypeSlug, locale string, fields []entity.FieldDefinition) (*entity.Document, string, error)
 	SaveSingleType(ctx context.Context, contentTypeSlug string, data map[string]any, locale string, fields []entity.FieldDefinition, userID string) (*entity.Document, error)
 	PublishSingleType(ctx context.Context, contentTypeSlug, locale string, fields []entity.FieldDefinition, userID string) error
-	UnpublishSingleType(ctx context.Context, contentTypeSlug, locale string) error
+	UnpublishSingleType(ctx context.Context, contentTypeSlug, locale string, fields []entity.FieldDefinition) error
 	GetAllPaginated(ctx context.Context, contentTypeSlug string, start, size int, locale string, fields []entity.FieldDefinition, orderBy string, sortDir int) ([]*entity.Document, []string, int64, error)
 }
 
@@ -225,7 +225,8 @@ func (h *DocumentHandler) PublishSingleType(ginCtx *gin.Context) {
 
 func (h *DocumentHandler) UnpublishSingleType(ginCtx *gin.Context) {
 	slug := ginCtx.Param("slug")
-	if err := h.usecase.UnpublishSingleType(ginCtx.Request.Context(), slug, ginCtx.Query("locale")); err != nil {
+	fields := h.resolveFields(ginCtx, slug)
+	if err := h.usecase.UnpublishSingleType(ginCtx.Request.Context(), slug, ginCtx.Query("locale"), fields); err != nil {
 		ginWriteErr(ginCtx, err)
 		return
 	}
@@ -406,7 +407,8 @@ func (h *DocumentHandler) PublishCollection(ginCtx *gin.Context) {
 func (h *DocumentHandler) UnpublishCollection(ginCtx *gin.Context) {
 	slug := ginCtx.Param("slug")
 	documentID := ginCtx.Param("documentId")
-	if err := h.usecase.Unpublish(ginCtx.Request.Context(), slug, documentID, ginCtx.Query("locale")); err != nil {
+	fields := h.resolveFields(ginCtx, slug)
+	if err := h.usecase.Unpublish(ginCtx.Request.Context(), slug, documentID, ginCtx.Query("locale"), fields); err != nil {
 		ginWriteErr(ginCtx, err)
 		return
 	}

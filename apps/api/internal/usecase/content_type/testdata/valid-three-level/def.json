@@ -1,0 +1,16 @@
+{
+  "slug": "three-level",
+  "name": "Three Level",
+  "kind": "single",
+  "fields": [
+    { "name": "seo", "type": "component", "fields": [
+      { "name": "title", "type": "text" },
+      { "name": "openGraph", "type": "component", "fields": [
+        { "name": "image", "type": "media" },
+        { "name": "metadata", "type": "component", "fields": [
+          { "name": "author", "type": "text" }
+        ]}
+      ]}
+    ]}
+  ]
+}
