@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ConnectionOverlay } from '@/components/ConnectionOverlay';
 
 const PING_INTERVAL_HEALTHY = 14 * 60 * 1000;
@@ -15,15 +15,16 @@ export function HealthProvider({ children }: { children: ReactNode }) {
   const [isApiHealthy, setIsApiHealthy] = useState(true);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
+  const pingRef = useRef<() => void>(() => {});
 
-  const clearTimer = useCallback(() => {
+  function clearTimer() {
     if (timerRef.current !== null) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
-  }, []);
+  }
 
-  const pingHealth = useCallback(() => {
+  function pingHealth() {
     clearTimer();
 
     const controller = new AbortController();
@@ -37,10 +38,10 @@ export function HealthProvider({ children }: { children: ReactNode }) {
 
         if (response.ok) {
           setIsApiHealthy(true);
-          timerRef.current = setTimeout(pingHealth, PING_INTERVAL_HEALTHY);
+          timerRef.current = setTimeout(() => pingRef.current(), PING_INTERVAL_HEALTHY);
         } else {
           setIsApiHealthy(false);
-          timerRef.current = setTimeout(pingHealth, PING_INTERVAL_UNHEALTHY);
+          timerRef.current = setTimeout(() => pingRef.current(), PING_INTERVAL_UNHEALTHY);
         }
       })
       .catch(() => {
@@ -48,26 +49,30 @@ export function HealthProvider({ children }: { children: ReactNode }) {
         if (!mountedRef.current) return;
 
         setIsApiHealthy(false);
-        timerRef.current = setTimeout(pingHealth, PING_INTERVAL_UNHEALTHY);
+        timerRef.current = setTimeout(() => pingRef.current(), PING_INTERVAL_UNHEALTHY);
       });
-  }, [clearTimer]);
+  }
+
+  useEffect(() => {
+    pingRef.current = pingHealth;
+  });
 
   useEffect(() => {
     mountedRef.current = true;
-    pingHealth();
+    pingRef.current();
 
     return () => {
       mountedRef.current = false;
       clearTimer();
     };
-  }, [pingHealth, clearTimer]);
+  }, []);
 
   useEffect(() => {
     function handleVisibilityChange() {
       if (document.visibilityState === 'hidden') {
         clearTimer();
       } else {
-        pingHealth();
+        pingRef.current();
       }
     }
 
@@ -75,7 +80,7 @@ export function HealthProvider({ children }: { children: ReactNode }) {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [pingHealth, clearTimer]);
+  }, []);
 
   return (
     <HealthContext.Provider value={{ isApiHealthy }}>
