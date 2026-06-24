@@ -97,6 +97,16 @@ func TestLoadDefinitions_ComponentEmptyName(t *testing.T) {
 func TestLoadDefinitions_ComponentDepthExceeded(t *testing.T) {
 	_, err := contenttype.LoadDefinitions("testdata/invalid/component-depth-exceeded")
 	if err == nil {
-		t.Fatal("LoadDefinitions() error = nil, want error for component depth > 2")
+		t.Fatal("LoadDefinitions() error = nil, want error for component depth > 3")
+	}
+}
+
+func TestLoadDefinitions_ThreeLevelComponent_Valid(t *testing.T) {
+	defs, err := contenttype.LoadDefinitions("testdata/valid-three-level")
+	if err != nil {
+		t.Fatalf("LoadDefinitions() error = %v, want nil for 3-level nesting", err)
+	}
+	if len(defs) != 1 {
+		t.Fatalf("LoadDefinitions() count = %d, want 1", len(defs))
 	}
 }

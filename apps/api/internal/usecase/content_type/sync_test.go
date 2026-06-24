@@ -374,9 +374,13 @@ func TestSync_EnsuresComponentTables(t *testing.T) {
 	docRepo := &repomock.DocumentRepository{}
 	compRepo := &repomock.ComponentRepository{}
 
-	var ensured []string
-	compRepo.EnsureCollectionFn = func(_ context.Context, slug, comp string, _ []entity.FieldDefinition) error {
-		ensured = append(ensured, slug+"/"+comp)
+	type ensuredCall struct {
+		path     string
+		isNested bool
+	}
+	var ensured []ensuredCall
+	compRepo.EnsureCollectionFn = func(_ context.Context, slug, comp string, _ []entity.FieldDefinition, isNested bool) error {
+		ensured = append(ensured, ensuredCall{path: slug + "/" + comp, isNested: isNested})
 		return nil
 	}
 
@@ -398,8 +402,72 @@ func TestSync_EnsuresComponentTables(t *testing.T) {
 	if len(ensured) != 2 {
 		t.Fatalf("EnsureCollection called %d times, want 2", len(ensured))
 	}
-	if ensured[0] != "blog/banner" || ensured[1] != "blog/seo" {
-		t.Errorf("ensured = %v, want [blog/banner blog/seo]", ensured)
+	if ensured[0].path != "blog/banner" || ensured[1].path != "blog/seo" {
+		t.Errorf("ensured paths = [%s %s], want [blog/banner blog/seo]", ensured[0].path, ensured[1].path)
+	}
+	if ensured[0].isNested || ensured[1].isNested {
+		t.Errorf("top-level components should have isNested=false, got [%v %v]", ensured[0].isNested, ensured[1].isNested)
+	}
+}
+
+func TestSync_EnsuresNestedComponentTables(t *testing.T) {
+	repo := &repomock.ContentTypeRepository{}
+	repo.FindAllFn = func(_ context.Context) ([]*entity.ContentType, error) { return nil, nil }
+	repo.FindBySlugFn = func(_ context.Context, _ string) (*entity.ContentType, error) {
+		return nil, pkgerrors.ErrNotFound
+	}
+	repo.CreateFn = func(_ context.Context, ct *entity.ContentType) error {
+		ct.DocumentID = "ct-" + ct.Slug
+		return nil
+	}
+
+	entries := &fakeEntryManager{}
+	docRepo := &repomock.DocumentRepository{}
+	compRepo := &repomock.ComponentRepository{}
+
+	type ensuredCall struct {
+		path     string
+		isNested bool
+	}
+	var ensured []ensuredCall
+	compRepo.EnsureCollectionFn = func(_ context.Context, slug, comp string, _ []entity.FieldDefinition, isNested bool) error {
+		ensured = append(ensured, ensuredCall{path: slug + "/" + comp, isNested: isNested})
+		return nil
+	}
+
+	syncer := contenttype.NewSyncer(contenttype.New(repo), entries, docRepo, compRepo)
+
+	defs := []contenttype.ContentTypeDefinition{
+		{
+			Slug: "page", Name: "Page", Kind: "single",
+			Fields: []entity.FieldDefinition{
+				{Name: "title", Type: "text"},
+				{Name: "seo", Type: "component", Fields: []entity.FieldDefinition{
+					{Name: "title", Type: "text"},
+					{Name: "openGraph", Type: "component", Fields: []entity.FieldDefinition{
+						{Name: "image", Type: "media"},
+					}},
+				}},
+			},
+		},
+	}
+	if err := syncer.Sync(ctx, defs); err != nil {
+		t.Fatalf("Sync() error = %v", err)
+	}
+	if len(ensured) != 2 {
+		t.Fatalf("EnsureCollection called %d times, want 2", len(ensured))
+	}
+	if ensured[0].path != "page/seo" {
+		t.Errorf("ensured[0].path = %q, want %q", ensured[0].path, "page/seo")
+	}
+	if ensured[0].isNested {
+		t.Error("ensured[0] (top-level) should have isNested=false")
+	}
+	if ensured[1].path != "page/seo_openGraph" {
+		t.Errorf("ensured[1].path = %q, want %q", ensured[1].path, "page/seo_openGraph")
+	}
+	if !ensured[1].isNested {
+		t.Error("ensured[1] (nested) should have isNested=true")
 	}
 }
 

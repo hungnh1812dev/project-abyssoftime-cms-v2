@@ -16,12 +16,12 @@ type documentUseCase interface {
 	GetForEdit(ctx context.Context, contentTypeSlug, documentID, locale string, fields []entity.FieldDefinition) (*entity.Document, string, error)
 	GetPublished(ctx context.Context, contentTypeSlug, documentID, locale string, fields []entity.FieldDefinition) (*entity.Document, error)
 	Publish(ctx context.Context, contentTypeSlug, documentID, locale string, fields []entity.FieldDefinition, userID string) error
-	Unpublish(ctx context.Context, contentTypeSlug, documentID, locale string) error
+	Unpublish(ctx context.Context, contentTypeSlug, documentID, locale string, fields []entity.FieldDefinition) error
 	Delete(ctx context.Context, contentTypeSlug, documentID string, fields []entity.FieldDefinition) error
 	GetSingleType(ctx context.Context, contentTypeSlug, locale string, fields []entity.FieldDefinition) (*entity.Document, string, error)
 	SaveSingleType(ctx context.Context, contentTypeSlug string, data map[string]any, locale string, fields []entity.FieldDefinition, userID string) (*entity.Document, error)
 	PublishSingleType(ctx context.Context, contentTypeSlug, locale string, fields []entity.FieldDefinition, userID string) error
-	UnpublishSingleType(ctx context.Context, contentTypeSlug, locale string) error
+	UnpublishSingleType(ctx context.Context, contentTypeSlug, locale string, fields []entity.FieldDefinition) error
 	GetAllPaginated(ctx context.Context, contentTypeSlug string, start, size int, locale string, fields []entity.FieldDefinition, orderBy string, sortDir int) ([]*entity.Document, []string, int64, error)
 }
 
@@ -76,7 +76,7 @@ func (server *DocumentServiceServer) PublishDocument(ctx context.Context, req *p
 }
 
 func (server *DocumentServiceServer) UnpublishDocument(ctx context.Context, req *pb.PublishDocumentRequest) (*pb.Document, error) {
-	if err := server.usecase.Unpublish(ctx, req.ContentTypeSlug, req.DocumentId, req.Locale); err != nil {
+	if err := server.usecase.Unpublish(ctx, req.ContentTypeSlug, req.DocumentId, req.Locale, nil); err != nil {
 		return nil, toGRPCError(err)
 	}
 	doc, _, err := server.usecase.GetForEdit(ctx, req.ContentTypeSlug, req.DocumentId, req.Locale, nil)
@@ -126,7 +126,7 @@ func (server *DocumentServiceServer) PublishSingleType(ctx context.Context, req 
 }
 
 func (server *DocumentServiceServer) UnpublishSingleType(ctx context.Context, req *pb.GetSingleTypeRequest) (*pb.Document, error) {
-	if err := server.usecase.UnpublishSingleType(ctx, req.ContentTypeSlug, req.Locale); err != nil {
+	if err := server.usecase.UnpublishSingleType(ctx, req.ContentTypeSlug, req.Locale, nil); err != nil {
 		return nil, toGRPCError(err)
 	}
 	doc, _, err := server.usecase.GetSingleType(ctx, req.ContentTypeSlug, req.Locale, nil)

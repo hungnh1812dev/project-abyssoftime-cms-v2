@@ -6,7 +6,9 @@
     { "name": "outer", "type": "component", "fields": [
       { "name": "middle", "type": "component", "fields": [
         { "name": "inner", "type": "component", "fields": [
-          { "name": "title", "type": "text" }
+          { "name": "deepest", "type": "component", "fields": [
+            { "name": "title", "type": "text" }
+          ]}
         ]}
       ]}
     ]}

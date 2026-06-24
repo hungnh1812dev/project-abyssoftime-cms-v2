@@ -71,7 +71,7 @@ func validateFields(fields []entity.FieldDefinition, path string, depth int) err
 			if f.Name == "" {
 				return fmt.Errorf("%q: component field must have a non-empty name", path)
 			}
-			if depth > 2 {
+			if depth > 3 {
 				return fmt.Errorf("%q: component %q exceeds maximum nesting depth of 3", path, f.Name)
 			}
 			if err := validateFields(f.Fields, path, depth+1); err != nil {
