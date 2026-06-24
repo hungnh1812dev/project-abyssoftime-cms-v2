@@ -187,3 +187,32 @@ Before writing any spec, plan, or code for a module:
 4. Cross-check for conflicts between the three
 5. If conflict found → ask user before proceeding
 6. If no rule covers the situation → check related module rules, then ask user
+
+---
+
+## 12. Rule Maintenance Protocol
+
+Whenever a code change, new feature, bug fix, spec update, or refactor introduces behavior that **adds, changes, or removes** a convention covered by the rules, **update the corresponding rule file(s) in the same task** — do not defer to a separate task.
+
+### 12.1 What Triggers a Rule Update
+- New entity field or repository method added → update module rule + `mongodb.md` / `postgresql.md`
+- New API endpoint or changed response shape → update module rule
+- New permission constant → update `auth.md`
+- New field type in FieldDefinition → update `content-type-parsing.md` + `postgresql.md`
+- Schema loader or sync engine logic changed → update `content-type-parsing.md`
+- New middleware or changed middleware behavior → update `core.md`
+- New frontend hook, component pattern, or query key → update `frontend.md`
+- New boundary rule discovered (Always/Never/Ask First) → update the relevant module rule
+- Existing rule no longer accurate → correct or remove it
+
+### 12.2 How to Update
+1. Identify which rule file(s) are affected
+2. Read the current rule content
+3. Edit the specific section — add, modify, or remove the rule
+4. Keep the same format: numbered sections, code blocks, boundary tables
+5. If a rule is removed, delete it cleanly — no "removed" comments
+
+### 12.3 Invariants
+- Rules must always reflect the **current** state of the codebase — never lag behind
+- A PR that changes behavior without updating the corresponding rule is incomplete
+- When in doubt about whether a change warrants a rule update, update it — over-documenting is better than stale rules
