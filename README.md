@@ -29,15 +29,15 @@ make dev
 
 The web app runs at **http://localhost:5173** and the API at **http://localhost:8080**.
 
-| Command | Description |
-|---------|-------------|
+| Command               | Description                |
+| --------------------- | -------------------------- |
 | `make postgres-start` | Start PostgreSQL container |
-| `make postgres-stop` | Stop PostgreSQL container |
-| `make dev` | API + web in parallel |
-| `make dev-api` | Go API only |
-| `make dev-web` | Vite dev server only |
-| `make test-api` | `go test ./...` |
-| `make test-web` | `vitest run` |
+| `make postgres-stop`  | Stop PostgreSQL container  |
+| `make dev`            | API + web in parallel      |
+| `make dev-api`        | Go API only                |
+| `make dev-web`        | Vite dev server only       |
+| `make test-api`       | `go test ./...`            |
+| `make test-web`       | `vitest run`               |
 
 See [docs/local-dev.md](docs/local-dev.md) for full setup instructions, env var reference, and troubleshooting.
 
@@ -61,11 +61,11 @@ Panels are hard-coded React pages — no drag-and-drop engine. See [docs/guide.m
 
 ## Tech stack
 
-| Layer | Technology |
-|-------|------------|
-| Backend | Go, Chi router, Clean Architecture |
-| Database | PostgreSQL (separate service on Render.com) |
-| Auth | JWT (access + HttpOnly refresh cookie) |
-| Frontend | React, Vite, TanStack Query, react-hook-form, Shadcn UI |
-| Media | Cloudinary |
-| Deploy | Render.com (Docker, PostgreSQL as separate managed service) |
+| Layer    | Technology                                                  |
+| -------- | ----------------------------------------------------------- |
+| Backend  | Go, Chi router, Clean Architecture                          |
+| Database | PostgreSQL (separate service on Render.com)                 |
+| Auth     | JWT (access + HttpOnly refresh cookie)                      |
+| Frontend | React, Vite, TanStack Query, react-hook-form, Shadcn UI     |
+| Media    | Cloudinary                                                  |
+| Deploy   | Render.com (Docker, PostgreSQL as separate managed service) |
