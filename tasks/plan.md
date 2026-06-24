@@ -304,6 +304,192 @@ Cross-origin test: run API on :8080, web on :5173 with `VITE_API_URL=http://loca
 
 ---
 
+## Current: Phase HP — Background Health Ping Service
+
+Spec: [specs/health-ping.md](../specs/health-ping.md)
+Scope: Frontend only (`apps/web/`)
+New files: 2 | Modified files: 1
+
+### Dependency Graph
+
+```
+ConnectionOverlay.tsx (pure UI, no deps)
+       ↑
+HealthContext.tsx (imports ConnectionOverlay, uses fetch)
+       ↑
+main.tsx (wraps app with HealthProvider)
+```
+
+The overlay is a leaf node (no project dependencies beyond Tailwind). The context imports the overlay and contains all logic. `main.tsx` is the final integration point.
+
+---
+
+### Phase 1: ConnectionOverlay Component
+
+**Goal:** Build and test the pure UI overlay component in isolation.
+
+#### Task 1.1 — Create `ConnectionOverlay.tsx`
+
+**File:** `apps/web/src/components/ConnectionOverlay.tsx`
+
+**What to build:**
+- Named export `ConnectionOverlay` accepting `{ visible: boolean }`
+- Fixed full-screen overlay: `z-50`, `bg-background/80 backdrop-blur-sm`
+- Centered content: spinner (`animate-spin`), heading "Connecting to service...", subtext about server startup
+- Fade in/out transition using Tailwind (`transition-opacity`, conditional `opacity-0 pointer-events-none`)
+- Accessibility: `role="alert"`, `aria-live="assertive"`, `aria-busy="true"`
+
+**Acceptance criteria:**
+- `visible={true}` → overlay visible, blocks interaction
+- `visible={false}` → overlay hidden (`opacity-0`, `pointer-events-none`)
+- ARIA attributes present
+- No `any` types, named export only
+
+#### Task 1.2 — Test `ConnectionOverlay`
+
+**File:** `apps/web/src/components/__tests__/ConnectionOverlay.test.tsx`
+
+**Test cases:**
+1. Renders spinner + text when `visible={true}`
+2. Has `opacity-0` / `pointer-events-none` when `visible={false}`
+3. Has `role="alert"`, `aria-live="assertive"`, `aria-busy="true"`
+
+**Verify:** `npx vitest run src/components/__tests__/ConnectionOverlay.test.tsx`
+
+#### Checkpoint 1
+
+```bash
+cd apps/web && npx tsc --noEmit && npx vitest run src/components/__tests__/ConnectionOverlay.test.tsx
+```
+
+---
+
+### Phase 2: HealthContext Provider
+
+**Goal:** Implement the ping loop, state management, and visibility API integration.
+
+#### Task 2.1 — Create `HealthContext.tsx`
+
+**File:** `apps/web/src/context/HealthContext.tsx`
+
+**What to build:**
+- `HealthProvider` component wrapping children + `<ConnectionOverlay>`
+- State: `isApiHealthy` (initial `true` — optimistic)
+- Ref: `timerRef` (stores `setTimeout` ID)
+- `pingHealth()` function:
+  - Uses `fetch` with `AbortController` (5s timeout) to `GET ${VITE_API_URL}/health`
+  - On success (HTTP 200): set healthy, schedule next in 14 min
+  - On failure: set unhealthy, schedule retry in 10s
+- Effect 1 (mount): call `pingHealth()` immediately
+- Effect 2 (visibility): add `visibilitychange` listener
+  - `hidden` → clear timer
+  - `visible` → immediate `pingHealth()`
+- Cleanup: clear timer, remove listener
+- Export `useHealthStatus()` hook
+
+**Key constraints:**
+- Do NOT use the `api` axios instance (no auth interceptor)
+- Do NOT use TanStack Query
+- All names 3+ characters
+- Named export only
+
+**Acceptance criteria:**
+- On mount, fires GET /health immediately
+- Healthy → 14m interval; Unhealthy → 10s interval
+- State transition: unhealthy→healthy auto-dismisses overlay
+- Tab hidden pauses, tab visible resumes
+- Uses standalone `fetch`, not `api` client
+- Timer cleaned up on unmount
+
+#### Task 2.2 — Test `HealthContext`
+
+**File:** `apps/web/src/context/__tests__/HealthContext.test.tsx`
+
+**Test cases (using `vi.useFakeTimers()` + `vi.stubGlobal('fetch', ...)`):**
+
+1. **Initial healthy state** — renders children, no overlay
+2. **Ping failure shows overlay** — mock fetch rejects → overlay visible
+3. **Recovery hides overlay** — fail then succeed → overlay disappears
+4. **Retry interval on failure** — after failure, next ping at ~10s (advance timers)
+5. **Success interval** — after success, next ping at ~14m (advance timers)
+6. **Cleanup on unmount** — timer cleared, no dangling effects
+7. **Visibility pause** — dispatch `visibilitychange` with `hidden` → timer cleared
+8. **Visibility resume** — dispatch `visibilitychange` with `visible` → immediate ping
+
+**Verify:** `npx vitest run src/context/__tests__/HealthContext.test.tsx`
+
+#### Checkpoint 2
+
+```bash
+cd apps/web && npx tsc --noEmit && npx vitest run src/context/__tests__/HealthContext.test.tsx
+```
+
+---
+
+### Phase 3: Integration
+
+**Goal:** Wire `HealthProvider` into the app tree.
+
+#### Task 3.1 — Update `main.tsx`
+
+**File:** `apps/web/src/main.tsx`
+
+**Changes:**
+- Import `HealthProvider` from `@/context/HealthContext`
+- Wrap inside `QueryClientProvider`, outside `BrowserRouter`:
+
+```tsx
+<QueryClientProvider client={queryClient}>
+  <HealthProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <AppRouter />
+      </AuthProvider>
+    </BrowserRouter>
+  </HealthProvider>
+  <Toaster position="top-right" />
+  <ReactQueryDevtools initialIsOpen={false} />
+</QueryClientProvider>
+```
+
+**Rationale for position:**
+- Outside `BrowserRouter` because it's route-independent
+- Inside `QueryClientProvider` in case future features need query client access from health context
+- Overlay renders inside `HealthProvider`, so it covers the entire app including auth pages
+
+**Acceptance criteria:**
+- App compiles without errors
+- Overlay appears on API down, disappears on recovery
+- Existing functionality (auth, routing) unaffected
+
+#### Checkpoint 3 (Final)
+
+```bash
+make test-web        # all frontend tests pass
+cd apps/web && npx tsc --noEmit   # no type errors
+make dev-web         # visual verification in browser
+```
+
+Manual browser test:
+1. Start only frontend (`make dev-web`) without API → overlay should appear
+2. Start API (`make dev-api`) → overlay should auto-dismiss
+3. Stop API → overlay reappears within 14 minutes (or 10s if already unhealthy)
+4. Switch tab away and back → ping fires immediately on return
+
+---
+
+### Risk Assessment
+
+| Risk | Mitigation |
+|---|---|
+| Overlay flash on fast connections | Optimistic initial `true` — only show overlay after confirmed failure |
+| Timer leak on fast navigation | `useEffect` cleanup clears `setTimeout` + removes event listener |
+| Auth interceptor interference | Standalone `fetch` with no headers |
+| Render.com CORS blocking `/health` | `/health` is already public and CORS-configured in router |
+| Tests flaky with real timers | Use `vi.useFakeTimers()` exclusively |
+
+---
+
 ## Upcoming
 
 *(Add new plans here as they are defined.)*

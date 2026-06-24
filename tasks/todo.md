@@ -125,6 +125,21 @@ Spec: [bugfix-auth-and-naming.md](bugfix-auth-and-naming.md) (B2 follow-up). Pla
 
 ---
 
+## Phase HP — Background Health Ping Service
+
+Spec: [specs/health-ping.md](../specs/health-ping.md). Plan: [plan.md](plan.md) (Phase HP section).
+
+- [ ] T1.1 Create `ConnectionOverlay.tsx` — full-screen overlay with spinner, text, ARIA, fade transition
+- [ ] T1.2 Create `ConnectionOverlay.test.tsx` — visible/hidden states, accessibility
+- [ ] Checkpoint 1: `tsc --noEmit` + ConnectionOverlay tests pass
+- [ ] T2.1 Create `HealthContext.tsx` — ping loop with fetch, 10s/14m intervals, visibility API, HealthProvider + useHealthStatus
+- [ ] T2.2 Create `HealthContext.test.tsx` — 8 test cases (ping lifecycle, timers, visibility, cleanup)
+- [ ] Checkpoint 2: `tsc --noEmit` + HealthContext tests pass
+- [ ] T3.1 Update `main.tsx` — wrap app with HealthProvider
+- [ ] Checkpoint 3 (Final): `make test-web` + `tsc --noEmit` + manual browser verification
+
+---
+
 ## Archive Index
 
 | Archive | Phases | Status |
