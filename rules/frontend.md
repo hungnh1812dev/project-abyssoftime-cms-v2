@@ -276,14 +276,18 @@ apps/web/src/
 
 ## 11. Repeatable Component UI Rules
 
-### 11.1 Non-Repeatable (Existing)
-- Rendered as bordered `<fieldset>` with component fields inside
+### 11.1 Non-Repeatable
+- Rendered as collapsible `<fieldset>` with chevron toggle in legend
+- Default state: expanded at depth=0 (top-level), collapsed at depth>=1 (nested)
+- Collapsed header shows component name + first text field value as hint (truncated 60 chars)
+- `aria-expanded` on toggle button; child grid unmounted when collapsed (form values preserved by react-hook-form)
 
 ### 11.2 Repeatable
 - Rendered as list of bordered cards with controls
-- Each entry: numbered header + Move Up/Move Down/Remove buttons
+- Each entry: collapsible with chevron toggle, numbered header + Move Up/Move Down/Remove buttons
+- Each entry starts collapsed by default; move/delete buttons always visible
 - Move up disabled on first item; Move down disabled on last
-- "Add entry" button at bottom — appends empty object
+- "Add entry" button at bottom — appends empty object (collapsed)
 - Remove: no confirmation (immediate splice and re-index)
 
 ### 11.3 Form State

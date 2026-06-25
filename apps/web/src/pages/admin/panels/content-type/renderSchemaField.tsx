@@ -1,5 +1,8 @@
 /* eslint-disable react-refresh/only-export-components */
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useState } from 'react';
+import { useFormContext } from 'react-hook-form';
+import { ChevronRight } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { FormField, TextInput, BooleanInput, NumberInput, MediaInput } from '@/components/form';
 import { RepeatableComponentField } from '@/components/form/inputs/RepeatableComponentField';
 import type { FieldDefinition } from '@/types/cms';
@@ -44,6 +47,58 @@ const depthStyles = [
   { border: 'border-amber-300 dark:border-amber-700', bg: 'bg-amber-50/50 dark:bg-amber-950/20', legend: 'text-amber-700 dark:text-amber-300' },
 ] as const;
 
+function findFirstTextFieldName(fields: FieldDefinition[]): string | undefined {
+  return fields.find((fld) => fld.type === 'text')?.name;
+}
+
+function formatHintText(value: unknown): string {
+  if (typeof value !== 'string') return '';
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  return trimmed.length > 60 ? trimmed.slice(0, 60) + '...' : trimmed;
+}
+
+interface CollapsibleFieldsetProps {
+  fieldKey: string;
+  label: string;
+  depth: number;
+  fieldName: string;
+  fields: FieldDefinition[];
+  children: React.ReactNode;
+}
+
+function CollapsibleFieldset({ fieldKey, label, depth, fieldName, fields, children }: CollapsibleFieldsetProps) {
+  const [expanded, setExpanded] = useState(() => depth < 1);
+  const { watch } = useFormContext();
+  const style = depthStyles[depth % depthStyles.length];
+
+  const firstTextName = findFirstTextFieldName(fields);
+  const rawValue = firstTextName ? watch(`${fieldName}.${firstTextName}`) : undefined;
+  const hintText = formatHintText(rawValue);
+
+  return (
+    <fieldset key={fieldKey} aria-label={label} className={`md:col-span-6 rounded-md border p-4 ${style.border} ${style.bg}`}>
+      <legend className={`px-1 text-sm font-medium ${style.legend}`}>
+        <button
+          type="button"
+          className="flex items-center gap-1"
+          onClick={() => setExpanded((prev) => !prev)}
+          aria-expanded={expanded}
+        >
+          <ChevronRight className={cn('size-3.5 shrink-0 transition-transform duration-200', expanded && 'rotate-90')} />
+          <span>{label}</span>
+          {hintText && <span className="text-muted-foreground ml-1 truncate text-xs font-normal">{'— '}{hintText}</span>}
+        </button>
+      </legend>
+      {expanded && (
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+          {children}
+        </div>
+      )}
+    </fieldset>
+  );
+}
+
 function renderField(field: FieldDefinition, prefix: string, keyPrefix: string, depth: number, _index: number): React.ReactNode {
   const fieldName = prefix + field.name;
   const fieldKey = `${keyPrefix}${field.name}`;
@@ -64,14 +119,17 @@ function renderField(field: FieldDefinition, prefix: string, keyPrefix: string, 
       );
     }
     const childPrefix = fieldName + '.';
-    const style = depthStyles[depth % depthStyles.length];
     return (
-      <fieldset key={fieldKey} className={`md:col-span-6 rounded-md border p-4 ${style.border} ${style.bg}`}>
-        <legend className={`px-1 text-sm font-medium ${style.legend}`}>{field.name}</legend>
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-          {(field.fields ?? []).map((child, childIndex) => renderField(child, childPrefix, childKeyPrefix, depth + 1, childIndex))}
-        </div>
-      </fieldset>
+      <CollapsibleFieldset
+        key={fieldKey}
+        fieldKey={fieldKey}
+        label={field.name}
+        depth={depth}
+        fieldName={fieldName}
+        fields={field.fields ?? []}
+      >
+        {(field.fields ?? []).map((child, childIndex) => renderField(child, childPrefix, childKeyPrefix, depth + 1, childIndex))}
+      </CollapsibleFieldset>
     );
   }
 

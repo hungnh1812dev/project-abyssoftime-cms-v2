@@ -56,6 +56,39 @@ func componentFields(fields []entity.FieldDefinition) []entity.FieldDefinition {
 	return result
 }
 
+func sanitizeFields(data map[string]any, fields []entity.FieldDefinition) {
+	for _, field := range fields {
+		val, exists := data[field.Name]
+		if !exists || val == nil {
+			continue
+		}
+		if field.Type == "component" {
+			if field.Repeatable {
+				arr, ok := val.([]any)
+				if !ok {
+					continue
+				}
+				for _, item := range arr {
+					compMap, ok := item.(map[string]any)
+					if ok {
+						sanitizeFields(compMap, field.Fields)
+					}
+				}
+			} else {
+				compMap, ok := val.(map[string]any)
+				if ok {
+					sanitizeFields(compMap, field.Fields)
+				}
+			}
+			continue
+		}
+		str, ok := val.(string)
+		if ok && str == "" && field.Type != "text" && field.Type != "richtext" && field.Type != "json" {
+			data[field.Name] = nil
+		}
+	}
+}
+
 // --- Save flow (top-down) ---
 
 func (uc *UseCase) extractAndSaveComponents(ctx context.Context, slug string, doc *entity.Document, fields []entity.FieldDefinition) error {
@@ -509,6 +542,8 @@ func (uc *UseCase) Save(ctx context.Context, contentTypeSlug string, doc *entity
 		doc.CreatedAt = now
 		doc.CreatedBy = userID
 	}
+
+	sanitizeFields(doc.Fields, fields)
 
 	if err := uc.extractAndSaveComponents(ctx, contentTypeSlug, doc, fields); err != nil {
 		return nil, err

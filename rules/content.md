@@ -383,6 +383,7 @@ gorm_id, component_id, parent_component_id, version, locale, sort_order, <fields
 | **Always** | Route GraphQL through the same usecase — no logic in resolvers |
 | **Always** | Default `repeatable` to `false` when omitted |
 | **Always** | Validate data shape at usecase (object vs array based on repeatable) |
+| **Always** | Sanitize field values before save: coerce `""` to nil for number, boolean, media fields |
 | **Always** | Preserve `sort_order` through save→publish→read cycle |
 | **Always** | Chain key is `(locale, FK_ID)` for all component operations |
 | **Always** | Max 3 levels of component nesting; fatal error if exceeded |
