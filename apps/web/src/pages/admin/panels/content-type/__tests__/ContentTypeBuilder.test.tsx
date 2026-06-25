@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@/test-utils';
 import { ContentTypeBuilder } from '../ContentTypeBuilder';
@@ -27,23 +27,19 @@ describe('ContentTypeBuilder — primitives', () => {
   });
 });
 
-describe('ContentTypeBuilder — layout', () => {
-  it('renders a 2-col grid for type=layout', () => {
+describe('ContentTypeBuilder — width', () => {
+  it('renders fields in a 6-column grid with correct col-span classes', () => {
     const schema: FieldDefinition[] = [
-      {
-        name: 'section',
-        type: 'layout',
-        fields: [
-          { name: 'left', type: 'text' },
-          { name: 'right', type: 'text' },
-        ],
-      },
+      { name: 'fullWidth', type: 'text' },
+      { name: 'half', type: 'text', width: '50%' },
+      { name: 'third', type: 'text', width: '1/3' },
     ];
     const { container } = renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} />);
-    const grid = container.querySelector('.grid');
+    const grid = container.querySelector('.md\\:grid-cols-6');
     expect(grid).toBeInTheDocument();
-    expect(screen.getByLabelText('left')).toBeInTheDocument();
-    expect(screen.getByLabelText('right')).toBeInTheDocument();
+    expect(screen.getByLabelText('fullWidth').closest('.md\\:col-span-6')).toBeInTheDocument();
+    expect(screen.getByLabelText('half').closest('.md\\:col-span-3')).toBeInTheDocument();
+    expect(screen.getByLabelText('third').closest('.md\\:col-span-2')).toBeInTheDocument();
   });
 });
 
@@ -78,5 +74,95 @@ describe('ContentTypeBuilder — component', () => {
     // TanStack Query v5 calls mutationFn(variables, context); check first arg only
     const firstCallData = onSubmit.mock.calls[0][0] as Record<string, unknown>;
     expect(firstCallData).toMatchObject({ banner: { title: 'Hello' } });
+  });
+});
+
+describe('ContentTypeBuilder — collapsible components', () => {
+  it('top-level component (depth=0) is expanded by default', () => {
+    const schema: FieldDefinition[] = [
+      {
+        name: 'banner',
+        type: 'component',
+        fields: [{ name: 'title', type: 'text' }],
+      },
+    ];
+    renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} />);
+    const group = screen.getByRole('group', { name: 'banner' });
+    expect(within(group).getByLabelText('title')).toBeInTheDocument();
+    expect(within(group).getByRole('button', { name: /banner/i })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('nested component (depth>=1) is collapsed by default', () => {
+    const schema: FieldDefinition[] = [
+      {
+        name: 'section',
+        type: 'component',
+        fields: [
+          {
+            name: 'inner',
+            type: 'component',
+            fields: [{ name: 'subtitle', type: 'text' }],
+          },
+        ],
+      },
+    ];
+    renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} />);
+    const innerGroup = screen.getByRole('group', { name: 'inner' });
+    expect(innerGroup).toBeInTheDocument();
+    expect(within(innerGroup).queryByLabelText('subtitle')).not.toBeInTheDocument();
+    expect(within(innerGroup).getByRole('button', { name: /inner/i })).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('clicking header toggles expand/collapse', async () => {
+    const schema: FieldDefinition[] = [
+      {
+        name: 'banner',
+        type: 'component',
+        fields: [{ name: 'title', type: 'text' }],
+      },
+    ];
+    renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} />);
+    const group = screen.getByRole('group', { name: 'banner' });
+    const toggle = within(group).getByRole('button', { name: /banner/i });
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(within(group).getByLabelText('title')).toBeInTheDocument();
+
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(within(group).queryByLabelText('title')).not.toBeInTheDocument();
+
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(within(group).getByLabelText('title')).toBeInTheDocument();
+  });
+
+  it('shows hint text from first text field value', async () => {
+    const schema: FieldDefinition[] = [
+      {
+        name: 'banner',
+        type: 'component',
+        fields: [{ name: 'title', type: 'text' }, { name: 'count', type: 'number' }],
+      },
+    ];
+    renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} />);
+    const input = screen.getByLabelText('title');
+    await userEvent.type(input, 'Hello World');
+
+    const group = screen.getByRole('group', { name: 'banner' });
+    expect(within(group).getByText(/Hello World/)).toBeInTheDocument();
+  });
+
+  it('shows no hint when component has no text fields', () => {
+    const schema: FieldDefinition[] = [
+      {
+        name: 'stats',
+        type: 'component',
+        fields: [{ name: 'count', type: 'number' }],
+      },
+    ];
+    renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} />);
+    const group = screen.getByRole('group', { name: 'stats' });
+    expect(within(group).queryByText('—')).not.toBeInTheDocument();
   });
 });

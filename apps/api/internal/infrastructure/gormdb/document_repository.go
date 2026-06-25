@@ -64,18 +64,6 @@ func existingColumns(db *gorm.DB, table string) (map[string]bool, error) {
 	return set, nil
 }
 
-func flattenLayoutFields(fields []entity.FieldDefinition) []entity.FieldDefinition {
-	var result []entity.FieldDefinition
-	for _, field := range fields {
-		if field.Type == "layout" {
-			result = append(result, field.Fields...)
-		} else {
-			result = append(result, field)
-		}
-	}
-	return result
-}
-
 func fieldColumnType(fieldType string) string {
 	switch fieldType {
 	case "number":
@@ -111,7 +99,7 @@ func (r *documentRepository) createDocumentTable(ctx context.Context, table stri
 	cols = append(cols, "document_id TEXT")
 	cols = append(cols, "version TEXT")
 	cols = append(cols, "locale TEXT")
-	for _, f := range flattenLayoutFields(fields) {
+	for _, f := range fields {
 		if f.Type == "component" {
 			continue
 		}
@@ -133,8 +121,7 @@ func (r *documentRepository) addMissingDocumentColumns(ctx context.Context, tabl
 	if err != nil {
 		return err
 	}
-	flat := flattenLayoutFields(fields)
-	for _, f := range flat {
+	for _, f := range fields {
 		if f.Type == "component" {
 			continue
 		}

@@ -7,19 +7,26 @@ import type { FieldDefinition } from '@/types/cms';
 
 const noop = () => Promise.resolve();
 
-describe('RepeatableComponentField', () => {
-  const repeatableSchema: FieldDefinition[] = [
-    {
-      name: 'skills',
-      type: 'component',
-      repeatable: true,
-      fields: [
-        { name: 'category', type: 'text' },
-        { name: 'skill', type: 'text' },
-      ],
-    },
-  ];
+const repeatableSchema: FieldDefinition[] = [
+  {
+    name: 'skills',
+    type: 'component',
+    repeatable: true,
+    fields: [
+      { name: 'category', type: 'text' },
+      { name: 'skill', type: 'text' },
+    ],
+  },
+];
 
+async function addAndExpandEntry() {
+  const addBtn = screen.getByRole('button', { name: /add entry/i });
+  await userEvent.click(addBtn);
+  const toggle = screen.getByRole('button', { expanded: false });
+  await userEvent.click(toggle);
+}
+
+describe('RepeatableComponentField', () => {
   it('renders an add button when empty', () => {
     renderWithProviders(<ContentTypeBuilder schema={repeatableSchema} mutationFn={noop} />);
     expect(screen.getByRole('button', { name: /add entry/i })).toBeInTheDocument();
@@ -27,8 +34,7 @@ describe('RepeatableComponentField', () => {
 
   it('adds an entry when add button is clicked', async () => {
     renderWithProviders(<ContentTypeBuilder schema={repeatableSchema} mutationFn={noop} />);
-    const addBtn = screen.getByRole('button', { name: /add entry/i });
-    await userEvent.click(addBtn);
+    await addAndExpandEntry();
 
     expect(screen.getByText('#1')).toBeInTheDocument();
     expect(screen.getByLabelText('category')).toBeInTheDocument();
@@ -52,8 +58,7 @@ describe('RepeatableComponentField', () => {
     const onSubmit = vi.fn();
     renderWithProviders(<ContentTypeBuilder schema={repeatableSchema} mutationFn={onSubmit} />);
 
-    const addBtn = screen.getByRole('button', { name: /add entry/i });
-    await userEvent.click(addBtn);
+    await addAndExpandEntry();
 
     const categoryInput = screen.getByLabelText('category');
     const skillInput = screen.getByLabelText('skill');
@@ -81,5 +86,78 @@ describe('RepeatableComponentField', () => {
     const group = screen.getByRole('group', { name: 'banner' });
     expect(group).toBeInTheDocument();
     expect(within(group).getByLabelText('title')).toBeInTheDocument();
+  });
+});
+
+describe('RepeatableComponentField — collapsible entries', () => {
+  it('newly added entry is collapsed by default', async () => {
+    renderWithProviders(<ContentTypeBuilder schema={repeatableSchema} mutationFn={noop} />);
+    const addBtn = screen.getByRole('button', { name: /add entry/i });
+    await userEvent.click(addBtn);
+
+    expect(screen.getByText('#1')).toBeInTheDocument();
+    expect(screen.queryByLabelText('category')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('skill')).not.toBeInTheDocument();
+  });
+
+  it('clicking entry header expands it', async () => {
+    renderWithProviders(<ContentTypeBuilder schema={repeatableSchema} mutationFn={noop} />);
+    await addAndExpandEntry();
+
+    expect(screen.getByLabelText('category')).toBeInTheDocument();
+    expect(screen.getByLabelText('skill')).toBeInTheDocument();
+  });
+
+  it('clicking expanded entry header collapses it', async () => {
+    renderWithProviders(<ContentTypeBuilder schema={repeatableSchema} mutationFn={noop} />);
+    await addAndExpandEntry();
+
+    expect(screen.getByLabelText('category')).toBeInTheDocument();
+
+    const toggle = screen.getByRole('button', { expanded: true });
+    await userEvent.click(toggle);
+
+    expect(screen.queryByLabelText('category')).not.toBeInTheDocument();
+  });
+
+  it('move/delete buttons visible when entry is collapsed', async () => {
+    renderWithProviders(<ContentTypeBuilder schema={repeatableSchema} mutationFn={noop} />);
+    const addBtn = screen.getByRole('button', { name: /add entry/i });
+    await userEvent.click(addBtn);
+
+    expect(screen.getByRole('button', { name: /move item 1 up/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /move item 1 down/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /remove item 1/i })).toBeInTheDocument();
+  });
+
+  it('hint text shows first text field value', async () => {
+    renderWithProviders(<ContentTypeBuilder schema={repeatableSchema} mutationFn={noop} />);
+    await addAndExpandEntry();
+
+    const categoryInput = screen.getByLabelText('category');
+    await userEvent.type(categoryInput, 'Frontend');
+
+    const toggle = screen.getByRole('button', { expanded: true });
+    await userEvent.click(toggle);
+
+    expect(screen.getByText(/Frontend/)).toBeInTheDocument();
+  });
+
+  it('expanding one entry does not affect others', async () => {
+    renderWithProviders(<ContentTypeBuilder schema={repeatableSchema} mutationFn={noop} />);
+    const addBtn = screen.getByRole('button', { name: /add entry/i });
+    await userEvent.click(addBtn);
+    await userEvent.click(addBtn);
+
+    expect(screen.getByText('#1')).toBeInTheDocument();
+    expect(screen.getByText('#2')).toBeInTheDocument();
+
+    const toggles = screen.getAllByRole('button', { expanded: false });
+    await userEvent.click(toggles[0]);
+
+    expect(screen.getByLabelText('category')).toBeInTheDocument();
+
+    const collapsedToggles = screen.getAllByRole('button', { expanded: false });
+    expect(collapsedToggles.length).toBeGreaterThanOrEqual(1);
   });
 });

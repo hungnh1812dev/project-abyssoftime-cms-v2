@@ -56,6 +56,51 @@ func componentFields(fields []entity.FieldDefinition) []entity.FieldDefinition {
 	return result
 }
 
+func sanitizeFields(data map[string]any, fields []entity.FieldDefinition) {
+	for _, field := range fields {
+		val, exists := data[field.Name]
+		if !exists || val == nil {
+			continue
+		}
+		if field.Type == "component" {
+			if field.Repeatable {
+				arr, ok := val.([]any)
+				if !ok {
+					continue
+				}
+				for _, item := range arr {
+					compMap, ok := item.(map[string]any)
+					if ok {
+						sanitizeFields(compMap, field.Fields)
+					}
+				}
+			} else {
+				compMap, ok := val.(map[string]any)
+				if ok {
+					sanitizeFields(compMap, field.Fields)
+				}
+			}
+			continue
+		}
+		if field.Type == "media" {
+			if obj, ok := val.(map[string]any); ok {
+				if docID, ok := obj["documentId"].(string); ok && docID != "" {
+					data[field.Name] = docID
+				} else {
+					data[field.Name] = nil
+				}
+			} else if str, ok := val.(string); ok && str == "" {
+				data[field.Name] = nil
+			}
+			continue
+		}
+		str, ok := val.(string)
+		if ok && str == "" && field.Type != "text" && field.Type != "richtext" {
+			data[field.Name] = nil
+		}
+	}
+}
+
 // --- Save flow (top-down) ---
 
 func (uc *UseCase) extractAndSaveComponents(ctx context.Context, slug string, doc *entity.Document, fields []entity.FieldDefinition) error {
@@ -453,11 +498,6 @@ func (uc *UseCase) deleteChildren(ctx context.Context, slug, parentPath, parentC
 
 func (uc *UseCase) resolveMediaFields(ctx context.Context, data map[string]any, fields []entity.FieldDefinition) {
 	for _, f := range fields {
-		if f.Type == "layout" {
-			uc.resolveMediaFields(ctx, data, f.Fields)
-			continue
-		}
-
 		raw, ok := data[f.Name]
 		if !ok || raw == nil {
 			continue
@@ -514,6 +554,8 @@ func (uc *UseCase) Save(ctx context.Context, contentTypeSlug string, doc *entity
 		doc.CreatedAt = now
 		doc.CreatedBy = userID
 	}
+
+	sanitizeFields(doc.Fields, fields)
 
 	if err := uc.extractAndSaveComponents(ctx, contentTypeSlug, doc, fields); err != nil {
 		return nil, err

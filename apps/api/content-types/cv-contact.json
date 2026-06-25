@@ -3,27 +3,12 @@
   "name": "Contact Information",
   "kind": "single",
   "fields": [
-    {
-      "type": "layout",
-      "fields": [
-        { "name": "name", "type": "text" },
-        { "name": "address", "type": "text" }
-      ]
-    },
-    {
-      "type": "layout",
-      "fields": [
-        { "name": "phone", "type": "text" },
-        { "name": "email", "type": "text" }
-      ]
-    },
-    {
-      "type": "layout",
-      "fields": [
-        { "name": "linkedin", "type": "text" },
-        { "name": "github", "type": "text" }
-      ]
-    },
+    { "name": "name", "type": "text", "width": "50%" },
+    { "name": "address", "type": "text", "width": "50%" },
+    { "name": "phone", "type": "text", "width": "50%" },
+    { "name": "email", "type": "text", "width": "50%" },
+    { "name": "linkedin", "type": "text", "width": "50%" },
+    { "name": "github", "type": "text", "width": "50%" },
     { "name": "avatar", "type": "media" }
   ]
 }

@@ -58,15 +58,6 @@ func validateDefinition(def ContentTypeDefinition, path string) error {
 func validateFields(fields []entity.FieldDefinition, path string, depth int) error {
 	for _, f := range fields {
 		switch f.Type {
-		case "layout":
-			if len(f.Fields) == 0 {
-				return fmt.Errorf("%q: layout field %q must have at least one child field", path, f.Name)
-			}
-			for _, child := range f.Fields {
-				if child.Type == "component" {
-					return fmt.Errorf("%q: layout field %q must not contain component children", path, f.Name)
-				}
-			}
 		case "component":
 			if f.Name == "" {
 				return fmt.Errorf("%q: component field must have a non-empty name", path)

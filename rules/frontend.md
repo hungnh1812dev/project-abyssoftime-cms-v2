@@ -91,7 +91,17 @@ apps/web/src/
 | `MediaInput` | `@/components/form/inputs/MediaInput` | Image/file upload |
 | `RepeatableComponentField` | `@/components/form/inputs/RepeatableComponentField` | Ordered component arrays |
 
-### 3.3 UI Design System
+### 3.3 Form Field Grid Layout
+- Fields render in a responsive 6-column grid: `grid grid-cols-1 md:grid-cols-6 gap-4`
+- Each field's `width` property controls its column span:
+  - `"100%"` or omitted → `md:col-span-6` (full width)
+  - `"50%"` → `md:col-span-3` (half width)
+  - `"1/3"` → `md:col-span-2` (one-third width)
+- Component fields always span full width (`md:col-span-6`)
+- Mobile: all fields are full width (`grid-cols-1`)
+- The grid applies at every nesting level (top-level, inside components, inside repeatable entries)
+
+### 3.4 UI Design System
 - Indigo color tokens
 - Sidebar navigation
 - Sticky action bar
@@ -266,14 +276,18 @@ apps/web/src/
 
 ## 11. Repeatable Component UI Rules
 
-### 11.1 Non-Repeatable (Existing)
-- Rendered as bordered `<fieldset>` with component fields inside
+### 11.1 Non-Repeatable
+- Rendered as collapsible `<fieldset>` with chevron toggle in legend
+- Default state: expanded at depth=0 (top-level), collapsed at depth>=1 (nested)
+- Collapsed header shows component name + first text field value as hint (truncated 60 chars)
+- `aria-expanded` on toggle button; child grid unmounted when collapsed (form values preserved by react-hook-form)
 
 ### 11.2 Repeatable
 - Rendered as list of bordered cards with controls
-- Each entry: numbered header + Move Up/Move Down/Remove buttons
+- Each entry: collapsible with chevron toggle, numbered header + Move Up/Move Down/Remove buttons
+- Each entry starts collapsed by default; move/delete buttons always visible
 - Move up disabled on first item; Move down disabled on last
-- "Add entry" button at bottom — appends empty object
+- "Add entry" button at bottom — appends empty object (collapsed)
 - Remove: no confirmation (immediate splice and re-index)
 
 ### 11.3 Form State
