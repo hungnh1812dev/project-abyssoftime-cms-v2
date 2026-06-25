@@ -66,10 +66,7 @@ export function ContentTypePanel({ contentType, id, isNew }: Props) {
   const publishCollection = usePublishCollectionDocument();
   const unpublishCollection = useUnpublishCollectionDocument();
 
-  const breadcrumbs: BreadcrumbItem[] = [
-    { label: 'Home', to: '/admin' },
-    { label: 'Content Manager' },
-  ];
+  const breadcrumbs: BreadcrumbItem[] = [{ label: 'Home', to: '/admin' }, { label: 'Content Manager' }];
 
   const isLoading = isSingle ? singleQuery.isLoading : !isNew && collectionQuery.isLoading;
   const doc = isSingle ? singleQuery.data : isNew ? undefined : collectionQuery.data;
@@ -167,7 +164,7 @@ export function ContentTypePanel({ contentType, id, isNew }: Props) {
       metadata={
         doc.data.updatedByName ? (
           <p className="text-muted-foreground text-sm">
-            Last updated by {doc.data.updatedByName as string} on {formatAuditDate(doc.data.updatedAt)}
+            Last updated by <span className="font-bold">{doc.data.updatedByName as string}</span> on {formatAuditDate(doc.data.updatedAt)}
           </p>
         ) : undefined
       }

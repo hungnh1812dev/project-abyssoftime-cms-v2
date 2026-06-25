@@ -17,7 +17,7 @@ export function ContentDetailLayout({ title, status, breadcrumbs, backLink, meta
     <div className="min-h-full">
       <StickyActionBar title={title} status={status} breadcrumbs={breadcrumbs} renderActions={renderActions} />
       <div className="p-6">
-        {backLink && <div className="mb-4">{backLink}</div>}
+        {backLink && <div className="mb-0.5">{backLink}</div>}
         {metadata && <div className="mb-4">{metadata}</div>}
         {children}
       </div>
