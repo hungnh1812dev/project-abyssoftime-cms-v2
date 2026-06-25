@@ -63,12 +63,10 @@ func (b *SchemaBuilder) BuildContentTypeSDL(def contenttype.ContentTypeDefinitio
 	}
 
 	// Object type
+	flatFields := flattenLayoutFieldsDef(def.Fields)
 	fmt.Fprintf(&sb, "type %s {\n", typeName)
 	sb.WriteString("  documentId: ID!\n")
-	for _, f := range def.Fields {
-		if f.Type == "layout" {
-			continue
-		}
+	for _, f := range flatFields {
 		if f.Type == "component" {
 			compType := typeName + slugToPascalCase(f.Name)
 			if f.Repeatable {
@@ -88,8 +86,8 @@ func (b *SchemaBuilder) BuildContentTypeSDL(def contenttype.ContentTypeDefinitio
 
 	// Input type
 	fmt.Fprintf(&sb, "input %sInput {\n", typeName)
-	for _, f := range def.Fields {
-		if f.Type == "layout" || f.Type == "component" {
+	for _, f := range flatFields {
+		if f.Type == "component" {
 			continue
 		}
 		fmt.Fprintf(&sb, "  %s: %s\n", f.Name, fieldTypeToGraphQL(f.Type))
@@ -97,10 +95,10 @@ func (b *SchemaBuilder) BuildContentTypeSDL(def contenttype.ContentTypeDefinitio
 	sb.WriteString("}\n\n")
 
 	// Filter type
-	writeFilterType(&sb, typeName, def.Fields)
+	writeFilterType(&sb, typeName, flatFields)
 
 	// OrderBy type
-	writeOrderByType(&sb, typeName, def.Fields)
+	writeOrderByType(&sb, typeName, flatFields)
 
 	if def.Kind == "collection" {
 		// Queries
@@ -174,9 +172,6 @@ func flattenLayoutFieldsDef(fields []entity.FieldDefinition) []entity.FieldDefin
 func writeFilterType(sb *strings.Builder, typeName string, fields []entity.FieldDefinition) {
 	fmt.Fprintf(sb, "input %sFilter {\n", typeName)
 	for _, f := range fields {
-		if f.Type == "layout" {
-			continue
-		}
 		switch f.Type {
 		case "text", "richtext":
 			fmt.Fprintf(sb, "  %s: StringFilter\n", f.Name)

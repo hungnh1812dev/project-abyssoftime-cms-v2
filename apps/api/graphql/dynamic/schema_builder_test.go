@@ -244,6 +244,36 @@ func TestBuildContentTypeSDL_RepeatableComponent(t *testing.T) {
 	}
 }
 
+func TestBuildContentTypeSDL_TopLevelLayout(t *testing.T) {
+	def := contenttype.ContentTypeDefinition{
+		Slug: "cv-page",
+		Name: "CV Page",
+		Kind: "collection",
+		Fields: []entity.FieldDefinition{
+			{Type: "layout", Fields: []entity.FieldDefinition{
+				{Name: "position", Type: "text"},
+				{Name: "isMain", Type: "boolean"},
+			}},
+			{Name: "company", Type: "text"},
+		},
+	}
+	builder := NewSchemaBuilder(nil)
+	sdl := builder.BuildContentTypeSDL(def)
+
+	for _, want := range []string{
+		"position: String",
+		"isMain: Boolean",
+		"company: String",
+		"position: StringFilter",
+		"isMain: BooleanFilter",
+		"position: SortOrder",
+	} {
+		if !strings.Contains(sdl, want) {
+			t.Errorf("layout-flattened SDL missing %q\n\nFull SDL:\n%s", want, sdl)
+		}
+	}
+}
+
 func TestBuildSDL_MergesAllDefinitions(t *testing.T) {
 	defs := []contenttype.ContentTypeDefinition{
 		{
