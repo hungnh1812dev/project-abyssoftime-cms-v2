@@ -1111,13 +1111,15 @@ func TestSave_SanitizesEmptyStringOnNumberField(t *testing.T) {
 		{Name: "count", Type: "number"},
 		{Name: "active", Type: "boolean"},
 		{Name: "avatar", Type: "media"},
+		{Name: "metadata", Type: "json"},
 	}
 	doc := &entity.Document{
 		Fields: map[string]any{
-			"title":  "",
-			"count":  "",
-			"active": "",
-			"avatar": "",
+			"title":    "",
+			"count":    "",
+			"active":   "",
+			"avatar":   "",
+			"metadata": "",
 		},
 	}
 
@@ -1137,6 +1139,9 @@ func TestSave_SanitizesEmptyStringOnNumberField(t *testing.T) {
 	}
 	if upserted.Fields["avatar"] != nil {
 		t.Errorf("avatar = %v, want nil (media fields coerce empty string to nil)", upserted.Fields["avatar"])
+	}
+	if upserted.Fields["metadata"] != nil {
+		t.Errorf("metadata = %v, want nil (json fields coerce empty string to nil)", upserted.Fields["metadata"])
 	}
 }
 
@@ -1186,5 +1191,40 @@ func TestSave_SanitizesEmptyStringInsideComponent(t *testing.T) {
 	}
 	if savedComps[0].Fields["rating"] != nil {
 		t.Errorf("rating = %v, want nil", savedComps[0].Fields["rating"])
+	}
+}
+
+func TestSave_SanitizesMediaObjectToDocumentID(t *testing.T) {
+	repo := &repomock.DocumentRepository{}
+	repo.FindDraftByDocumentIDFn = func(_ context.Context, _, _, _ string) (*entity.Document, error) {
+		return nil, pkgerrors.ErrNotFound
+	}
+	var upserted *entity.Document
+	repo.UpsertDraftFn = func(_ context.Context, _ string, doc *entity.Document) error {
+		upserted = doc
+		return nil
+	}
+
+	fields := []entity.FieldDefinition{
+		{Name: "avatar", Type: "media"},
+	}
+	doc := &entity.Document{
+		Fields: map[string]any{
+			"avatar": map[string]any{
+				"documentId":   "abc-123",
+				"url":          "https://example.com/photo.jpg",
+				"thumbnailUrl": "https://example.com/photo_thumb.jpg",
+				"fileName":     "photo.jpg",
+			},
+		},
+	}
+
+	uc := docuc.New(repo, nil, &repomock.MediaAssetRepository{}, supportedLocales)
+	_, err := uc.Save(ctx, testSlug, doc, fields, "user-1")
+	if err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+	if upserted.Fields["avatar"] != "abc-123" {
+		t.Errorf("avatar = %v, want %q (media object should be reduced to documentId)", upserted.Fields["avatar"], "abc-123")
 	}
 }

@@ -82,8 +82,20 @@ func sanitizeFields(data map[string]any, fields []entity.FieldDefinition) {
 			}
 			continue
 		}
+		if field.Type == "media" {
+			if obj, ok := val.(map[string]any); ok {
+				if docID, ok := obj["documentId"].(string); ok && docID != "" {
+					data[field.Name] = docID
+				} else {
+					data[field.Name] = nil
+				}
+			} else if str, ok := val.(string); ok && str == "" {
+				data[field.Name] = nil
+			}
+			continue
+		}
 		str, ok := val.(string)
-		if ok && str == "" && field.Type != "text" && field.Type != "richtext" && field.Type != "json" {
+		if ok && str == "" && field.Type != "text" && field.Type != "richtext" {
 			data[field.Name] = nil
 		}
 	}

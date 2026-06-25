@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 
 	cloudinarygo "github.com/cloudinary/cloudinary-go/v2"
 	"github.com/cloudinary/cloudinary-go/v2/api/uploader"
@@ -31,8 +32,12 @@ func NewCloudinaryAdapter(cloudName, apiKey, apiSecret string) (repository.Stora
 func boolPtr(b bool) *bool { return &b }
 
 func (a *adapter) Upload(ctx context.Context, file io.Reader, filename string, generateThumbnail bool) (*repository.UploadResult, error) {
+	publicID := filename
+	if idx := strings.LastIndex(publicID, "."); idx != -1 {
+		publicID = publicID[:idx]
+	}
 	params := uploader.UploadParams{
-		PublicID:       filename,
+		PublicID:       publicID,
 		Overwrite:      boolPtr(true),
 		UniqueFilename: boolPtr(false),
 	}
