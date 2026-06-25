@@ -53,7 +53,7 @@ func (r *componentRepository) createComponentTable(ctx context.Context, table st
 	cols = append(cols, "version TEXT")
 	cols = append(cols, "locale TEXT")
 	cols = append(cols, "sort_order INTEGER DEFAULT 0")
-	for _, field := range flattenLayoutFields(fields) {
+	for _, field := range fields {
 		if field.Type == "component" {
 			continue
 		}
@@ -89,7 +89,7 @@ func (r *componentRepository) addMissingComponentColumns(ctx context.Context, ta
 			return err
 		}
 	}
-	for _, field := range flattenLayoutFields(fields) {
+	for _, field := range fields {
 		if field.Type == "component" {
 			continue
 		}

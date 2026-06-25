@@ -38,10 +38,12 @@ type FieldDefinition struct {
     Name       string            `json:"name"                    bson:"name"`
     Type       string            `json:"type"                    bson:"type"`
     Ext        []string          `json:"ext,omitempty"           bson:"ext,omitempty"`
+    Width      string            `json:"width,omitempty"         bson:"width,omitempty"`
     Repeatable bool              `json:"repeatable,omitempty"    bson:"repeatable,omitempty"`
     Fields     []FieldDefinition `json:"fields,omitempty"        bson:"fields,omitempty"`
 }
 ```
+- `Width`: UI hint for form column span. Values: `"100%"` (default), `"50%"`, `"1/3"`. No effect on storage.
 
 ### 2.2 Field Types
 
@@ -54,7 +56,6 @@ type FieldDefinition struct {
 | `media` | Media reference | No | Document table column (TEXT — stores documentId) |
 | `json` | Arbitrary JSON | No | Document table column (TEXT — serialized JSON string) |
 | `component` | Nested component | **Yes** — has `fields` | PostgreSQL: separate table; MongoDB: nested BSON |
-| `layout` | UI grouping | **Yes** — has `fields` | No column — children promoted to parent level |
 
 ### 2.3 Component Fields
 ```json
@@ -76,27 +77,9 @@ type FieldDefinition struct {
 - May have additional `"component"` key in JSON — ignored by Go (not in struct)
 - Component fields can contain other components (nesting)
 
-### 2.4 Layout Fields
-```json
-{
-  "type": "layout",
-  "fields": [
-    { "name": "position", "type": "text" },
-    { "name": "isMain", "type": "boolean" }
-  ]
-}
-```
-- **No `name` field** — layout is a UI grouping, not a data field
-- Children promoted to parent level in database columns
-- **NEVER** nest components inside layouts:
-  - `layout → component` → **FORBIDDEN** (validation error)
-  - `component → layout → text` → **ALLOWED** (layout inside component)
-- Layout children treated as direct children of the parent for column creation
-
-### 2.5 Nesting Depth Limits
+### 2.4 Nesting Depth Limits
 - Maximum: **3 levels** of component nesting
 - Counting starts at depth=1 for top-level fields
-- Layout does NOT count as a nesting level
 
 | Depth | Example | Status |
 |---|---|---|
@@ -148,10 +131,6 @@ func validateFields(fields []entity.FieldDefinition, path string, depth int) err
 ```
 
 ### 4.2 Validation Rules Per Type
-
-**`layout` fields:**
-- Must have at least one child field → error: `"layout field %q must have at least one child field"`
-- Children must NOT be `component` type → error: `"layout field %q must not contain component children"`
 
 **`component` fields:**
 - `Name` must be non-empty → error: `"component field must have a non-empty name"`
@@ -226,15 +205,15 @@ type EntryManager interface {
 func fieldsEqual(a, b []entity.FieldDefinition) bool {
     if len(a) != len(b) { return false }
     for i := range a {
-        if a[i].Name != b[i].Name { return false }
-        if a[i].Type != b[i].Type { return false }
-        if a[i].Repeatable != b[i].Repeatable { return false }
+        if a[i].Name != b[i].Name || a[i].Type != b[i].Type || a[i].Width != b[i].Width || a[i].Repeatable != b[i].Repeatable {
+            return false
+        }
         if !fieldsEqual(a[i].Fields, b[i].Fields) { return false }
     }
     return true
 }
 ```
-- Compares: `Name`, `Type`, `Repeatable`, and sub-`Fields` (recursive)
+- Compares: `Name`, `Type`, `Width`, `Repeatable`, and sub-`Fields` (recursive)
 - Does NOT compare: `Ext`, `component` key (JSON-only alias), `ListFields`
 - Order-sensitive — field order matters
 
@@ -247,6 +226,7 @@ func fieldsEqual(a, b []entity.FieldDefinition) bool {
 | Field removed | Yes |
 | Field type changed | Yes |
 | Field `repeatable` toggled | Yes |
+| Field `width` changed | Yes |
 | Field order changed | Yes |
 | `listFields` changed | **No** — never compared, never overwritten |
 | `Ext` changed | **No** — not compared |
@@ -386,34 +366,28 @@ const (
   "name": "English Vocabulary",
   "kind": "collection",
   "fields": [
-    {
-      "type": "layout",
-      "fields": [
-        { "name": "packName", "type": "text" },
-        { "name": "packTitle", "type": "text" }
-      ]
-    },
+    { "name": "packName", "type": "text", "width": "50%" },
+    { "name": "packTitle", "type": "text", "width": "50%" },
     { "name": "words", "type": "json" }
   ]
 }
 ```
 - Creates table `documents_en_vocab_pack` with columns: `pack_name TEXT`, `pack_title TEXT`, `words TEXT`
 - No component tables
-- Layout → children promoted: `packName`, `packTitle` become direct columns
+- `width` is a UI hint only — does not affect column creation
 
 ### 8.2 Complex Collection (3-level nesting)
 ```json
 {
   "slug": "cv-page",
   "fields": [
-    { "type": "layout", "fields": [
-      { "name": "position", "type": "text" },
-      { "name": "isMain", "type": "boolean" }
-    ]},
+    { "name": "position", "type": "text", "width": "50%" },
+    { "name": "isMain", "type": "boolean", "width": "50%" },
     { "name": "company", "type": "text" },
     { "name": "experiences", "type": "component", "repeatable": true,
       "fields": [
-        { "type": "layout", "fields": [...] },
+        { "name": "company", "type": "text", "width": "50%" },
+        { "name": "location", "type": "text", "width": "50%" },
         { "name": "roles", "type": "component", "repeatable": true,
           "fields": [...]
         }
@@ -441,19 +415,20 @@ const (
 |---|---|
 | **Always** | Validate fields recursively with depth tracking |
 | **Always** | Reject component nesting > 3 levels with fatal error |
-| **Always** | Reject components inside layout fields |
-| **Always** | Flatten layout fields before creating DB columns |
 | **Always** | Skip component fields when creating document table columns |
 | **Always** | Build component table path by concatenating names with `_` |
 | **Always** | Set `isNested = depth > 0` for component table FK selection |
 | **Always** | Drop component tables bottom-up (deepest first) |
 | **Always** | Log table existence and row count during sync |
-| **Always** | Compare Name, Kind, Fields (not ListFields) for change detection |
+| **Always** | Compare Name, Kind, Width, Fields (not ListFields) for change detection |
+| **Always** | Every field in JSON schema must have a `name` — no structural wrappers |
+| **Always** | `width` defaults to `"100%"` when omitted — it is a UI hint only |
 | **Never** | Overwrite `ListFields` during sync — it's user-managed |
 | **Never** | Let sync write back to JSON definition files |
-| **Never** | Nest components inside layout fields |
 | **Never** | Create content types via API or UI — JSON-only |
 | **Never** | Validate `listFields` in schema loader — removed |
 | **Never** | Drop tables in `EnsureCollection` — additive only |
+| **Never** | Use `type: "layout"` in content-type schemas — removed |
+| **Never** | Let `width` affect database column creation or storage |
 | **Ask first** | Increasing max nesting depth beyond 3 |
 | **Ask first** | Adding new field types |

@@ -162,7 +162,7 @@ func fieldsEqual(a, b []entity.FieldDefinition) bool {
 		return false
 	}
 	for i := range a {
-		if a[i].Name != b[i].Name || a[i].Type != b[i].Type || a[i].Repeatable != b[i].Repeatable {
+		if a[i].Name != b[i].Name || a[i].Type != b[i].Type || a[i].Width != b[i].Width || a[i].Repeatable != b[i].Repeatable {
 			return false
 		}
 		if !fieldsEqual(a[i].Fields, b[i].Fields) {

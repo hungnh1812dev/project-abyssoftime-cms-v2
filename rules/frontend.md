@@ -91,7 +91,17 @@ apps/web/src/
 | `MediaInput` | `@/components/form/inputs/MediaInput` | Image/file upload |
 | `RepeatableComponentField` | `@/components/form/inputs/RepeatableComponentField` | Ordered component arrays |
 
-### 3.3 UI Design System
+### 3.3 Form Field Grid Layout
+- Fields render in a responsive 6-column grid: `grid grid-cols-1 md:grid-cols-6 gap-4`
+- Each field's `width` property controls its column span:
+  - `"100%"` or omitted → `md:col-span-6` (full width)
+  - `"50%"` → `md:col-span-3` (half width)
+  - `"1/3"` → `md:col-span-2` (one-third width)
+- Component fields always span full width (`md:col-span-6`)
+- Mobile: all fields are full width (`grid-cols-1`)
+- The grid applies at every nesting level (top-level, inside components, inside repeatable entries)
+
+### 3.4 UI Design System
 - Indigo color tokens
 - Sidebar navigation
 - Sticky action bar

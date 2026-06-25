@@ -13,6 +13,7 @@ type FieldDefinition struct {
 	Name       string            `json:"name"                    bson:"name"`
 	Type       string            `json:"type"                    bson:"type"`
 	Ext        []string          `json:"ext,omitempty"           bson:"ext,omitempty"`
+	Width      string            `json:"width,omitempty"         bson:"width,omitempty"`
 	Repeatable bool              `json:"repeatable,omitempty"    bson:"repeatable,omitempty"`
 	Fields     []FieldDefinition `json:"fields,omitempty"        bson:"fields,omitempty"`
 }

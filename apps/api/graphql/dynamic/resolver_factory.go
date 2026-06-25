@@ -185,7 +185,7 @@ func (f *ResolverFactory) BuildHandler(defs []contenttype.ContentTypeDefinition)
 func (f *ResolverFactory) buildComponentType(parentType string, fd entity.FieldDefinition, jsonSc *graphql.Scalar, mediaType *graphql.Object) *graphql.Object {
 	typeName := parentType + slugToPascalCase(fd.Name)
 	compFields := graphql.Fields{}
-	for _, sub := range flattenLayoutFieldsDef(fd.Fields) {
+	for _, sub := range fd.Fields {
 		if sub.Type == "component" {
 			nestedType := f.buildComponentType(typeName, sub, jsonSc, mediaType)
 			if sub.Repeatable {
@@ -215,9 +215,6 @@ func (f *ResolverFactory) buildObjectType(def contenttype.ContentTypeDefinition,
 		"publishedAt": &graphql.Field{Type: timeSc},
 	}
 	for _, fd := range def.Fields {
-		if fd.Type == "layout" {
-			continue
-		}
 		if fd.Type == "component" {
 			compType := f.buildComponentType(typeName, fd, jsonSc, mediaType)
 			if fd.Repeatable {
@@ -242,7 +239,7 @@ func (f *ResolverFactory) buildObjectType(def contenttype.ContentTypeDefinition,
 func (f *ResolverFactory) buildInputType(def contenttype.ContentTypeDefinition, jsonSc *graphql.Scalar) *graphql.InputObject {
 	fields := graphql.InputObjectConfigFieldMap{}
 	for _, fd := range def.Fields {
-		if fd.Type == "layout" || fd.Type == "component" {
+		if fd.Type == "component" {
 			continue
 		}
 		fields[fd.Name] = &graphql.InputObjectFieldConfig{Type: gqlScalarFor(fd.Type, jsonSc)}
@@ -532,7 +529,7 @@ func (f *ResolverFactory) docToMap(ctx context.Context, d *entity.Document, fiel
 		} else if fd.Type == "component" {
 			raw := d.Fields[fd.Name]
 			m[fd.Name] = f.resolveComponentMedia(ctx, raw, fd.Fields)
-		} else if fd.Type != "layout" {
+		} else {
 			m[fd.Name] = d.Fields[fd.Name]
 		}
 	}

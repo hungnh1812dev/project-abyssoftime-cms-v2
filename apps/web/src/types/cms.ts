@@ -2,6 +2,7 @@ export interface FieldDefinition {
   name: string;
   type: string;
   ext?: string[];
+  width?: '100%' | '50%' | '1/3';
   repeatable?: boolean;
   fields?: FieldDefinition[];
 }
@@ -45,10 +46,6 @@ export function stripSystemFields(data: Record<string, unknown>): Record<string,
     }
   }
   return content;
-}
-
-export function flattenFields(fields: FieldDefinition[]): FieldDefinition[] {
-  return fields.flatMap((field) => (field.type === 'layout' ? (field.fields ?? []) : [field]));
 }
 
 export interface Locale {

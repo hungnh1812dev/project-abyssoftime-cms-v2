@@ -63,7 +63,7 @@ func (b *SchemaBuilder) BuildContentTypeSDL(def contenttype.ContentTypeDefinitio
 	}
 
 	// Object type
-	flatFields := flattenLayoutFieldsDef(def.Fields)
+	flatFields := def.Fields
 	fmt.Fprintf(&sb, "type %s {\n", typeName)
 	sb.WriteString("  documentId: ID!\n")
 	for _, f := range flatFields {
@@ -142,7 +142,7 @@ func writeComponentType(sb *strings.Builder, parentType string, f entity.FieldDe
 	}
 
 	fmt.Fprintf(sb, "type %s {\n", compType)
-	for _, sub := range flattenLayoutFieldsDef(f.Fields) {
+	for _, sub := range f.Fields {
 		if sub.Type == "component" {
 			nestedType := compType + slugToPascalCase(sub.Name)
 			if sub.Repeatable {
@@ -157,17 +157,6 @@ func writeComponentType(sb *strings.Builder, parentType string, f entity.FieldDe
 	sb.WriteString("}\n\n")
 }
 
-func flattenLayoutFieldsDef(fields []entity.FieldDefinition) []entity.FieldDefinition {
-	var result []entity.FieldDefinition
-	for _, f := range fields {
-		if f.Type == "layout" {
-			result = append(result, f.Fields...)
-		} else {
-			result = append(result, f)
-		}
-	}
-	return result
-}
 
 func writeFilterType(sb *strings.Builder, typeName string, fields []entity.FieldDefinition) {
 	fmt.Fprintf(sb, "input %sFilter {\n", typeName)

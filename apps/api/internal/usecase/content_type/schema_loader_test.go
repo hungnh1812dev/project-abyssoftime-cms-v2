@@ -73,19 +73,6 @@ func TestLoadDefinitions_MissingDir(t *testing.T) {
 	}
 }
 
-func TestLoadDefinitions_LayoutEmptyFields(t *testing.T) {
-	_, err := contenttype.LoadDefinitions("testdata/invalid/layout-empty-fields")
-	if err == nil {
-		t.Fatal("LoadDefinitions() error = nil, want error for layout with empty fields")
-	}
-}
-
-func TestLoadDefinitions_LayoutContainsComponent(t *testing.T) {
-	_, err := contenttype.LoadDefinitions("testdata/invalid/layout-contains-component")
-	if err == nil {
-		t.Fatal("LoadDefinitions() error = nil, want error for layout containing a component")
-	}
-}
 
 func TestLoadDefinitions_ComponentEmptyName(t *testing.T) {
 	_, err := contenttype.LoadDefinitions("testdata/invalid/component-empty-name")

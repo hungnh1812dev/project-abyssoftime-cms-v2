@@ -28,7 +28,7 @@ export function RepeatableComponentField({ name, label, depth = 0, keyPrefix: _k
   const style = getDepthStyle(depth);
 
   return (
-    <fieldset className={`rounded-md border p-4 ${style.border} ${style.bg}`}>
+    <fieldset className={`md:col-span-6 rounded-md border p-4 ${style.border} ${style.bg}`}>
       <legend className={`px-1 text-sm font-medium ${style.legend}`}>{label}</legend>
       <div className="space-y-4">
         {fields.map((item, index) => (
@@ -70,7 +70,7 @@ export function RepeatableComponentField({ name, label, depth = 0, keyPrefix: _k
                 </Button>
               </div>
             </div>
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
               {childFields.map((child, childIndex) => renderField(child, `${name}.${index}.`, depth + 1, childIndex))}
             </div>
           </div>

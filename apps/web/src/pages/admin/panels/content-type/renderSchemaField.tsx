@@ -27,23 +27,26 @@ function primitiveInput(field: FieldDefinition): React.ReactElement<Record<strin
   }
 }
 
+function widthToColSpan(width: string | undefined): string {
+  switch (width) {
+    case '50%':
+      return 'md:col-span-3';
+    case '1/3':
+      return 'md:col-span-2';
+    default:
+      return 'md:col-span-6';
+  }
+}
+
 const depthStyles = [
   { border: 'border-indigo-300 dark:border-indigo-700', bg: 'bg-indigo-50/50 dark:bg-indigo-950/20', legend: 'text-indigo-700 dark:text-indigo-300' },
   { border: 'border-violet-300 dark:border-violet-700', bg: 'bg-violet-50/50 dark:bg-violet-950/20', legend: 'text-violet-700 dark:text-violet-300' },
   { border: 'border-amber-300 dark:border-amber-700', bg: 'bg-amber-50/50 dark:bg-amber-950/20', legend: 'text-amber-700 dark:text-amber-300' },
 ] as const;
 
-function renderField(field: FieldDefinition, prefix: string, keyPrefix: string, depth: number, index: number): React.ReactNode {
+function renderField(field: FieldDefinition, prefix: string, keyPrefix: string, depth: number, _index: number): React.ReactNode {
   const fieldName = prefix + field.name;
-  const fieldKey = field.name ? `${keyPrefix}${field.name}` : `${keyPrefix}layout_${index}`;
-
-  if (field.type === 'layout') {
-    return (
-      <div key={fieldKey} className="grid gap-4 md:grid-cols-2">
-        {(field.fields ?? []).map((child, childIndex) => renderField(child, prefix, keyPrefix, depth, childIndex))}
-      </div>
-    );
-  }
+  const fieldKey = `${keyPrefix}${field.name}`;
 
   if (field.type === 'component') {
     const childKeyPrefix = `${fieldKey}_`;
@@ -63,16 +66,20 @@ function renderField(field: FieldDefinition, prefix: string, keyPrefix: string, 
     const childPrefix = fieldName + '.';
     const style = depthStyles[depth % depthStyles.length];
     return (
-      <fieldset key={fieldKey} className={`rounded-md border p-4 ${style.border} ${style.bg}`}>
+      <fieldset key={fieldKey} className={`md:col-span-6 rounded-md border p-4 ${style.border} ${style.bg}`}>
         <legend className={`px-1 text-sm font-medium ${style.legend}`}>{field.name}</legend>
-        {(field.fields ?? []).map((child, childIndex) => renderField(child, childPrefix, childKeyPrefix, depth + 1, childIndex))}
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+          {(field.fields ?? []).map((child, childIndex) => renderField(child, childPrefix, childKeyPrefix, depth + 1, childIndex))}
+        </div>
       </fieldset>
     );
   }
 
+  const colSpan = widthToColSpan(field.width);
+
   if (field.type === 'json') {
     return (
-      <div key={fieldKey}>
+      <div key={fieldKey} className={colSpan}>
         <label className="mb-1 block text-sm font-medium">{field.name}</label>
         <Suspense fallback={<div className="bg-muted h-48 animate-pulse rounded-md" />}>
           <JsonInput name={fieldName} />
@@ -83,7 +90,7 @@ function renderField(field: FieldDefinition, prefix: string, keyPrefix: string, 
 
   if (field.type === 'richtext') {
     return (
-      <div key={fieldKey}>
+      <div key={fieldKey} className={colSpan}>
         <label className="mb-1 block text-sm font-medium">{field.name}</label>
         <Suspense fallback={<div className="bg-muted h-48 animate-pulse rounded-md" />}>
           <RichTextInput name={fieldName} />
@@ -94,7 +101,7 @@ function renderField(field: FieldDefinition, prefix: string, keyPrefix: string, 
 
   if (field.type === 'media') {
     return (
-      <div key={fieldKey}>
+      <div key={fieldKey} className={colSpan}>
         <label className="mb-1 block text-sm font-medium">{field.name}</label>
         <MediaInput name={fieldName} ext={field.ext} />
       </div>
@@ -102,7 +109,7 @@ function renderField(field: FieldDefinition, prefix: string, keyPrefix: string, 
   }
 
   return (
-    <div key={fieldKey}>
+    <div key={fieldKey} className={colSpan}>
       <label className="mb-1 block text-sm font-medium">{field.name}</label>
       <FormField name={fieldName}>{primitiveInput(field)}</FormField>
     </div>

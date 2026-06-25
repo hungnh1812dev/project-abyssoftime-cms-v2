@@ -140,6 +140,29 @@ Spec: [specs/health-ping.md](../specs/health-ping.md). Plan: [plan.md](plan.md) 
 
 ---
 
+## Phase LW — Remove Layout + Add Field Width
+
+Spec: [specs/remove-layout-add-field-width.md](../specs/remove-layout-add-field-width.md).
+
+- [x] T1.1 Add `Width` to `FieldDefinition` entity
+- [x] T1.2 Remove layout validation from schema loader
+- [x] T1.3 Add `Width` to `fieldsEqual()` in sync engine
+- [x] T1.4 Remove layout tests + fixtures
+- [x] ✅ Checkpoint 1: `go vet` + `go test content_type`
+- [x] T2.1–2.3 Migrate all content-type JSON files (cv-contact, en-vocab-pack, cv-page)
+- [x] ✅ Checkpoint 2: JSON parsing verified
+- [x] T3.1–3.5 Remove all backend layout code (flattenLayoutFields, flattenLayoutFieldsDef, handler/usecase/GraphQL branches)
+- [x] T3.6 Update backend tests (rewrite layout tests → width tests, delete GraphQL layout test)
+- [x] ✅ Checkpoint 3: `go vet` + `go test` + `go build` all pass, zero `"layout"` references in Go
+- [x] T4.1–4.2 Update FE types + remove `flattenFields`
+- [x] T4.3–4.4 Update `renderSchemaField` (width-based col-span) + grid containers (ContentTypeBuilder, RepeatableComponentField)
+- [x] T4.5 Update frontend tests (replace layout test with width test)
+- [x] ✅ Checkpoint 4: `npm run lint` + `npm run build` + `vitest run` (199 pass)
+- [x] T5.1–5.3 Update rules documentation (content-type-parsing, content, frontend)
+- [x] ✅ Checkpoint 5 (Final): full verification pass
+
+---
+
 ## Archive Index
 
 | Archive | Phases | Status |

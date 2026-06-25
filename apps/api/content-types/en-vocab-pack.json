@@ -3,13 +3,8 @@
   "name": "English Vocabulary",
   "kind": "collection",
   "fields": [
-    {
-      "type": "layout",
-      "fields": [
-        { "name": "packName", "type": "text" },
-        { "name": "packTitle", "type": "text" }
-      ]
-    },
+    { "name": "packName", "type": "text", "width": "50%" },
+    { "name": "packTitle", "type": "text", "width": "50%" },
     { "name": "words", "type": "json" }
   ]
 }

@@ -27,23 +27,19 @@ describe('ContentTypeBuilder — primitives', () => {
   });
 });
 
-describe('ContentTypeBuilder — layout', () => {
-  it('renders a 2-col grid for type=layout', () => {
+describe('ContentTypeBuilder — width', () => {
+  it('renders fields in a 6-column grid with correct col-span classes', () => {
     const schema: FieldDefinition[] = [
-      {
-        name: 'section',
-        type: 'layout',
-        fields: [
-          { name: 'left', type: 'text' },
-          { name: 'right', type: 'text' },
-        ],
-      },
+      { name: 'fullWidth', type: 'text' },
+      { name: 'half', type: 'text', width: '50%' },
+      { name: 'third', type: 'text', width: '1/3' },
     ];
     const { container } = renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} />);
-    const grid = container.querySelector('.grid');
+    const grid = container.querySelector('.md\\:grid-cols-6');
     expect(grid).toBeInTheDocument();
-    expect(screen.getByLabelText('left')).toBeInTheDocument();
-    expect(screen.getByLabelText('right')).toBeInTheDocument();
+    expect(screen.getByLabelText('fullWidth').closest('.md\\:col-span-6')).toBeInTheDocument();
+    expect(screen.getByLabelText('half').closest('.md\\:col-span-3')).toBeInTheDocument();
+    expect(screen.getByLabelText('third').closest('.md\\:col-span-2')).toBeInTheDocument();
   });
 });
 

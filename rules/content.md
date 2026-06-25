@@ -20,10 +20,12 @@ type FieldDefinition struct {
     Name       string            `json:"name"`
     Type       string            `json:"type"`
     Ext        []string          `json:"ext,omitempty"`
+    Width      string            `json:"width,omitempty"`
     Repeatable bool              `json:"repeatable,omitempty"`
     Fields     []FieldDefinition `json:"fields,omitempty"`
 }
 ```
+- `Width`: UI hint for form column span (`"100%"`, `"50%"`, `"1/3"`). Defaults to `"100%"` when omitted. No effect on storage.
 - `type` values: `text`, `richtext`, `number`, `boolean`, `media`, `json`, `component`
 - `repeatable` only valid on `type: "component"` — ignored on other types
 - Maximum nesting depth: 3 levels — fatal error on startup if exceeded
