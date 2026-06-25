@@ -95,11 +95,7 @@ func (h *ContentTypeHandler) UpdateListFields(ginCtx *gin.Context) {
 
 	fieldNames := make(map[string]bool, len(contentType.Fields))
 	for _, field := range contentType.Fields {
-		if field.Type == "layout" {
-			for _, child := range field.Fields {
-				fieldNames[child.Name] = true
-			}
-		} else if field.Type != "component" {
+		if field.Type != "component" {
 			fieldNames[field.Name] = true
 		}
 	}

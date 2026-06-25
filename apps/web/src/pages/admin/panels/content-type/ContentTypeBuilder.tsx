@@ -34,7 +34,7 @@ export function ContentTypeBuilder({ contentTypeSlug, schema, query, mutationFn,
         <FormActions renderActions={renderActions} />
         <Card>
           <CardContent>
-            <div className="space-y-4">{schema.map((field, index) => renderSchemaField(field, '', keyPrefix, index))}</div>
+            <div className="grid grid-cols-1 md:grid-cols-6 gap-4">{schema.map((field, index) => renderSchemaField(field, '', keyPrefix, index))}</div>
           </CardContent>
         </Card>
       </div>

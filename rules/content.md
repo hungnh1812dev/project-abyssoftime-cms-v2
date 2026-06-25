@@ -20,10 +20,12 @@ type FieldDefinition struct {
     Name       string            `json:"name"`
     Type       string            `json:"type"`
     Ext        []string          `json:"ext,omitempty"`
+    Width      string            `json:"width,omitempty"`
     Repeatable bool              `json:"repeatable,omitempty"`
     Fields     []FieldDefinition `json:"fields,omitempty"`
 }
 ```
+- `Width`: UI hint for form column span (`"100%"`, `"50%"`, `"1/3"`). Defaults to `"100%"` when omitted. No effect on storage.
 - `type` values: `text`, `richtext`, `number`, `boolean`, `media`, `json`, `component`
 - `repeatable` only valid on `type: "component"` — ignored on other types
 - Maximum nesting depth: 3 levels — fatal error on startup if exceeded
@@ -381,6 +383,7 @@ gorm_id, component_id, parent_component_id, version, locale, sort_order, <fields
 | **Always** | Route GraphQL through the same usecase — no logic in resolvers |
 | **Always** | Default `repeatable` to `false` when omitted |
 | **Always** | Validate data shape at usecase (object vs array based on repeatable) |
+| **Always** | Sanitize field values before save: coerce `""` to nil for number, boolean, media fields |
 | **Always** | Preserve `sort_order` through save→publish→read cycle |
 | **Always** | Chain key is `(locale, FK_ID)` for all component operations |
 | **Always** | Max 3 levels of component nesting; fatal error if exceeded |

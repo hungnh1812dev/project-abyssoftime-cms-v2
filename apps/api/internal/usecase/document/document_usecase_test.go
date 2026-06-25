@@ -1094,3 +1094,137 @@ func TestDelete_DeletesAllLocales(t *testing.T) {
 		}
 	}
 }
+
+func TestSave_SanitizesEmptyStringOnNumberField(t *testing.T) {
+	repo := &repomock.DocumentRepository{}
+	repo.FindDraftByDocumentIDFn = func(_ context.Context, _, _, _ string) (*entity.Document, error) {
+		return nil, pkgerrors.ErrNotFound
+	}
+	var upserted *entity.Document
+	repo.UpsertDraftFn = func(_ context.Context, _ string, doc *entity.Document) error {
+		upserted = doc
+		return nil
+	}
+
+	fields := []entity.FieldDefinition{
+		{Name: "title", Type: "text"},
+		{Name: "count", Type: "number"},
+		{Name: "active", Type: "boolean"},
+		{Name: "avatar", Type: "media"},
+		{Name: "metadata", Type: "json"},
+	}
+	doc := &entity.Document{
+		Fields: map[string]any{
+			"title":    "",
+			"count":    "",
+			"active":   "",
+			"avatar":   "",
+			"metadata": "",
+		},
+	}
+
+	uc := docuc.New(repo, nil, &repomock.MediaAssetRepository{}, supportedLocales)
+	_, err := uc.Save(ctx, testSlug, doc, fields, "user-1")
+	if err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+	if upserted.Fields["title"] != "" {
+		t.Errorf("title = %v, want empty string (text fields preserve empty strings)", upserted.Fields["title"])
+	}
+	if upserted.Fields["count"] != nil {
+		t.Errorf("count = %v, want nil (number fields coerce empty string to nil)", upserted.Fields["count"])
+	}
+	if upserted.Fields["active"] != nil {
+		t.Errorf("active = %v, want nil (boolean fields coerce empty string to nil)", upserted.Fields["active"])
+	}
+	if upserted.Fields["avatar"] != nil {
+		t.Errorf("avatar = %v, want nil (media fields coerce empty string to nil)", upserted.Fields["avatar"])
+	}
+	if upserted.Fields["metadata"] != nil {
+		t.Errorf("metadata = %v, want nil (json fields coerce empty string to nil)", upserted.Fields["metadata"])
+	}
+}
+
+func TestSave_SanitizesEmptyStringInsideComponent(t *testing.T) {
+	repo := &repomock.DocumentRepository{}
+	repo.FindDraftByDocumentIDFn = func(_ context.Context, _, _, _ string) (*entity.Document, error) {
+		return nil, pkgerrors.ErrNotFound
+	}
+	repo.UpsertDraftFn = func(_ context.Context, _ string, _ *entity.Document) error { return nil }
+
+	var savedComps []*entity.Component
+	compRepo := &repomock.ComponentRepository{}
+	compRepo.UpsertAllFn = func(_ context.Context, _, _, _, _ string, _ entity.DocumentVersion, comps []*entity.Component) error {
+		savedComps = comps
+		return nil
+	}
+
+	fields := []entity.FieldDefinition{
+		{
+			Name: "banner",
+			Type: "component",
+			Fields: []entity.FieldDefinition{
+				{Name: "subtitle", Type: "text"},
+				{Name: "rating", Type: "number"},
+			},
+		},
+	}
+	doc := &entity.Document{
+		Fields: map[string]any{
+			"banner": map[string]any{
+				"subtitle": "",
+				"rating":   "",
+			},
+		},
+	}
+
+	uc := docuc.New(repo, compRepo, &repomock.MediaAssetRepository{}, supportedLocales)
+	_, err := uc.Save(ctx, testSlug, doc, fields, "user-1")
+	if err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+	if len(savedComps) != 1 {
+		t.Fatalf("saved %d components, want 1", len(savedComps))
+	}
+	if savedComps[0].Fields["subtitle"] != "" {
+		t.Errorf("subtitle = %v, want empty string", savedComps[0].Fields["subtitle"])
+	}
+	if savedComps[0].Fields["rating"] != nil {
+		t.Errorf("rating = %v, want nil", savedComps[0].Fields["rating"])
+	}
+}
+
+func TestSave_SanitizesMediaObjectToDocumentID(t *testing.T) {
+	repo := &repomock.DocumentRepository{}
+	repo.FindDraftByDocumentIDFn = func(_ context.Context, _, _, _ string) (*entity.Document, error) {
+		return nil, pkgerrors.ErrNotFound
+	}
+	var upserted *entity.Document
+	repo.UpsertDraftFn = func(_ context.Context, _ string, doc *entity.Document) error {
+		upserted = doc
+		return nil
+	}
+
+	fields := []entity.FieldDefinition{
+		{Name: "avatar", Type: "media"},
+	}
+	doc := &entity.Document{
+		Fields: map[string]any{
+			"avatar": map[string]any{
+				"documentId":   "abc-123",
+				"url":          "https://example.com/photo.jpg",
+				"thumbnailUrl": "https://example.com/photo_thumb.jpg",
+				"fileName":     "photo.jpg",
+			},
+		},
+	}
+
+	uc := docuc.New(repo, nil, &repomock.MediaAssetRepository{}, supportedLocales)
+	_, err := uc.Save(ctx, testSlug, doc, fields, "user-1")
+	if err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+	if upserted.Fields["avatar"] != "abc-123" {
+		t.Errorf("avatar = %v, want %q (media object should be reduced to documentId)", upserted.Fields["avatar"], "abc-123")
+	}
+}

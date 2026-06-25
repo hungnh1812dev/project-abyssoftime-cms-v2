@@ -467,7 +467,7 @@ func TestDocumentRepository_EnsureCollection_IgnoresRemovedField(t *testing.T) {
 	}
 }
 
-func TestDocumentRepository_LayoutFieldsRoundTrip(t *testing.T) {
+func TestDocumentRepository_WidthFieldsRoundTrip(t *testing.T) {
 	db, err := NewClient("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
@@ -475,19 +475,13 @@ func TestDocumentRepository_LayoutFieldsRoundTrip(t *testing.T) {
 	repo := NewDocumentRepository(db)
 	ctx := context.Background()
 
-	layoutFields := []entity.FieldDefinition{
-		{
-			Name: "layout",
-			Type: "layout",
-			Fields: []entity.FieldDefinition{
-				{Name: "packName", Type: "text"},
-				{Name: "packTitle", Type: "text"},
-			},
-		},
+	widthFields := []entity.FieldDefinition{
+		{Name: "packName", Type: "text", Width: "50%"},
+		{Name: "packTitle", Type: "text", Width: "50%"},
 		{Name: "words", Type: "json"},
 	}
 
-	if err := repo.EnsureCollection(ctx, "en-vocab-pack", layoutFields); err != nil {
+	if err := repo.EnsureCollection(ctx, "en-vocab-pack", widthFields); err != nil {
 		t.Fatalf("EnsureCollection: %v", err)
 	}
 
@@ -523,7 +517,6 @@ func TestDocumentRepository_LayoutFieldsRoundTrip(t *testing.T) {
 		t.Errorf("packTitle = %v, want %q", got, "Title 1")
 	}
 
-	// Update and verify round-trip
 	doc.Fields["packName"] = "Pack 2"
 	doc.Fields["packTitle"] = "Title 2"
 	if err := repo.UpsertDraft(ctx, "en-vocab-pack", doc); err != nil {
@@ -542,7 +535,7 @@ func TestDocumentRepository_LayoutFieldsRoundTrip(t *testing.T) {
 	}
 }
 
-func TestDocumentRepository_LayoutFieldsMigrateExistingTable(t *testing.T) {
+func TestDocumentRepository_WidthFieldsMigrateExistingTable(t *testing.T) {
 	db, err := NewClient("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
@@ -550,37 +543,27 @@ func TestDocumentRepository_LayoutFieldsMigrateExistingTable(t *testing.T) {
 	repo := NewDocumentRepository(db)
 	ctx := context.Background()
 
-	// Simulate old code: table created with layout field skipped entirely
 	oldSQL := fmt.Sprintf("CREATE TABLE %s (gorm_id INTEGER PRIMARY KEY AUTOINCREMENT, document_id TEXT, version TEXT, locale TEXT, words TEXT, created_at TIMESTAMP, updated_at TIMESTAMP, published_at TIMESTAMP, created_by TEXT, updated_by TEXT, published_by TEXT)",
 		documentTableName("en-vocab-pack"))
 	if err := db.Exec(oldSQL).Error; err != nil {
 		t.Fatalf("create old table: %v", err)
 	}
 
-	// Insert a document using old schema (no pack_name, pack_title columns)
 	insertSQL := fmt.Sprintf("INSERT INTO %s (document_id, version, locale, words, created_at, updated_at, created_by, updated_by) VALUES ('d1', 'draft', 'en', '[\"hello\"]', datetime('now'), datetime('now'), 'u1', 'u1')",
 		documentTableName("en-vocab-pack"))
 	if err := db.Exec(insertSQL).Error; err != nil {
 		t.Fatalf("insert: %v", err)
 	}
 
-	// Now call EnsureCollection with layout fields (simulates restart with fix)
-	layoutFields := []entity.FieldDefinition{
-		{
-			Name: "layout",
-			Type: "layout",
-			Fields: []entity.FieldDefinition{
-				{Name: "packName", Type: "text"},
-				{Name: "packTitle", Type: "text"},
-			},
-		},
+	widthFields := []entity.FieldDefinition{
+		{Name: "packName", Type: "text", Width: "50%"},
+		{Name: "packTitle", Type: "text", Width: "50%"},
 		{Name: "words", Type: "json"},
 	}
-	if err := repo.EnsureCollection(ctx, "en-vocab-pack", layoutFields); err != nil {
+	if err := repo.EnsureCollection(ctx, "en-vocab-pack", widthFields); err != nil {
 		t.Fatalf("EnsureCollection: %v", err)
 	}
 
-	// Verify columns were added
 	cols, err := existingColumns(db, documentTableName("en-vocab-pack"))
 	if err != nil {
 		t.Fatalf("existingColumns: %v", err)
@@ -592,7 +575,6 @@ func TestDocumentRepository_LayoutFieldsMigrateExistingTable(t *testing.T) {
 		t.Error("expected 'pack_title' column after migration")
 	}
 
-	// Update the existing document with layout field values
 	doc := &entity.Document{
 		DocumentID: "d1", Version: entity.VersionDraft,
 		Fields:    map[string]any{"packName": "New Pack", "packTitle": "New Title", "words": `["hello"]`},
@@ -604,7 +586,6 @@ func TestDocumentRepository_LayoutFieldsMigrateExistingTable(t *testing.T) {
 		t.Fatalf("UpsertDraft: %v", err)
 	}
 
-	// Read back and verify
 	found, err := repo.FindDraftByDocumentID(ctx, "en-vocab-pack", "d1", "en")
 	if err != nil {
 		t.Fatalf("FindDraftByDocumentID: %v", err)

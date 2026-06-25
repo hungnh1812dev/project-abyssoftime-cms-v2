@@ -1,8 +1,0 @@
-{
-  "slug": "bad-layout-empty",
-  "name": "Bad Layout",
-  "kind": "single",
-  "fields": [
-    { "name": "section", "type": "layout", "fields": [] }
-  ]
-}

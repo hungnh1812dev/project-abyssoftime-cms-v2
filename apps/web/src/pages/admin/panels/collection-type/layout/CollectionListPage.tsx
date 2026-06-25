@@ -11,7 +11,7 @@ import { useLocales } from '@/hooks/useLocales';
 import { getRegistration, type CollectionColumnDef } from '@/content-type-registry';
 import { ColumnChooserDialog } from '@/components/collection/ColumnChooserDialog';
 import { LocaleSelector } from '@/components/locale/LocaleSelector';
-import { flattenFields, type ContentType, type Document, type FieldDefinition } from '@/types/cms';
+import { type ContentType, type Document, type FieldDefinition } from '@/types/cms';
 import { Pencil, Trash2, Copy, ArrowUpDown, ArrowUp, ArrowDown, Settings2 } from 'lucide-react';
 import { Breadcrumb } from '@/components/ui/breadcrumb';
 
@@ -26,7 +26,7 @@ function deriveColumns(contentType: ContentType): CollectionColumnDef[] {
   if (registration?.columns) return registration.columns;
 
   const listFieldNames = (contentType.listFields ?? []).filter((name) => !SYSTEM_FIELD_KEYS.has(name));
-  const fields = flattenFields(contentType.Fields ?? []);
+  const fields = contentType.Fields ?? [];
   const fieldMap = new Map<string, FieldDefinition>();
   for (const field of fields) fieldMap.set(field.name, field);
 
