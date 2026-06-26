@@ -67,6 +67,16 @@ func TestFilterFieldToColumn_ContentField(t *testing.T) {
 	}
 }
 
+func TestFilterFieldToColumn_CamelCaseContentField(t *testing.T) {
+	col, ok := filterFieldToColumn("isMain")
+	if !ok {
+		t.Error("filterFieldToColumn(isMain) not ok")
+	}
+	if col != "is_main" {
+		t.Errorf("filterFieldToColumn(isMain) = %q, want is_main", col)
+	}
+}
+
 func TestFilterFieldToColumn_InvalidChars(t *testing.T) {
 	_, ok := filterFieldToColumn("title; DROP TABLE")
 	if ok {

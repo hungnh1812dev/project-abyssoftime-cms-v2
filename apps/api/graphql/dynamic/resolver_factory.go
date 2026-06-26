@@ -596,6 +596,16 @@ func (f *ResolverFactory) resolveMediaField(ctx context.Context, value any) any 
 	if value == nil {
 		return nil
 	}
+	if asset, ok := value.(*entity.MediaAsset); ok {
+		return map[string]any{
+			"documentId":   asset.DocumentID,
+			"url":          asset.URL,
+			"thumbnailUrl": asset.ThumbnailURL,
+			"fileName":     asset.FileName,
+			"width":        asset.Width,
+			"height":       asset.Height,
+		}
+	}
 	docID, ok := value.(string)
 	if !ok || docID == "" {
 		return nil
