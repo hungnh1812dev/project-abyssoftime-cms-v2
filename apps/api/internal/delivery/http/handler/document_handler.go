@@ -25,7 +25,7 @@ type documentUseCase interface {
 	SaveSingleType(ctx context.Context, contentTypeSlug string, data map[string]any, locale string, fields []entity.FieldDefinition, userID string) (*entity.Document, error)
 	PublishSingleType(ctx context.Context, contentTypeSlug, locale string, fields []entity.FieldDefinition, userID string) error
 	UnpublishSingleType(ctx context.Context, contentTypeSlug, locale string, fields []entity.FieldDefinition) error
-	GetAllPaginated(ctx context.Context, contentTypeSlug string, start, size int, locale string, fields []entity.FieldDefinition, orderBy string, sortDir int) ([]*entity.Document, []string, int64, error)
+	GetAllPaginated(ctx context.Context, contentTypeSlug string, start, size int, locale string, fields []entity.FieldDefinition, orderBy string, sortDir int, filters []entity.FilterNode) ([]*entity.Document, []string, int64, error)
 }
 
 type documentContentTypeUseCase interface {
@@ -278,7 +278,7 @@ func (h *DocumentHandler) ListCollection(ginCtx *gin.Context) {
 		}
 	}
 
-	docs, statuses, total, err := h.usecase.GetAllPaginated(ginCtx.Request.Context(), slug, start, size, ginCtx.Query("locale"), ct.Fields, orderBy, sortDir)
+	docs, statuses, total, err := h.usecase.GetAllPaginated(ginCtx.Request.Context(), slug, start, size, ginCtx.Query("locale"), ct.Fields, orderBy, sortDir, nil)
 	if err != nil {
 		ginWriteErr(ginCtx, err)
 		return

@@ -163,6 +163,24 @@ Spec: [specs/remove-layout-add-field-width.md](../specs/remove-layout-add-field-
 
 ---
 
+## Phase GF — GraphQL Collection Filters
+
+Spec: [specs/graphql-collection-filters.md](../specs/graphql-collection-filters.md).
+
+- [x] T1 Domain entity `filter.go` (FilterNode, FieldFilter, FilterOperator)
+- [x] T2 Signature propagation across all layers (repo → mock → GORM → MongoDB → usecase → handlers → tests)
+- [x] ✅ Checkpoint 1: `go vet` + `go test` green
+- [x] T3 GORM filter engine (`applyFilters` + `filterFieldToColumn`)
+- [x] T4 MongoDB filter engine (`buildMongoFilter` + `mongoFieldKey`)
+- [x] ✅ Checkpoint 2: `go vet` + `go test` green
+- [x] T5 GraphQL schema + resolver wiring (base filter types, `writeFilterType`, `buildFilterInputType`, `parseFilters`)
+- [x] T6 New tests: filter parsing (9 tests) + GORM filter builder (11 tests)
+- [x] ✅ Checkpoint 3: `go vet` + `go test` green
+- [x] T7 Update existing schema builder tests + `rules/content.md`
+- [x] ✅ Checkpoint 4 (Final): `go vet` + `go test` + `go build` all pass
+
+---
+
 ## Archive Index
 
 | Archive | Phases | Status |

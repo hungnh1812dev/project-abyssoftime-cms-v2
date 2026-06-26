@@ -13,6 +13,96 @@ import (
 	pkgerrors "project-abyssoftime-cms-v2/api/pkg/errors"
 )
 
+var mongoSystemFields = map[string]string{
+	"documentId":  "documentId",
+	"createdAt":   "createdAt",
+	"updatedAt":   "updatedAt",
+	"publishedAt": "publishedAt",
+}
+
+var mongoOperatorMap = map[entity.FilterOperator]string{
+	entity.FilterOpEq:    "$eq",
+	entity.FilterOpNe:    "$ne",
+	entity.FilterOpIn:    "$in",
+	entity.FilterOpNotIn: "$nin",
+}
+
+func mongoFieldKey(field string) string {
+	if key, ok := mongoSystemFields[field]; ok {
+		return key
+	}
+	return "data." + field
+}
+
+func buildMongoFilter(filters []entity.FilterNode) bson.M {
+	if len(filters) == 0 {
+		return bson.M{}
+	}
+	conditions := make([]bson.M, 0, len(filters))
+	for _, node := range filters {
+		cond := buildMongoFilterNode(node)
+		if len(cond) > 0 {
+			conditions = append(conditions, cond)
+		}
+	}
+	if len(conditions) == 0 {
+		return bson.M{}
+	}
+	if len(conditions) == 1 {
+		return conditions[0]
+	}
+	return bson.M{"$and": conditions}
+}
+
+func buildMongoFilterNode(node entity.FilterNode) bson.M {
+	if node.Field != nil {
+		key := mongoFieldKey(node.Field.Field)
+		oper, ok := mongoOperatorMap[node.Field.Operator]
+		if !ok {
+			return bson.M{}
+		}
+		return bson.M{key: bson.M{oper: node.Field.Value}}
+	}
+
+	if len(node.And) > 0 {
+		children := make([]bson.M, 0, len(node.And))
+		for _, child := range node.And {
+			cond := buildMongoFilterNode(child)
+			if len(cond) > 0 {
+				children = append(children, cond)
+			}
+		}
+		if len(children) == 0 {
+			return bson.M{}
+		}
+		return bson.M{"$and": children}
+	}
+
+	if len(node.Or) > 0 {
+		children := make([]bson.M, 0, len(node.Or))
+		for _, child := range node.Or {
+			cond := buildMongoFilterNode(child)
+			if len(cond) > 0 {
+				children = append(children, cond)
+			}
+		}
+		if len(children) == 0 {
+			return bson.M{}
+		}
+		return bson.M{"$or": children}
+	}
+
+	if node.Not != nil {
+		inner := buildMongoFilterNode(*node.Not)
+		if len(inner) == 0 {
+			return bson.M{}
+		}
+		return bson.M{"$nor": []bson.M{inner}}
+	}
+
+	return bson.M{}
+}
+
 var _ repository.DocumentRepository = (*documentRepository)(nil)
 
 type documentRepository struct {
@@ -115,9 +205,14 @@ func resolveBsonSortKey(orderBy string) string {
 	return "createdAt"
 }
 
-func (r *documentRepository) FindDraftsByContentTypePaginated(ctx context.Context, contentTypeSlug string, start, size int, locale, orderBy string, sortDir int) ([]*entity.Document, int64, error) {
+func (r *documentRepository) FindDraftsByContentTypePaginated(ctx context.Context, contentTypeSlug string, start, size int, locale, orderBy string, sortDir int, filters []entity.FilterNode) ([]*entity.Document, int64, error) {
 	col := r.collection(contentTypeSlug)
 	filter := bson.M{"version": entity.VersionDraft, "locale": locale}
+	if extra := buildMongoFilter(filters); len(extra) > 0 {
+		for key, val := range extra {
+			filter[key] = val
+		}
+	}
 
 	total, err := col.CountDocuments(ctx, filter)
 	if err != nil {
@@ -141,9 +236,14 @@ func (r *documentRepository) FindDraftsByContentTypePaginated(ctx context.Contex
 	return results, total, nil
 }
 
-func (r *documentRepository) FindPublishedByContentTypePaginated(ctx context.Context, contentTypeSlug string, start, size int, locale, orderBy string, sortDir int) ([]*entity.Document, int64, error) {
+func (r *documentRepository) FindPublishedByContentTypePaginated(ctx context.Context, contentTypeSlug string, start, size int, locale, orderBy string, sortDir int, filters []entity.FilterNode) ([]*entity.Document, int64, error) {
 	col := r.collection(contentTypeSlug)
 	filter := bson.M{"version": entity.VersionPublished, "locale": locale}
+	if extra := buildMongoFilter(filters); len(extra) > 0 {
+		for key, val := range extra {
+			filter[key] = val
+		}
+	}
 
 	total, err := col.CountDocuments(ctx, filter)
 	if err != nil {

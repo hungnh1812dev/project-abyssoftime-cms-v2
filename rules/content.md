@@ -204,10 +204,14 @@ type Component struct {
 
 ### 6.1 Schema Generation
 - Dynamic per content-type at startup (after sync)
-- Collection type → `Query.<slug>(Id: ID!, locale: String, status: String)` + `Query.<slugList>(...)`
+- Collection type → `Query.<slug>(Id: ID!, locale: String, status: String)` + `Query.<slugList>(filters: [<Type>Filter!], ...)`
 - Single type → `Query.<slug>(locale: String, status: String)`
 - Queries default to published; `status: "draft"` opt-in for authenticated users
 - Response wrappers removed — nullable single, `[Type!]!` list
+- Base filter input types defined in base schema: `IDFilter`, `StringFilter`, `NumberFilter`, `BooleanFilter`, `TimeFilter`
+- Per-type `<Type>Filter` includes: `documentId` (IDFilter), `createdAt`/`updatedAt`/`publishedAt` (TimeFilter), content fields, `and`/`or`/`not` combinators
+- `filters` argument is an array — items are implicitly ANDed
+- Supported operators: `eq`, `ne`, `in`, `notIn`
 
 ### 6.2 Field Type Mapping
 | Content Type | GraphQL Type |
@@ -225,6 +229,7 @@ type Component struct {
 - Type: PascalCase of slug (`blog-posts` → `BlogPost`)
 - Input: `<Type>Input`
 - Filter: `<Type>Filter`
+- Base filters: `IDFilter`, `StringFilter`, `NumberFilter`, `BooleanFilter`, `TimeFilter`
 - OrderBy: `<Type>OrderBy`
 - Component: `<ContentType><ComponentName>` (e.g., `BlogPostBanner`)
 - Query single: camelCase (`blogPost`)
@@ -403,6 +408,12 @@ gorm_id, component_id, parent_component_id, version, locale, sort_order, <fields
 | **Never** | Define `listFields` in JSON schema files |
 | **Never** | Let sync overwrite user-configured `listFields` |
 | **Never** | Filter on repeatable component sub-fields in GraphQL |
+| **Never** | Allow filtering on `component`, `media`, or `json` fields in GraphQL |
+| **Never** | Build SQL with string concatenation of user-provided filter values |
+| **Always** | Validate filter field names against known content fields + system fields |
+| **Always** | Use parameterized queries for all filter conditions |
+| **Always** | Map filter field names to correct column/key names per DB adapter |
 | **Ask first** | Changing default `size` or max from 100 |
 | **Ask first** | Increasing max nesting depth beyond 3 |
 | **Ask first** | Adding indexes on `parent_component_id` |
+| **Ask first** | Adding new filter operators beyond `eq`, `ne`, `in`, `notIn` |
