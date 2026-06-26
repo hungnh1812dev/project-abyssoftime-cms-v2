@@ -141,7 +141,7 @@ func TestDocumentRepository_FindDraftsByContentTypePaginated(t *testing.T) {
 		_ = repo.UpsertDraft(ctx, "blog", doc)
 	}
 
-	docs, total, err := repo.FindDraftsByContentTypePaginated(ctx, "blog", 0, 2, "en", "createdAt", -1)
+	docs, total, err := repo.FindDraftsByContentTypePaginated(ctx, "blog", 0, 2, "en", "createdAt", -1, nil)
 	if err != nil {
 		t.Fatalf("FindDraftsByContentTypePaginated: %v", err)
 	}
@@ -220,12 +220,12 @@ func TestDocumentRepository_DeleteAllByContentType(t *testing.T) {
 		t.Fatalf("DeleteAllByContentType: %v", err)
 	}
 
-	docs, total, _ := repo.FindDraftsByContentTypePaginated(ctx, "blog", 0, 100, "en", "createdAt", -1)
+	docs, total, _ := repo.FindDraftsByContentTypePaginated(ctx, "blog", 0, 100, "en", "createdAt", -1, nil)
 	if total != 0 || len(docs) != 0 {
 		t.Errorf("blog docs after delete: total=%d, len=%d", total, len(docs))
 	}
 
-	docs, total, _ = repo.FindDraftsByContentTypePaginated(ctx, "other", 0, 100, "en", "createdAt", -1)
+	docs, total, _ = repo.FindDraftsByContentTypePaginated(ctx, "other", 0, 100, "en", "createdAt", -1, nil)
 	if total != 1 {
 		t.Errorf("other docs after delete: total=%d, want 1", total)
 	}

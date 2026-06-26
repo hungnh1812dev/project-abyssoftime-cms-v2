@@ -15,8 +15,8 @@ type DocumentRepository struct {
 	UpsertDraftFn               func(ctx context.Context, contentTypeSlug string, doc *entity.Document) error
 	UpsertPublishedFn           func(ctx context.Context, contentTypeSlug string, doc *entity.Document) error
 	FindDraftsByContentTypeFn            func(ctx context.Context, contentTypeSlug string) ([]*entity.Document, error)
-	FindDraftsByContentTypePaginatedFn      func(ctx context.Context, contentTypeSlug string, start, size int, locale, orderBy string, sortDir int) ([]*entity.Document, int64, error)
-	FindPublishedByContentTypePaginatedFn  func(ctx context.Context, contentTypeSlug string, start, size int, locale, orderBy string, sortDir int) ([]*entity.Document, int64, error)
+	FindDraftsByContentTypePaginatedFn      func(ctx context.Context, contentTypeSlug string, start, size int, locale, orderBy string, sortDir int, filters []entity.FilterNode) ([]*entity.Document, int64, error)
+	FindPublishedByContentTypePaginatedFn  func(ctx context.Context, contentTypeSlug string, start, size int, locale, orderBy string, sortDir int, filters []entity.FilterNode) ([]*entity.Document, int64, error)
 	FindPublishedByDocumentIDsFn           func(ctx context.Context, contentTypeSlug string, documentIDs []string, locale string) ([]*entity.Document, error)
 	DeleteByDocumentIDFn                 func(ctx context.Context, contentTypeSlug, documentID, locale string) error
 	DeletePublishedByDocumentIDFn func(ctx context.Context, contentTypeSlug, documentID, locale string) error
@@ -47,12 +47,12 @@ func (m *DocumentRepository) FindDraftsByContentType(ctx context.Context, conten
 	return m.FindDraftsByContentTypeFn(ctx, contentTypeSlug)
 }
 
-func (m *DocumentRepository) FindDraftsByContentTypePaginated(ctx context.Context, contentTypeSlug string, start, size int, locale, orderBy string, sortDir int) ([]*entity.Document, int64, error) {
-	return m.FindDraftsByContentTypePaginatedFn(ctx, contentTypeSlug, start, size, locale, orderBy, sortDir)
+func (m *DocumentRepository) FindDraftsByContentTypePaginated(ctx context.Context, contentTypeSlug string, start, size int, locale, orderBy string, sortDir int, filters []entity.FilterNode) ([]*entity.Document, int64, error) {
+	return m.FindDraftsByContentTypePaginatedFn(ctx, contentTypeSlug, start, size, locale, orderBy, sortDir, filters)
 }
 
-func (m *DocumentRepository) FindPublishedByContentTypePaginated(ctx context.Context, contentTypeSlug string, start, size int, locale, orderBy string, sortDir int) ([]*entity.Document, int64, error) {
-	return m.FindPublishedByContentTypePaginatedFn(ctx, contentTypeSlug, start, size, locale, orderBy, sortDir)
+func (m *DocumentRepository) FindPublishedByContentTypePaginated(ctx context.Context, contentTypeSlug string, start, size int, locale, orderBy string, sortDir int, filters []entity.FilterNode) ([]*entity.Document, int64, error) {
+	return m.FindPublishedByContentTypePaginatedFn(ctx, contentTypeSlug, start, size, locale, orderBy, sortDir, filters)
 }
 
 func (m *DocumentRepository) FindPublishedByDocumentIDs(ctx context.Context, contentTypeSlug string, documentIDs []string, locale string) ([]*entity.Document, error) {

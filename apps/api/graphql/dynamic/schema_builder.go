@@ -25,6 +25,37 @@ enum SortOrder {
   DESC
 }
 
+input IDFilter {
+  eq: ID
+  ne: ID
+  in: [ID!]
+  notIn: [ID!]
+}
+
+input StringFilter {
+  eq: String
+  ne: String
+  in: [String!]
+  notIn: [String!]
+}
+
+input NumberFilter {
+  eq: Float
+  ne: Float
+  in: [Float!]
+  notIn: [Float!]
+}
+
+input BooleanFilter {
+  eq: Boolean
+  ne: Boolean
+}
+
+input TimeFilter {
+  eq: Time
+  ne: Time
+}
+
 type MediaAsset {
   documentId: ID!
   url: String!
@@ -104,7 +135,7 @@ func (b *SchemaBuilder) BuildContentTypeSDL(def contenttype.ContentTypeDefinitio
 		// Queries
 		sb.WriteString("extend type Query {\n")
 		fmt.Fprintf(&sb, "  %s(%sId: ID!, locale: String): %s\n", camel, camel, typeName)
-		fmt.Fprintf(&sb, "  %sList(where: %sFilter, orderBy: %sOrderBy, start: Int, size: Int, locale: String): [%s!]!\n", camel, typeName, typeName, typeName)
+		fmt.Fprintf(&sb, "  %sList(filters: [%sFilter!], orderBy: %sOrderBy, start: Int, size: Int, locale: String): [%s!]!\n", camel, typeName, typeName, typeName)
 		sb.WriteString("}\n\n")
 
 		// Mutations
@@ -160,19 +191,23 @@ func writeComponentType(sb *strings.Builder, parentType string, f entity.FieldDe
 
 func writeFilterType(sb *strings.Builder, typeName string, fields []entity.FieldDefinition) {
 	fmt.Fprintf(sb, "input %sFilter {\n", typeName)
-	for _, f := range fields {
-		switch f.Type {
+	sb.WriteString("  documentId: IDFilter\n")
+	sb.WriteString("  createdAt: TimeFilter\n")
+	sb.WriteString("  updatedAt: TimeFilter\n")
+	sb.WriteString("  publishedAt: TimeFilter\n")
+	for _, field := range fields {
+		switch field.Type {
 		case "text", "richtext":
-			fmt.Fprintf(sb, "  %s: StringFilter\n", f.Name)
+			fmt.Fprintf(sb, "  %s: StringFilter\n", field.Name)
 		case "number":
-			fmt.Fprintf(sb, "  %s: NumberFilter\n", f.Name)
+			fmt.Fprintf(sb, "  %s: NumberFilter\n", field.Name)
 		case "boolean":
-			fmt.Fprintf(sb, "  %s: BooleanFilter\n", f.Name)
+			fmt.Fprintf(sb, "  %s: BooleanFilter\n", field.Name)
 		}
 	}
-	fmt.Fprintf(sb, "  AND: [%sFilter!]\n", typeName)
-	fmt.Fprintf(sb, "  OR: [%sFilter!]\n", typeName)
-	fmt.Fprintf(sb, "  NOT: %sFilter\n", typeName)
+	fmt.Fprintf(sb, "  and: [%sFilter!]\n", typeName)
+	fmt.Fprintf(sb, "  or: [%sFilter!]\n", typeName)
+	fmt.Fprintf(sb, "  not: %sFilter\n", typeName)
 	sb.WriteString("}\n\n")
 }
 

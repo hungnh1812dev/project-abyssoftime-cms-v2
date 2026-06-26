@@ -33,6 +33,89 @@ func resolveGormSortClause(orderBy string, sortDir int) string {
 	return fmt.Sprintf("%s %s", col, dir)
 }
 
+var filterColumnMap = map[string]string{
+	"documentId":  "document_id",
+	"createdAt":   "created_at",
+	"updatedAt":   "updated_at",
+	"publishedAt": "published_at",
+}
+
+func filterFieldToColumn(field string) (string, bool) {
+	if col, ok := filterColumnMap[field]; ok {
+		return col, true
+	}
+	for _, char := range field {
+		if !((char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || (char >= '0' && char <= '9') || char == '_') {
+			return "", false
+		}
+	}
+	if len(field) == 0 {
+		return "", false
+	}
+	return field, true
+}
+
+func applyFilters(database *gorm.DB, filters []entity.FilterNode) *gorm.DB {
+	if len(filters) == 0 {
+		return database
+	}
+	for _, node := range filters {
+		database = applyFilterNode(database, node)
+	}
+	return database
+}
+
+func applyFilterNode(database *gorm.DB, node entity.FilterNode) *gorm.DB {
+	if node.Field != nil {
+		col, ok := filterFieldToColumn(node.Field.Field)
+		if !ok {
+			return database
+		}
+		switch node.Field.Operator {
+		case entity.FilterOpEq:
+			database = database.Where(fmt.Sprintf("%s = ?", col), node.Field.Value)
+		case entity.FilterOpNe:
+			database = database.Where(fmt.Sprintf("%s != ?", col), node.Field.Value)
+		case entity.FilterOpIn:
+			database = database.Where(fmt.Sprintf("%s IN (?)", col), node.Field.Value)
+		case entity.FilterOpNotIn:
+			database = database.Where(fmt.Sprintf("%s NOT IN (?)", col), node.Field.Value)
+		}
+		return database
+	}
+
+	if len(node.And) > 0 {
+		for _, child := range node.And {
+			database = applyFilterNode(database, child)
+		}
+		return database
+	}
+
+	if len(node.Or) > 0 {
+		combined := database.Session(&gorm.Session{NewDB: true})
+		for idx, child := range node.Or {
+			sub := database.Session(&gorm.Session{NewDB: true})
+			sub = applyFilterNode(sub, child)
+			if idx == 0 {
+				combined = sub
+			} else {
+				combined = combined.Or(sub)
+			}
+		}
+		database = database.Where(combined)
+		return database
+	}
+
+	if node.Not != nil {
+		sub := database.Session(&gorm.Session{NewDB: true})
+		sub = applyFilterNode(sub, *node.Not)
+		database = database.Not(sub)
+		return database
+	}
+
+	return database
+}
+
 var _ repository.DocumentRepository = (*documentRepository)(nil)
 
 type documentRepository struct {
@@ -337,10 +420,11 @@ func (r *documentRepository) FindDraftsByContentType(ctx context.Context, conten
 	return r.findMany(ctx, contentTypeSlug, q)
 }
 
-func (r *documentRepository) FindDraftsByContentTypePaginated(ctx context.Context, contentTypeSlug string, start, size int, locale, orderBy string, sortDir int) ([]*entity.Document, int64, error) {
+func (r *documentRepository) FindDraftsByContentTypePaginated(ctx context.Context, contentTypeSlug string, start, size int, locale, orderBy string, sortDir int, filters []entity.FilterNode) ([]*entity.Document, int64, error) {
 	var total int64
 	q := r.table(contentTypeSlug).WithContext(ctx).
 		Where("version = ? AND locale = ?", entity.VersionDraft, locale)
+	q = applyFilters(q, filters)
 
 	if err := q.Count(&total).Error; err != nil {
 		return nil, 0, err
@@ -357,10 +441,11 @@ func (r *documentRepository) FindDraftsByContentTypePaginated(ctx context.Contex
 	return docs, total, nil
 }
 
-func (r *documentRepository) FindPublishedByContentTypePaginated(ctx context.Context, contentTypeSlug string, start, size int, locale, orderBy string, sortDir int) ([]*entity.Document, int64, error) {
+func (r *documentRepository) FindPublishedByContentTypePaginated(ctx context.Context, contentTypeSlug string, start, size int, locale, orderBy string, sortDir int, filters []entity.FilterNode) ([]*entity.Document, int64, error) {
 	var total int64
 	q := r.table(contentTypeSlug).WithContext(ctx).
 		Where("version = ? AND locale = ?", entity.VersionPublished, locale)
+	q = applyFilters(q, filters)
 
 	if err := q.Count(&total).Error; err != nil {
 		return nil, 0, err
