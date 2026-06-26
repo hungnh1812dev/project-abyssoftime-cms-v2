@@ -52,7 +52,7 @@ func filterFieldToColumn(field string) (string, bool) {
 	if len(field) == 0 {
 		return "", false
 	}
-	return field, true
+	return toSnakeCase(field), true
 }
 
 func applyFilters(database *gorm.DB, filters []entity.FilterNode) *gorm.DB {
