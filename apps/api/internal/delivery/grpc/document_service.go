@@ -22,7 +22,7 @@ type documentUseCase interface {
 	SaveSingleType(ctx context.Context, contentTypeSlug string, data map[string]any, locale string, fields []entity.FieldDefinition, userID string) (*entity.Document, error)
 	PublishSingleType(ctx context.Context, contentTypeSlug, locale string, fields []entity.FieldDefinition, userID string) error
 	UnpublishSingleType(ctx context.Context, contentTypeSlug, locale string, fields []entity.FieldDefinition) error
-	GetAllPaginated(ctx context.Context, contentTypeSlug string, start, size int, locale string, fields []entity.FieldDefinition, orderBy string, sortDir int) ([]*entity.Document, []string, int64, error)
+	GetAllPaginated(ctx context.Context, contentTypeSlug string, start, size int, locale string, fields []entity.FieldDefinition, orderBy string, sortDir int, filters []entity.FilterNode) ([]*entity.Document, []string, int64, error)
 }
 
 type DocumentServiceServer struct {
@@ -43,7 +43,7 @@ func (server *DocumentServiceServer) GetDocument(ctx context.Context, req *pb.Ge
 }
 
 func (server *DocumentServiceServer) ListDocuments(ctx context.Context, req *pb.ListDocumentsRequest) (*pb.ListDocumentsResponse, error) {
-	docs, _, total, err := server.usecase.GetAllPaginated(ctx, req.ContentTypeSlug, int(req.Start), int(req.Size), req.Locale, nil, "createdAt", -1)
+	docs, _, total, err := server.usecase.GetAllPaginated(ctx, req.ContentTypeSlug, int(req.Start), int(req.Size), req.Locale, nil, "createdAt", -1, nil)
 	if err != nil {
 		return nil, toGRPCError(err)
 	}

@@ -60,7 +60,7 @@ func (m *mockDocumentUC) PublishSingleType(ctx context.Context, s, l string, _ [
 func (m *mockDocumentUC) UnpublishSingleType(ctx context.Context, s, l string, _ []entity.FieldDefinition) error {
 	return m.unpublishSingleTypeFn(ctx, s, l)
 }
-func (m *mockDocumentUC) GetAllPaginated(ctx context.Context, s string, start, size int, l string, _ []entity.FieldDefinition, orderBy string, sortDir int) ([]*entity.Document, []string, int64, error) {
+func (m *mockDocumentUC) GetAllPaginated(ctx context.Context, s string, start, size int, l string, _ []entity.FieldDefinition, orderBy string, sortDir int, _ []entity.FilterNode) ([]*entity.Document, []string, int64, error) {
 	return m.getAllPaginatedFn(ctx, s, start, size, l, orderBy, sortDir)
 }
 func (m *mockDocumentUC) Duplicate(ctx context.Context, s, d, l string, _ []entity.FieldDefinition, u string) (*entity.Document, error) {

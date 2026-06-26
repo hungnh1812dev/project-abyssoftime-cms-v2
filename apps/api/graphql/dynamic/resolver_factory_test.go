@@ -14,8 +14,8 @@ import (
 
 type mockDocUC struct {
 	getForEditFn              func(ctx context.Context, slug, docID, locale string) (*entity.Document, string, error)
-	getAllPaginatedFn          func(ctx context.Context, slug string, start, size int, locale string, orderBy string, sortDir int) ([]*entity.Document, []string, int64, error)
-	getPublishedPaginatedFn   func(ctx context.Context, slug string, start, size int, locale string) ([]*entity.Document, int64, error)
+	getAllPaginatedFn          func(ctx context.Context, slug string, start, size int, locale string, orderBy string, sortDir int, filters []entity.FilterNode) ([]*entity.Document, []string, int64, error)
+	getPublishedPaginatedFn   func(ctx context.Context, slug string, start, size int, locale string, filters []entity.FilterNode) ([]*entity.Document, int64, error)
 	getPublishedSingleTypeFn  func(ctx context.Context, slug, locale string) (*entity.Document, error)
 	getSingleTypeFn           func(ctx context.Context, slug, locale string) (*entity.Document, string, error)
 	saveSingleTypeFn          func(ctx context.Context, slug string, data map[string]any, locale, userID string) (*entity.Document, error)
@@ -58,12 +58,12 @@ func (m *mockDocUC) PublishSingleType(ctx context.Context, s, l string, _ []enti
 func (m *mockDocUC) UnpublishSingleType(ctx context.Context, s, l string, _ []entity.FieldDefinition) error {
 	return m.unpublishSingleTypeFn(ctx, s, l)
 }
-func (m *mockDocUC) GetAllPaginated(ctx context.Context, s string, start, size int, l string, _ []entity.FieldDefinition, orderBy string, sortDir int) ([]*entity.Document, []string, int64, error) {
-	return m.getAllPaginatedFn(ctx, s, start, size, l, orderBy, sortDir)
+func (m *mockDocUC) GetAllPaginated(ctx context.Context, s string, start, size int, l string, _ []entity.FieldDefinition, orderBy string, sortDir int, filters []entity.FilterNode) ([]*entity.Document, []string, int64, error) {
+	return m.getAllPaginatedFn(ctx, s, start, size, l, orderBy, sortDir, filters)
 }
-func (m *mockDocUC) GetPublishedPaginated(ctx context.Context, s string, start, size int, l string, _ []entity.FieldDefinition) ([]*entity.Document, int64, error) {
+func (m *mockDocUC) GetPublishedPaginated(ctx context.Context, s string, start, size int, l string, _ []entity.FieldDefinition, filters []entity.FilterNode) ([]*entity.Document, int64, error) {
 	if m.getPublishedPaginatedFn != nil {
-		return m.getPublishedPaginatedFn(ctx, s, start, size, l)
+		return m.getPublishedPaginatedFn(ctx, s, start, size, l, filters)
 	}
 	return nil, 0, nil
 }
@@ -170,7 +170,7 @@ func TestResolverFactory_SingleTypeQuery(t *testing.T) {
 
 func TestResolverFactory_CollectionListQuery(t *testing.T) {
 	docUC := &mockDocUC{
-		getPublishedPaginatedFn: func(_ context.Context, _ string, start, size int, _ string) ([]*entity.Document, int64, error) {
+		getPublishedPaginatedFn: func(_ context.Context, _ string, start, size int, _ string, _ []entity.FilterNode) ([]*entity.Document, int64, error) {
 			return []*entity.Document{
 				{DocumentID: "d1", Locale: "en", Fields: map[string]any{"title": "Post 1"}},
 			}, 5, nil

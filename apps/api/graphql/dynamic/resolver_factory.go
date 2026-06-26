@@ -30,8 +30,8 @@ type DocumentUseCase interface {
 	SaveSingleType(ctx context.Context, contentTypeSlug string, data map[string]any, locale string, fields []entity.FieldDefinition, userID string) (*entity.Document, error)
 	PublishSingleType(ctx context.Context, contentTypeSlug, locale string, fields []entity.FieldDefinition, userID string) error
 	UnpublishSingleType(ctx context.Context, contentTypeSlug, locale string, fields []entity.FieldDefinition) error
-	GetAllPaginated(ctx context.Context, contentTypeSlug string, start, size int, locale string, fields []entity.FieldDefinition, orderBy string, sortDir int) ([]*entity.Document, []string, int64, error)
-	GetPublishedPaginated(ctx context.Context, contentTypeSlug string, start, size int, locale string, fields []entity.FieldDefinition) ([]*entity.Document, int64, error)
+	GetAllPaginated(ctx context.Context, contentTypeSlug string, start, size int, locale string, fields []entity.FieldDefinition, orderBy string, sortDir int, filters []entity.FilterNode) ([]*entity.Document, []string, int64, error)
+	GetPublishedPaginated(ctx context.Context, contentTypeSlug string, start, size int, locale string, fields []entity.FieldDefinition, filters []entity.FilterNode) ([]*entity.Document, int64, error)
 	GetPublishedSingleType(ctx context.Context, contentTypeSlug, locale string, fields []entity.FieldDefinition) (*entity.Document, error)
 }
 
@@ -68,6 +68,55 @@ func (f *ResolverFactory) BuildHandler(defs []contenttype.ContentTypeDefinition)
 		},
 	})
 	timeScalar := graphql.DateTime
+
+	idFilterType := graphql.NewInputObject(graphql.InputObjectConfig{
+		Name: "IDFilter",
+		Fields: graphql.InputObjectConfigFieldMap{
+			"eq":    &graphql.InputObjectFieldConfig{Type: graphql.ID},
+			"ne":    &graphql.InputObjectFieldConfig{Type: graphql.ID},
+			"in":    &graphql.InputObjectFieldConfig{Type: graphql.NewList(graphql.NewNonNull(graphql.ID))},
+			"notIn": &graphql.InputObjectFieldConfig{Type: graphql.NewList(graphql.NewNonNull(graphql.ID))},
+		},
+	})
+	stringFilterType := graphql.NewInputObject(graphql.InputObjectConfig{
+		Name: "StringFilter",
+		Fields: graphql.InputObjectConfigFieldMap{
+			"eq":    &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"ne":    &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"in":    &graphql.InputObjectFieldConfig{Type: graphql.NewList(graphql.NewNonNull(graphql.String))},
+			"notIn": &graphql.InputObjectFieldConfig{Type: graphql.NewList(graphql.NewNonNull(graphql.String))},
+		},
+	})
+	numberFilterType := graphql.NewInputObject(graphql.InputObjectConfig{
+		Name: "NumberFilter",
+		Fields: graphql.InputObjectConfigFieldMap{
+			"eq":    &graphql.InputObjectFieldConfig{Type: graphql.Float},
+			"ne":    &graphql.InputObjectFieldConfig{Type: graphql.Float},
+			"in":    &graphql.InputObjectFieldConfig{Type: graphql.NewList(graphql.NewNonNull(graphql.Float))},
+			"notIn": &graphql.InputObjectFieldConfig{Type: graphql.NewList(graphql.NewNonNull(graphql.Float))},
+		},
+	})
+	booleanFilterType := graphql.NewInputObject(graphql.InputObjectConfig{
+		Name: "BooleanFilter",
+		Fields: graphql.InputObjectConfigFieldMap{
+			"eq": &graphql.InputObjectFieldConfig{Type: graphql.Boolean},
+			"ne": &graphql.InputObjectFieldConfig{Type: graphql.Boolean},
+		},
+	})
+	timeFilterType := graphql.NewInputObject(graphql.InputObjectConfig{
+		Name: "TimeFilter",
+		Fields: graphql.InputObjectConfigFieldMap{
+			"eq": &graphql.InputObjectFieldConfig{Type: timeScalar},
+			"ne": &graphql.InputObjectFieldConfig{Type: timeScalar},
+		},
+	})
+
+	scalarFilterTypes := map[string]*graphql.InputObject{
+		"text":     stringFilterType,
+		"richtext": stringFilterType,
+		"number":   numberFilterType,
+		"boolean":  booleanFilterType,
+	}
 
 	mediaAssetType := graphql.NewObject(graphql.ObjectConfig{
 		Name: "MediaAsset",
@@ -120,7 +169,11 @@ func (f *ResolverFactory) BuildHandler(defs []contenttype.ContentTypeDefinition)
 		inputType := f.buildInputType(def, jsonScalar)
 
 		if def.Kind == "collection" {
-			f.addCollectionFields(def, objType, inputType, timeScalar, queryFields, mutationFields)
+			filterType := buildFilterInputType(
+				slugToPascalCase(def.Slug), def.Fields,
+				idFilterType, timeFilterType, scalarFilterTypes,
+			)
+			f.addCollectionFields(def, objType, inputType, filterType, timeScalar, queryFields, mutationFields)
 		} else {
 			f.addSingleFields(def, objType, inputType, queryFields, mutationFields)
 		}
@@ -254,6 +307,7 @@ func (f *ResolverFactory) addCollectionFields(
 	def contenttype.ContentTypeDefinition,
 	objType *graphql.Object,
 	inputType *graphql.InputObject,
+	filterType *graphql.InputObject,
 	timeSc *graphql.Scalar,
 	qf, mf graphql.Fields,
 ) {
@@ -291,34 +345,36 @@ func (f *ResolverFactory) addCollectionFields(
 	qf[camel+"List"] = &graphql.Field{
 		Type: graphql.NewNonNull(graphql.NewList(graphql.NewNonNull(objType))),
 		Args: graphql.FieldConfigArgument{
-			"start":  &graphql.ArgumentConfig{Type: graphql.Int, DefaultValue: 0},
-			"size":   &graphql.ArgumentConfig{Type: graphql.Int, DefaultValue: 20},
-			"locale": &graphql.ArgumentConfig{Type: graphql.String},
-			"status": &graphql.ArgumentConfig{Type: graphql.String},
+			"filters": &graphql.ArgumentConfig{Type: graphql.NewList(graphql.NewNonNull(filterType))},
+			"start":   &graphql.ArgumentConfig{Type: graphql.Int, DefaultValue: 0},
+			"size":    &graphql.ArgumentConfig{Type: graphql.Int, DefaultValue: 20},
+			"locale":  &graphql.ArgumentConfig{Type: graphql.String},
+			"status":  &graphql.ArgumentConfig{Type: graphql.String},
 		},
 		Resolve: func(p graphql.ResolveParams) (any, error) {
 			start, _ := p.Args["start"].(int)
 			size, _ := p.Args["size"].(int)
 			locale, _ := p.Args["locale"].(string)
 			statusFilter, _ := p.Args["status"].(string)
+			parsedFilters := parseFilters(p.Args["filters"])
 			if statusFilter == "draft" && middleware.UserID(p.Context) != "" {
-				docs, _, _, err := f.docUC.GetAllPaginated(p.Context, slug, start, size, locale, fields, "createdAt", -1)
+				docs, _, _, err := f.docUC.GetAllPaginated(p.Context, slug, start, size, locale, fields, "createdAt", -1, parsedFilters)
 				if err != nil {
 					return nil, err
 				}
 				items := make([]map[string]any, len(docs))
-				for i, d := range docs {
-					items[i] = f.docToMap(p.Context, d, fields)
+				for idx, doc := range docs {
+					items[idx] = f.docToMap(p.Context, doc, fields)
 				}
 				return items, nil
 			}
-			docs, _, err := f.docUC.GetPublishedPaginated(p.Context, slug, start, size, locale, fields)
+			docs, _, err := f.docUC.GetPublishedPaginated(p.Context, slug, start, size, locale, fields, parsedFilters)
 			if err != nil {
 				return nil, err
 			}
 			items := make([]map[string]any, len(docs))
-			for i, d := range docs {
-				items[i] = f.docToMap(p.Context, d, fields)
+			for idx, doc := range docs {
+				items[idx] = f.docToMap(p.Context, doc, fields)
 			}
 			return items, nil
 		},
@@ -603,6 +659,132 @@ func inputToMap(v any) map[string]any {
 		_ = json.Unmarshal(b, &m)
 		return m
 	}
+}
+
+func buildFilterInputType(
+	typeName string,
+	fields []entity.FieldDefinition,
+	idFilter, timeFilter *graphql.InputObject,
+	scalarFilters map[string]*graphql.InputObject,
+) *graphql.InputObject {
+	filterType := graphql.NewInputObject(graphql.InputObjectConfig{
+		Name: typeName + "Filter",
+		Fields: graphql.InputObjectConfigFieldMap{
+			"documentId":  &graphql.InputObjectFieldConfig{Type: idFilter},
+			"createdAt":   &graphql.InputObjectFieldConfig{Type: timeFilter},
+			"updatedAt":   &graphql.InputObjectFieldConfig{Type: timeFilter},
+			"publishedAt": &graphql.InputObjectFieldConfig{Type: timeFilter},
+		},
+	})
+
+	for _, field := range fields {
+		if scalarFilter, ok := scalarFilters[field.Type]; ok {
+			filterType.AddFieldConfig(field.Name, &graphql.InputObjectFieldConfig{Type: scalarFilter})
+		}
+	}
+
+	filterType.AddFieldConfig("and", &graphql.InputObjectFieldConfig{
+		Type: graphql.NewList(graphql.NewNonNull(filterType)),
+	})
+	filterType.AddFieldConfig("or", &graphql.InputObjectFieldConfig{
+		Type: graphql.NewList(graphql.NewNonNull(filterType)),
+	})
+	filterType.AddFieldConfig("not", &graphql.InputObjectFieldConfig{
+		Type: filterType,
+	})
+
+	return filterType
+}
+
+func parseFilters(raw any) []entity.FilterNode {
+	arr, ok := raw.([]any)
+	if !ok || len(arr) == 0 {
+		return nil
+	}
+	nodes := make([]entity.FilterNode, 0, len(arr))
+	for _, item := range arr {
+		m, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		node := parseFilterMap(m)
+		nodes = append(nodes, node...)
+	}
+	if len(nodes) == 0 {
+		return nil
+	}
+	return nodes
+}
+
+func parseFilterMap(filterMap map[string]any) []entity.FilterNode {
+	var nodes []entity.FilterNode
+	for key, val := range filterMap {
+		switch key {
+		case "and":
+			children := parseFilterList(val)
+			if len(children) > 0 {
+				nodes = append(nodes, entity.FilterNode{And: children})
+			}
+		case "or":
+			children := parseFilterList(val)
+			if len(children) > 0 {
+				nodes = append(nodes, entity.FilterNode{Or: children})
+			}
+		case "not":
+			notMap, ok := val.(map[string]any)
+			if !ok {
+				continue
+			}
+			children := parseFilterMap(notMap)
+			for _, child := range children {
+				nodes = append(nodes, entity.FilterNode{Not: &child})
+			}
+		default:
+			opMap, ok := val.(map[string]any)
+			if !ok {
+				continue
+			}
+			for oper, operVal := range opMap {
+				var filterOp entity.FilterOperator
+				switch oper {
+				case "eq":
+					filterOp = entity.FilterOpEq
+				case "ne":
+					filterOp = entity.FilterOpNe
+				case "in":
+					filterOp = entity.FilterOpIn
+				case "notIn":
+					filterOp = entity.FilterOpNotIn
+				default:
+					continue
+				}
+				nodes = append(nodes, entity.FilterNode{
+					Field: &entity.FieldFilter{
+						Field:    key,
+						Operator: filterOp,
+						Value:    operVal,
+					},
+				})
+			}
+		}
+	}
+	return nodes
+}
+
+func parseFilterList(val any) []entity.FilterNode {
+	arr, ok := val.([]any)
+	if !ok {
+		return nil
+	}
+	var nodes []entity.FilterNode
+	for _, item := range arr {
+		m, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		nodes = append(nodes, parseFilterMap(m)...)
+	}
+	return nodes
 }
 
 func gqlScalarFor(fieldType string, jsonSc *graphql.Scalar) graphql.Output {
