@@ -490,6 +490,188 @@ Manual browser test:
 
 ---
 
+## Current: Phase GQ — Migrate GraphQL to gqlgen (Full Codegen Pipeline)
+
+Spec: [specs/graphql-library-evaluation.md](../specs/graphql-library-evaluation.md)
+Scope: Backend only (`apps/api/`). No frontend changes.
+
+### Summary
+
+Replace `graphql-go/graphql` (dormant) with **gqlgen** (build-time codegen). A custom `gqlcodegen` tool reads `content-types/*.json` and generates `.graphql` schema files + resolver implementations. Then gqlgen generates the Go execution runtime. One `make graphql-generate` command does everything.
+
+**Key metrics:** ~1,089 lines of runtime code → ~345 (-68%). 2.7x performance improvement.
+
+### Dependency Graph
+
+```
+T1 (gqlgen dep + dirs)
+ └─ T2 (gqlgen.yml + model/types.go)
+     └─ T3 (gqlcodegen: SDL generation)
+         └─ T4 (gqlcodegen: resolver + yml generation + tests)
+             ─── [Checkpoint 1: gqlcodegen produces correct outputs]
+                  └─ T5 (first codegen run + resolver.go, content_types.go)
+                      ├─ T6 (media.go)           ── independent ──┐
+                      ├─ T7 (filter.go + orderBy) ── independent ──┤
+                      └─ T8 (document_helpers.go) ── independent ──┘
+                          └─ T9 (handler.go)
+                              ─── [Checkpoint 2: go build passes]
+                                   └─ T10 (main.go integration)
+                                       └─ T11 (remove old code)
+                                           └─ T12 (.gitignore + Makefile)
+                                               ─── [Checkpoint 3: go vet + go test + go build]
+                                                    ├─ T13 (resolver tests)  ── independent ──┐
+                                                    ├─ T14 (filter tests)    ── independent ──┤
+                                                    └─ T15 (rules + docs)    ── independent ──┘
+                                                        ─── [Checkpoint 4: full E2E]
+```
+
+---
+
+### Phase 1: Codegen Pipeline (Build-Time)
+
+#### T1: Add gqlgen dependency + directory structure
+
+**Files:** `apps/api/tools.go` (new), directories `graphql/{schema,generated,model,resolver}/`
+**Commands:** `cd apps/api && go get github.com/99designs/gqlgen@latest`
+**Acceptance:** `go build ./...` still passes.
+**Verify:** `cd apps/api && go build ./...`
+
+#### T2: Create gqlgen configuration + model types
+
+**Files:**
+- `apps/api/graphql/gqlgen.yml` — schema/exec/model/resolver paths, JSON→Map, Time→Time scalars
+- `apps/api/graphql/model/types.go` — `DocumentMap`, `MediaAssetMap`, `ContentTypeMap` type aliases
+
+**Acceptance:** Valid YAML/Go.
+**Verify:** `cd apps/api && go vet ./graphql/model/...`
+
+#### T3: Build gqlcodegen tool — SDL generation
+
+**File:** `apps/api/cmd/gqlcodegen/main.go` (new)
+
+Adapt `schema_builder.go` logic to write individual `.graphql` files. Key additions vs current:
+- `base.graphql` includes `directive @auth on FIELD_DEFINITION` + `type Mutation { _empty: Boolean }`
+- Per-type `.graphql` adds `status: String` to ALL query args (missing in current schema_builder)
+- Per-type `.graphql` adds `@auth` to ALL mutation fields
+
+**Reuse:** `slugToPascalCase`, `slugToCamelCase`, `fieldTypeToGraphQL`, `writeComponentType`, `writeFilterType`, `writeOrderByType` from `schema_builder.go`.
+
+**Acceptance:** `go run ./cmd/gqlcodegen --phase=schema` produces correct `.graphql` files.
+
+#### T4: Build gqlcodegen tool — resolver + config generation + tests
+
+**File:** `apps/api/cmd/gqlcodegen/main.go` (extend) + `main_test.go` (new)
+
+- Generate `graphql/resolver/content_gen.go` — field definitions + thin resolver methods
+- Inject models section into `gqlgen.yml`
+- `--phase=schema` / `--phase=resolvers` flags
+- Tests: SDL output, resolver output, models injection
+
+**Acceptance:** `go run ./cmd/gqlcodegen` produces all 3 artifacts.
+**Verify:** `cd apps/api && go test ./cmd/gqlcodegen/...`
+
+#### Checkpoint 1
+
+```bash
+cd apps/api && go run ./cmd/gqlcodegen --phase=schema  # verify .graphql files
+cd apps/api && go test ./cmd/gqlcodegen/...
+```
+
+---
+
+### Phase 2: gqlgen Generation + Hand-Written Runtime
+
+#### T5: First codegen run + root resolver + content_types
+
+Bootstrap pipeline: `gqlcodegen --phase=schema` → `gqlgen generate` → remove stubs → `gqlcodegen --phase=resolvers`
+
+**Hand-written files:**
+- `graphql/resolver/resolver.go` — Resolver struct, NewResolver, Query()/Mutation() methods
+- `graphql/resolver/content_types.go` — contentTypes query + _empty mutation stub
+
+#### T6: Media field resolution
+
+**File:** `graphql/resolver/media.go` — adapt from `resolver_factory.go:571-660`
+- `docToMap`, `resolveMediaField`, `resolveComponentMedia`, `resolveComponentMap`
+- Receiver changes from `ResolverFactory` to `Resolver` (methods, not closures)
+
+#### T7: Filter + OrderBy conversion
+
+**File:** `graphql/resolver/filter.go`
+- `convertFilterStructs[T any](filters []*T) []entity.FilterNode` — reflection-based
+- `extractOrderBy(orderByArg any) (string, int)` — first non-nil field, default `("createdAt", -1)`
+
+#### T8: Document CRUD helpers
+
+**File:** `graphql/resolver/document_helpers.go`
+- Collection: `getDocument`, `getDocumentList`, `createDocument`, `updateDocument`, `deleteDocument`, `publishDocument`, `unpublishDocument`
+- Single: `getSingleType`, `saveSingleType`, `publishSingleType`, `unpublishSingleType`
+- Helper: `structToMap(v any) map[string]any` (json roundtrip, same as current `inputToMap`)
+
+#### T9: HTTP handler
+
+**File:** `graphql/handler.go`
+- `NewHandler(resolver, tokenValidator) http.Handler`
+- Handler-level auth (JWT + access token fallback) — same as current
+- `@auth` directive: `skip_runtime: true` in gqlgen.yml (auth enforced at handler level)
+- Error presenter: maps domain errors to GraphQL error codes
+
+#### Checkpoint 2
+
+```bash
+cd apps/api && make graphql-generate && go build ./...
+```
+
+---
+
+### Phase 3: Server Integration + Cleanup
+
+#### T10: Update main.go
+
+Replace `dynamic.NewResolverFactory` + `BuildHandler` with `resolver.NewResolver` + `graphqlhandler.NewHandler`. Update imports.
+
+#### T11: Remove old code + dependencies
+
+Delete `graphql/dynamic/` directory (5 files, ~1,760 lines). Run `go mod tidy`.
+
+#### T12: Update .gitignore + Makefile
+
+`.gitignore`: add generated file patterns. Makefile: update `graphql-generate` to 4-step pipeline.
+
+#### Checkpoint 3
+
+```bash
+cd apps/api && go vet ./... && go test ./... && go build ./...
+```
+
+---
+
+### Phase 4: Tests + Documentation
+
+#### T13: Handler + resolver tests
+
+Adapt `resolver_factory_test.go` patterns: contentTypes query, single-type query, collection list, mutation auth.
+
+#### T14: Filter conversion tests
+
+New tests for `convertFilterStructs` and `extractOrderBy` — nil, eq, combinators, in/notIn, field name conversion.
+
+#### T15: Update rules + CLAUDE.md
+
+- `rules/content.md` §6: update for gqlgen architecture
+- `CLAUDE.md` commands table: add `make graphql-generate`
+- `SPEC.md`: mark GraphQL migration complete
+
+#### Checkpoint 4 (Final)
+
+```bash
+cd apps/api && go vet ./... && go test ./... && go build ./...
+make graphql-generate && cd apps/api && go build ./...  # idempotency
+make dev-api  # manual E2E testing
+```
+
+---
+
 ## Upcoming
 
 *(Add new plans here as they are defined.)*

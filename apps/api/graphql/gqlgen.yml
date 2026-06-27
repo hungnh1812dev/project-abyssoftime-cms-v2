@@ -1,0 +1,56 @@
+schema:
+  - schema/*.graphql
+
+exec:
+  filename: generated/generated.go
+  package: generated
+
+model:
+  filename: model/models_gen.go
+  package: model
+
+resolver:
+  layout: follow-schema
+  dir: resolver
+  package: resolver
+  filename_template: "{name}.resolvers.go"
+
+autobind: []
+
+directives:
+  auth:
+    skip_runtime: true
+
+models:
+  JSON:
+    model: "github.com/99designs/gqlgen/graphql.Map"
+  Time:
+    model: "github.com/99designs/gqlgen/graphql.Time"
+  # --- gqlcodegen models start ---
+  MediaAsset:
+    model: "project-abyssoftime-cms-v2/api/graphql/model.MediaAssetMap"
+  ContentType:
+    model: "project-abyssoftime-cms-v2/api/graphql/model.ContentTypeMap"
+  CommonText:
+    model: "project-abyssoftime-cms-v2/api/graphql/model.DocumentMap"
+  CvContact:
+    model: "project-abyssoftime-cms-v2/api/graphql/model.DocumentMap"
+  CvPage:
+    model: "project-abyssoftime-cms-v2/api/graphql/model.DocumentMap"
+  CvPageSkills:
+    model: "project-abyssoftime-cms-v2/api/graphql/model.DocumentMap"
+  CvPageExperiences:
+    model: "project-abyssoftime-cms-v2/api/graphql/model.DocumentMap"
+  CvPageExperiencesRoles:
+    model: "project-abyssoftime-cms-v2/api/graphql/model.DocumentMap"
+  CvPageProjects:
+    model: "project-abyssoftime-cms-v2/api/graphql/model.DocumentMap"
+  CvPageEducations:
+    model: "project-abyssoftime-cms-v2/api/graphql/model.DocumentMap"
+  CvPageLanguages:
+    model: "project-abyssoftime-cms-v2/api/graphql/model.DocumentMap"
+  CvPageReferences:
+    model: "project-abyssoftime-cms-v2/api/graphql/model.DocumentMap"
+  EnVocabPack:
+    model: "project-abyssoftime-cms-v2/api/graphql/model.DocumentMap"
+  # --- gqlcodegen models end ---

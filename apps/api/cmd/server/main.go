@@ -6,7 +6,8 @@ import (
 	"log"
 	"net"
 
-	"project-abyssoftime-cms-v2/api/graphql/dynamic"
+	graphqlpkg "project-abyssoftime-cms-v2/api/graphql"
+	"project-abyssoftime-cms-v2/api/graphql/resolver"
 	"project-abyssoftime-cms-v2/api/internal/config"
 	grpcdelivery "project-abyssoftime-cms-v2/api/internal/delivery/grpc"
 	deliveryhttp "project-abyssoftime-cms-v2/api/internal/delivery/http"
@@ -209,12 +210,9 @@ func main() {
 	}
 	log.Printf("synced %d content-type definitions from %s", len(defs), defsDir)
 
-	// Dynamic GraphQL — schema generated from content-type definitions
-	gqlFactory := dynamic.NewResolverFactory(documentUC, ctUC, mediaRepo, accessTokenUC)
-	gqlHandler, err := gqlFactory.BuildHandler(defs)
-	if err != nil {
-		log.Fatalf("graphql schema: %v", err)
-	}
+	// gqlgen GraphQL — schema pre-compiled at build time via make graphql-generate
+	gqlResolver := resolver.NewResolver(documentUC, ctUC, mediaRepo)
+	gqlHandler := graphqlpkg.NewHandler(gqlResolver, accessTokenUC)
 
 	// Gin router (REST + GraphQL)
 	router := deliveryhttp.SetupRouter(deliveryhttp.RouterConfig{

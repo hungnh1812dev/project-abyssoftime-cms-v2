@@ -181,6 +181,32 @@ Spec: [specs/graphql-collection-filters.md](../specs/graphql-collection-filters.
 
 ---
 
+## Phase GQ — Migrate GraphQL to gqlgen (Full Codegen Pipeline)
+
+Spec: [specs/graphql-library-evaluation.md](../specs/graphql-library-evaluation.md). Plan: [plan.md](plan.md) (Phase GQ section).
+
+- [x] T1 Add gqlgen dependency + directory structure (`tools.go`, `graphql/{schema,generated,model,resolver}/`)
+- [x] T2 Create `gqlgen.yml` config + `model/types.go` (DocumentMap, MediaAssetMap, ContentTypeMap)
+- [x] T3 Build gqlcodegen tool — SDL generation (`cmd/gqlcodegen/main.go`, adapt from `schema_builder.go`)
+- [x] T4 Build gqlcodegen tool — resolver + yml generation + tests
+- [x] ✅ Checkpoint 1: `gqlcodegen --phase=schema` produces correct .graphql files + tests pass
+- [x] T5 First codegen run + `resolver.go` (root resolver) + `content_types.go` (contentTypes query)
+- [x] T6 `media.go` — media field resolution (adapted from `resolver_factory.go`)
+- [x] T7 `filter.go` — reflection-based filter conversion + orderBy extraction
+- [x] T8 `document_helpers.go` — generic CRUD helpers (collection + single type)
+- [x] T9 `handler.go` — HTTP handler with handler-level auth + error presenter + map field resolvers
+- [x] ✅ Checkpoint 2: `make graphql-generate` + `go build ./...` passes
+- [x] T10 Update `cmd/server/main.go` — wire new gqlgen handler
+- [x] T11 Remove `graphql/dynamic/` directory + `go mod tidy` (remove graphql-go deps)
+- [x] T12 Update `.gitignore` + Makefile (`graphql-generate` 4-step pipeline)
+- [x] ✅ Checkpoint 3: `go vet` + `go test` + `go build` all pass
+- [x] T13 Handler + resolver tests (4 tests: contentTypes, singleType, collectionList, unauthorized)
+- [x] T14 Filter conversion tests (15 tests: convertFilterStructs, pascalToCamelCase, extractOrderBy)
+- [x] T15 Update `rules/content.md` §6 + `CLAUDE.md` commands + `SPEC.md` milestones
+- [ ] ✅ Checkpoint 4 (Final): manual E2E verification
+
+---
+
 ## Archive Index
 
 | Archive | Phases | Status |

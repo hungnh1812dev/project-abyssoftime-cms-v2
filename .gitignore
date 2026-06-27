@@ -27,6 +27,12 @@ apps/web/.env.local
 .env.*
 !.env.example
 
+# gqlgen generated files (regenerated at build time via make graphql-generate)
+apps/api/graphql/schema/
+apps/api/graphql/generated/
+apps/api/graphql/model/models_gen.go
+apps/api/graphql/resolver/content_gen.go
+
 # Editor
 .idea/
 .vscode/
