@@ -92,4 +92,8 @@ test-web:
 # ── Code generation ──────────────────────────────────────────────────────────
 
 graphql-generate:
-	cd apps/api && go run github.com/99designs/gqlgen generate
+	cd apps/api && go run ./cmd/gqlcodegen --phase=schema
+	rm -f apps/api/graphql/resolver/content_gen.go
+	-cd apps/api && go run github.com/99designs/gqlgen generate --config graphql/gqlgen.yml
+	rm -f apps/api/graphql/resolver/*.resolvers.go
+	cd apps/api && go run ./cmd/gqlcodegen --phase=resolvers

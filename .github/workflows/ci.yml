@@ -28,6 +28,13 @@ jobs:
           go-version-file: apps/api/go.mod
           cache-dependency-path: apps/api/go.sum
 
+      - name: Generate GraphQL
+        run: |
+          go run ./cmd/gqlcodegen --phase=schema
+          go run github.com/99designs/gqlgen generate --config graphql/gqlgen.yml
+          rm -f graphql/resolver/*.resolvers.go
+          go run ./cmd/gqlcodegen --phase=resolvers
+
       - name: go vet
         run: go vet ./...
 

@@ -6,7 +6,8 @@ import (
 	"log"
 	"net"
 
-	"project-abyssoftime-cms-v2/api/graphql/dynamic"
+	graphqlpkg "project-abyssoftime-cms-v2/api/graphql"
+	"project-abyssoftime-cms-v2/api/graphql/resolver"
 	"project-abyssoftime-cms-v2/api/internal/config"
 	grpcdelivery "project-abyssoftime-cms-v2/api/internal/delivery/grpc"
 	deliveryhttp "project-abyssoftime-cms-v2/api/internal/delivery/http"
@@ -209,12 +210,9 @@ func main() {
 	}
 	log.Printf("synced %d content-type definitions from %s", len(defs), defsDir)
 
-	// Dynamic GraphQL — schema generated from content-type definitions
-	gqlFactory := dynamic.NewResolverFactory(documentUC, ctUC, mediaRepo, accessTokenUC)
-	gqlHandler, err := gqlFactory.BuildHandler(defs)
-	if err != nil {
-		log.Fatalf("graphql schema: %v", err)
-	}
+	// gqlgen GraphQL — schema pre-compiled at build time via make graphql-generate
+	gqlResolver := resolver.NewResolver(documentUC, ctUC, mediaRepo)
+	gqlHandler := graphqlpkg.NewHandler(gqlResolver, accessTokenUC)
 
 	// Gin router (REST + GraphQL)
 	router := deliveryhttp.SetupRouter(deliveryhttp.RouterConfig{
@@ -233,21 +231,22 @@ func main() {
 		CORSOrigins:        cfg.CORSOrigins,
 	})
 
-	// gRPC server (optional — skipped if port unavailable)
-	grpcSrv := grpcdelivery.NewServer(authUC, ctUC, documentUC, mediaUC)
-
-	go func() {
-		grpcAddr := ":" + cfg.GRPCPort
-		lis, err := net.Listen("tcp", grpcAddr)
-		if err != nil {
-			log.Printf("gRPC disabled: %v", err)
-			return
-		}
-		log.Printf("gRPC server listening on %s", grpcAddr)
-		if err := grpcSrv.Serve(lis); err != nil {
-			log.Printf("gRPC stopped: %v", err)
-		}
-	}()
+	// gRPC server (opt-in via GRPC_ENABLED=true)
+	if cfg.GRPCEnabled {
+		grpcSrv := grpcdelivery.NewServer(authUC, ctUC, documentUC, mediaUC)
+		go func() {
+			grpcAddr := ":" + cfg.GRPCPort
+			lis, err := net.Listen("tcp", grpcAddr)
+			if err != nil {
+				log.Printf("gRPC disabled: %v", err)
+				return
+			}
+			log.Printf("gRPC server listening on %s", grpcAddr)
+			if err := grpcSrv.Serve(lis); err != nil {
+				log.Printf("gRPC stopped: %v", err)
+			}
+		}()
+	}
 
 	// Start REST + GraphQL (blocks)
 	addr := ":" + cfg.Port
