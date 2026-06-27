@@ -45,6 +45,7 @@ content-types/     → JSON schema-as-code definitions (→ apps/api/content-typ
 | `make test-api` | `go test ./...` inside `apps/api` |
 | `make test-web` | `vitest run` inside `apps/web` |
 | `make mongo-start` | Start MongoDB container |
+| `make graphql-generate` | Regenerate GraphQL schema + resolvers from `content-types/*.json` |
 
 ## Boundaries
 

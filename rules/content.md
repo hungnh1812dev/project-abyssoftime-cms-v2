@@ -202,44 +202,62 @@ type Component struct {
 
 ## 6. GraphQL Rules
 
-### 6.1 Schema Generation
-- Dynamic per content-type at startup (after sync)
-- Collection type → `Query.<slug>(Id: ID!, locale: String, status: String)` + `Query.<slugList>(filters: [<Type>Filter!], ...)`
+### 6.1 Build-Time Schema (gqlgen)
+- Schema defined in `.graphql` files generated at build time by `cmd/gqlcodegen`
+- Library: `github.com/99designs/gqlgen` (replaces `graphql-go/graphql`)
+- **Must run `make graphql-generate` after changing `content-types/*.json`**
+- Generated files (`.gitignored`): `graphql/schema/`, `graphql/generated/`, `graphql/model/models_gen.go`, `graphql/resolver/content_gen.go`
+- Hand-written files: `graphql/resolver/resolver.go`, `document_helpers.go`, `media.go`, `filter.go`, `content_types.go`, `graphql/handler.go`
+
+### 6.2 Schema Shape
+- Collection type → `Query.<slug>(Id: ID!, locale: String, status: String)` + `Query.<slugList>(filters, orderBy, start, size, locale, status)`
 - Single type → `Query.<slug>(locale: String, status: String)`
 - Queries default to published; `status: "draft"` opt-in for authenticated users
-- Response wrappers removed — nullable single, `[Type!]!` list
-- Base filter input types defined in base schema: `IDFilter`, `StringFilter`, `NumberFilter`, `BooleanFilter`, `TimeFilter`
+- All mutations have `@auth` directive (handler-level auth enforced)
+- Base filter input types: `IDFilter`, `StringFilter`, `NumberFilter`, `BooleanFilter`, `TimeFilter`
 - Per-type `<Type>Filter` includes: `documentId` (IDFilter), `createdAt`/`updatedAt`/`publishedAt` (TimeFilter), content fields, `and`/`or`/`not` combinators
 - `filters` argument is an array — items are implicitly ANDed
 - Supported operators: `eq`, `ne`, `in`, `notIn`
+- `orderBy` uses typed `<Type>OrderBy` struct (first non-nil field determines sort)
 
-### 6.2 Field Type Mapping
-| Content Type | GraphQL Type |
-|---|---|
-| `text` | `String` |
-| `richtext` | `String` |
-| `number` | `Float` |
-| `boolean` | `Boolean` |
-| `media` | `MediaAsset` object |
-| `json` | `JSON` scalar |
-| `component` (non-repeatable) | Nested object type |
-| `component` (repeatable) | `[NestedType!]` |
+### 6.3 Field Type Mapping
+| Content Type | GraphQL Output Type | GraphQL Input Type |
+|---|---|---|
+| `text` | `String` | `String` |
+| `richtext` | `String` | `String` |
+| `number` | `Float` | `Float` |
+| `boolean` | `Boolean` | `Boolean` |
+| `media` | `MediaAsset` object | `String` (documentId) |
+| `json` | `JSON` scalar | `JSON` |
+| `component` (non-repeatable) | Nested object type | *(excluded from input)* |
+| `component` (repeatable) | `[NestedType!]` | *(excluded from input)* |
 
-### 6.3 Naming Conventions
-- Type: PascalCase of slug (`blog-posts` → `BlogPost`)
+### 6.4 Naming Conventions
+- Type: PascalCase of slug (`blog-posts` → `BlogPosts`)
 - Input: `<Type>Input`
 - Filter: `<Type>Filter`
 - Base filters: `IDFilter`, `StringFilter`, `NumberFilter`, `BooleanFilter`, `TimeFilter`
 - OrderBy: `<Type>OrderBy`
-- Component: `<ContentType><ComponentName>` (e.g., `BlogPostBanner`)
-- Query single: camelCase (`blogPost`)
-- Query list: camelCase + `List` (`blogPostList`)
+- Component: `<ContentType><ComponentName>` (e.g., `CvPageSkills`)
+- Query single: camelCase (`cvPage`)
+- Query list: camelCase + `List` (`cvPageList`)
 
-### 6.4 Resolvers
-- All delegate to document usecase — **NO** business logic in resolvers
-- `ResolverFactory` takes `MediaAssetRepository` for media field resolution
-- Media fields resolved into full `MediaAsset` objects recursively
+### 6.5 Resolvers
+- All delegate to generic helpers in `document_helpers.go` — **NO** business logic in resolvers
+- `Resolver` struct takes `DocumentUseCase`, `ContentTypeUseCase`, `MediaAssetRepository`
+- Generated resolvers in `content_gen.go` are thin wrappers calling generic helpers
+- Media fields resolved into full `MediaAsset` objects recursively via `media.go`
+- Filter conversion: gqlgen typed structs → `entity.FilterNode` via reflection (`filter.go`)
 - **NEVER** duplicate filtering on repeatable component sub-fields (defer to future)
+- **NEVER** add business logic to generated or hand-written resolvers
+
+### 6.6 Codegen Pipeline (`make graphql-generate`)
+1. `gqlcodegen --phase=schema` → generates `.graphql` files + updates `gqlgen.yml` models
+2. `gqlgen generate` → generates `generated.go` + `models_gen.go`
+3. Remove gqlgen resolver stubs (`*.resolvers.go`)
+4. `gqlcodegen --phase=resolvers` → generates `content_gen.go`
+- **NEVER** edit generated files — they are overwritten on every run
+- **NEVER** commit generated files to git
 
 ---
 

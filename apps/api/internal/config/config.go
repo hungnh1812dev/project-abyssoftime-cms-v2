@@ -14,6 +14,7 @@ import (
 
 type Config struct {
 	Port             string
+	GRPCEnabled      bool
 	GRPCPort         string
 	JWTSecret        string
 	ContentTypeDir   string
@@ -174,6 +175,7 @@ func Load() (*Config, error) {
 
 	return &Config{
 		Port:             getenv("PORT", "8080"),
+		GRPCEnabled:      parseBoolDefault(os.Getenv("GRPC_ENABLED"), false),
 		GRPCPort:         getenv("GRPC_PORT", "9090"),
 		JWTSecret:        getenv("JWT_SECRET", ""),
 		ContentTypeDir:   getenv("CONTENT_TYPES_DIR", "content-types"),

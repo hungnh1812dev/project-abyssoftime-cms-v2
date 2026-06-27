@@ -175,6 +175,7 @@ The frontend spec is not modularized. Key sections:
 | Collection list | Sortable table, server-side ordering, user display names, icon actions |
 | UI design system | Indigo tokens, sidebar, sticky action bar, dark mode |
 | Bug fixes v1.8 | Auth UUID, register guard, response shape, input persistence, published-by-default GraphQL |
+| gqlgen migration | Replaced `graphql-go/graphql` with `gqlgen` build-time codegen pipeline; 68% runtime code reduction, 2.7x performance |
 
 ## Pending Changes
 
