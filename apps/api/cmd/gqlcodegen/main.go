@@ -691,7 +691,7 @@ func injectModels(graphqlDir string, defs []contenttype.ContentTypeDefinition) e
 	if idx := strings.Index(content, marker); idx >= 0 {
 		endIdx := strings.Index(content, endMarker)
 		if endIdx >= 0 {
-			content = content[:idx] + content[endIdx+len(endMarker)+1:]
+			content = strings.TrimRight(content[:idx], " \n") + "\n"
 		}
 	}
 
