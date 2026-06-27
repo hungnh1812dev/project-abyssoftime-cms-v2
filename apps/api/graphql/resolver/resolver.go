@@ -3,7 +3,6 @@ package resolver
 import (
 	"context"
 
-	"project-abyssoftime-cms-v2/api/graphql/generated"
 	"project-abyssoftime-cms-v2/api/internal/domain/entity"
 	"project-abyssoftime-cms-v2/api/internal/domain/repository"
 )
@@ -37,9 +36,3 @@ type Resolver struct {
 func NewResolver(docUC DocumentUseCase, ctUC ContentTypeUseCase, mediaRepo repository.MediaAssetRepository) *Resolver {
 	return &Resolver{docUC: docUC, ctUC: ctUC, mediaRepo: mediaRepo}
 }
-
-func (resolver *Resolver) Query() generated.QueryResolver       { return &queryResolver{resolver} }
-func (resolver *Resolver) Mutation() generated.MutationResolver { return &mutationResolver{resolver} }
-
-type queryResolver struct{ *Resolver }
-type mutationResolver struct{ *Resolver }

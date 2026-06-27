@@ -66,7 +66,7 @@ func TestBuildContentTypeSDL_Collection(t *testing.T) {
 		"title: SortOrder",
 		"createdAt: SortOrder",
 		"blogPosts(documentId: ID!, locale: String, status: String): BlogPosts",
-		"blogPostsList(filters: [BlogPostsFilter!], orderBy: BlogPostsOrderBy, start: Int, size: Int, locale: String, status: String): [BlogPosts!]!",
+		"blogPostses(filters: [BlogPostsFilter!], orderBy: BlogPostsOrderBy, start: Int, size: Int, locale: String, status: String): [BlogPosts!]!",
 		"createBlogPosts(data: BlogPostsInput!): BlogPosts! @auth",
 		"updateBlogPosts(documentId: ID!, data: BlogPostsInput!): BlogPosts! @auth",
 		"deleteBlogPosts(documentId: ID!): Boolean! @auth",

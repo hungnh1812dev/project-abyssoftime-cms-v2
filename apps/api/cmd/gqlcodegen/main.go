@@ -222,7 +222,7 @@ func buildContentTypeSDL(def contenttype.ContentTypeDefinition) string {
 	if def.Kind == "collection" {
 		builder.WriteString("extend type Query {\n")
 		fmt.Fprintf(&builder, "  %s(documentId: ID!, locale: String, status: String): %s\n", camel, typeName)
-		fmt.Fprintf(&builder, "  %sList(filters: [%sFilter!], orderBy: %sOrderBy, start: Int, size: Int, locale: String, status: String): [%s!]!\n", camel, typeName, typeName, typeName)
+		fmt.Fprintf(&builder, "  %s(filters: [%sFilter!], orderBy: %sOrderBy, start: Int, size: Int, locale: String, status: String): [%s!]!\n", pluralize(camel), typeName, typeName, typeName)
 		builder.WriteString("}\n\n")
 
 		builder.WriteString("extend type Mutation {\n")
@@ -330,6 +330,8 @@ func generateResolvers(graphqlDir string, defs []contenttype.ContentTypeDefiniti
 	builder.WriteString("var _ time.Time\n")
 	builder.WriteString("var _ context.Context\n\n")
 
+	writeResolverTypes(&builder)
+
 	for _, def := range defs {
 		writeFieldDefinitions(&builder, def)
 		builder.WriteString("\n")
@@ -347,6 +349,31 @@ func generateResolvers(graphqlDir string, defs []contenttype.ContentTypeDefiniti
 
 	outPath := filepath.Join(resolverDir, "content_gen.go")
 	return os.WriteFile(outPath, []byte(builder.String()), 0o644)
+}
+
+func writeResolverTypes(builder *strings.Builder) {
+	builder.WriteString("// ── Resolver types + root methods ──\n\n")
+	builder.WriteString("type queryResolver struct{ *Resolver }\n")
+	builder.WriteString("type mutationResolver struct{ *Resolver }\n\n")
+	builder.WriteString("func (resolver *Resolver) Query() generated.QueryResolver       { return &queryResolver{resolver} }\n")
+	builder.WriteString("func (resolver *Resolver) Mutation() generated.MutationResolver { return &mutationResolver{resolver} }\n\n")
+
+	builder.WriteString("func (resolver *queryResolver) ContentTypes(ctx context.Context) ([]map[string]interface{}, error) {\n")
+	builder.WriteString("\tcontentTypes, err := resolver.ctUC.FindAll(ctx)\n")
+	builder.WriteString("\tif err != nil {\n\t\treturn nil, err\n\t}\n")
+	builder.WriteString("\tresult := make([]map[string]interface{}, len(contentTypes))\n")
+	builder.WriteString("\tfor idx, contentType := range contentTypes {\n")
+	builder.WriteString("\t\tresult[idx] = map[string]interface{}{\n")
+	builder.WriteString("\t\t\t\"id\": contentType.ID, \"name\": contentType.Name, \"slug\": contentType.Slug,\n")
+	builder.WriteString("\t\t\t\"kind\": string(contentType.Kind), \"createdAt\": contentType.CreatedAt, \"updatedAt\": contentType.UpdatedAt,\n")
+	builder.WriteString("\t\t}\n")
+	builder.WriteString("\t}\n")
+	builder.WriteString("\treturn result, nil\n")
+	builder.WriteString("}\n\n")
+
+	builder.WriteString("func (resolver *mutationResolver) Empty(_ context.Context) (*bool, error) {\n")
+	builder.WriteString("\treturn nil, nil\n")
+	builder.WriteString("}\n\n")
 }
 
 func writeFieldDefinitions(builder *strings.Builder, def contenttype.ContentTypeDefinition) {
@@ -381,7 +408,7 @@ func writeCollectionResolvers(builder *strings.Builder, def contenttype.ContentT
 	fmt.Fprintf(builder, "\treturn resolver.getDocument(ctx, %q, %sID, locale, status, %s)\n", def.Slug, camel, fieldsVar)
 	builder.WriteString("}\n\n")
 
-	fmt.Fprintf(builder, "func (resolver *queryResolver) %sList(ctx context.Context, filters []*model.%sFilter, orderBy *model.%sOrderBy, start *int, size *int, locale *string, status *string) ([]map[string]interface{}, error) {\n", pascal, pascal, pascal)
+	fmt.Fprintf(builder, "func (resolver *queryResolver) %s(ctx context.Context, filters []*model.%sFilter, orderBy *model.%sOrderBy, start *int, size *int, locale *string, status *string) ([]map[string]interface{}, error) {\n", pluralize(pascal), pascal, pascal)
 	fmt.Fprintf(builder, "\treturn resolver.getDocumentList(ctx, %q, filters, orderBy, start, size, locale, status, %s)\n", def.Slug, fieldsVar)
 	builder.WriteString("}\n\n")
 
@@ -749,6 +776,17 @@ func slugToCamelCase(slug string) string {
 		return ""
 	}
 	return strings.ToLower(pascal[:1]) + pascal[1:]
+}
+
+func pluralize(name string) string {
+	if len(name) == 0 {
+		return name
+	}
+	lower := strings.ToLower(name)
+	if strings.HasSuffix(lower, "s") || strings.HasSuffix(lower, "x") || strings.HasSuffix(lower, "z") || strings.HasSuffix(lower, "ch") || strings.HasSuffix(lower, "sh") {
+		return name + "es"
+	}
+	return name + "s"
 }
 
 func fieldTypeToGraphQL(fieldType string) string {

@@ -173,11 +173,11 @@ func TestResolver_CollectionListQuery(test *testing.T) {
 	emptyCTUC := &mockCTUC{findAllFn: func(_ context.Context) ([]*entity.ContentType, error) { return nil, nil }}
 	handler := buildHandler(test, docUC, emptyCTUC)
 
-	result := gqlQuery(test, handler, `{ cvPageList(start: 0, size: 10, locale: "en") { documentId position } }`)
+	result := gqlQuery(test, handler, `{ cvPages(start: 0, size: 10, locale: "en") { documentId position } }`)
 	data := result["data"].(map[string]any)
-	items := data["cvPageList"].([]any)
+	items := data["cvPages"].([]any)
 	if len(items) != 1 {
-		test.Fatalf("cvPageList count = %d, want 1", len(items))
+		test.Fatalf("cvPages count = %d, want 1", len(items))
 	}
 	item := items[0].(map[string]any)
 	if item["position"] != "Engineer" {

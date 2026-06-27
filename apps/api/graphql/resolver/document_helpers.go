@@ -11,7 +11,7 @@ import (
 
 // ── Collection-type query helpers ──
 
-func (resolver *queryResolver) getDocument(ctx context.Context, slug, docID string, locale, status *string, fields []entity.FieldDefinition) (map[string]interface{}, error) {
+func (resolver *Resolver) getDocument(ctx context.Context, slug, docID string, locale, status *string, fields []entity.FieldDefinition) (map[string]interface{}, error) {
 	localeStr := derefString(locale)
 	if derefString(status) == "draft" && middleware.UserID(ctx) != "" {
 		doc, _, err := resolver.docUC.GetForEdit(ctx, slug, docID, localeStr, fields)
@@ -27,7 +27,7 @@ func (resolver *queryResolver) getDocument(ctx context.Context, slug, docID stri
 	return resolver.docToMap(ctx, doc, fields), nil
 }
 
-func (resolver *queryResolver) getDocumentList(ctx context.Context, slug string, filters interface{}, orderBy interface{}, start, size *int, locale, status *string, fields []entity.FieldDefinition) ([]map[string]interface{}, error) {
+func (resolver *Resolver) getDocumentList(ctx context.Context, slug string, filters interface{}, orderBy interface{}, start, size *int, locale, status *string, fields []entity.FieldDefinition) ([]map[string]interface{}, error) {
 	startVal := 0
 	if start != nil {
 		startVal = *start
@@ -62,7 +62,7 @@ func (resolver *queryResolver) getDocumentList(ctx context.Context, slug string,
 
 // ── Collection-type mutation helpers ──
 
-func (resolver *mutationResolver) createDocument(ctx context.Context, slug string, data interface{}, fields []entity.FieldDefinition) (map[string]interface{}, error) {
+func (resolver *Resolver) createDocument(ctx context.Context, slug string, data interface{}, fields []entity.FieldDefinition) (map[string]interface{}, error) {
 	dataMap := structToMap(data)
 	doc := &entity.Document{Fields: dataMap}
 	saved, err := resolver.docUC.Save(ctx, slug, doc, fields, middleware.UserID(ctx))
@@ -72,7 +72,7 @@ func (resolver *mutationResolver) createDocument(ctx context.Context, slug strin
 	return resolver.docToMap(ctx, saved, fields), nil
 }
 
-func (resolver *mutationResolver) updateDocument(ctx context.Context, slug, docID string, data interface{}, fields []entity.FieldDefinition) (map[string]interface{}, error) {
+func (resolver *Resolver) updateDocument(ctx context.Context, slug, docID string, data interface{}, fields []entity.FieldDefinition) (map[string]interface{}, error) {
 	dataMap := structToMap(data)
 	doc := &entity.Document{DocumentID: docID, Fields: dataMap}
 	saved, err := resolver.docUC.Save(ctx, slug, doc, fields, middleware.UserID(ctx))
@@ -82,11 +82,11 @@ func (resolver *mutationResolver) updateDocument(ctx context.Context, slug, docI
 	return resolver.docToMap(ctx, saved, fields), nil
 }
 
-func (resolver *mutationResolver) deleteDocument(ctx context.Context, slug, docID string, fields []entity.FieldDefinition) (bool, error) {
+func (resolver *Resolver) deleteDocument(ctx context.Context, slug, docID string, fields []entity.FieldDefinition) (bool, error) {
 	return true, resolver.docUC.Delete(ctx, slug, docID, fields)
 }
 
-func (resolver *mutationResolver) publishDocument(ctx context.Context, slug, docID string, locale *string, fields []entity.FieldDefinition) (map[string]interface{}, error) {
+func (resolver *Resolver) publishDocument(ctx context.Context, slug, docID string, locale *string, fields []entity.FieldDefinition) (map[string]interface{}, error) {
 	localeStr := derefString(locale)
 	if err := resolver.docUC.Publish(ctx, slug, docID, localeStr, fields, middleware.UserID(ctx)); err != nil {
 		return nil, err
@@ -98,7 +98,7 @@ func (resolver *mutationResolver) publishDocument(ctx context.Context, slug, doc
 	return resolver.docToMap(ctx, doc, fields), nil
 }
 
-func (resolver *mutationResolver) unpublishDocument(ctx context.Context, slug, docID string, locale *string, fields []entity.FieldDefinition) (map[string]interface{}, error) {
+func (resolver *Resolver) unpublishDocument(ctx context.Context, slug, docID string, locale *string, fields []entity.FieldDefinition) (map[string]interface{}, error) {
 	localeStr := derefString(locale)
 	if err := resolver.docUC.Unpublish(ctx, slug, docID, localeStr, fields); err != nil {
 		return nil, err
@@ -112,7 +112,7 @@ func (resolver *mutationResolver) unpublishDocument(ctx context.Context, slug, d
 
 // ── Single-type helpers ──
 
-func (resolver *queryResolver) getSingleType(ctx context.Context, slug string, locale, status *string, fields []entity.FieldDefinition) (map[string]interface{}, error) {
+func (resolver *Resolver) getSingleType(ctx context.Context, slug string, locale, status *string, fields []entity.FieldDefinition) (map[string]interface{}, error) {
 	localeStr := derefString(locale)
 	if derefString(status) == "draft" && middleware.UserID(ctx) != "" {
 		doc, _, err := resolver.docUC.GetSingleType(ctx, slug, localeStr, fields)
@@ -128,7 +128,7 @@ func (resolver *queryResolver) getSingleType(ctx context.Context, slug string, l
 	return resolver.docToMap(ctx, doc, fields), nil
 }
 
-func (resolver *mutationResolver) saveSingleType(ctx context.Context, slug string, data interface{}, locale *string, fields []entity.FieldDefinition) (map[string]interface{}, error) {
+func (resolver *Resolver) saveSingleType(ctx context.Context, slug string, data interface{}, locale *string, fields []entity.FieldDefinition) (map[string]interface{}, error) {
 	dataMap := structToMap(data)
 	localeStr := derefString(locale)
 	saved, err := resolver.docUC.SaveSingleType(ctx, slug, dataMap, localeStr, fields, middleware.UserID(ctx))
@@ -142,7 +142,7 @@ func (resolver *mutationResolver) saveSingleType(ctx context.Context, slug strin
 	return resolver.docToMap(ctx, doc, fields), nil
 }
 
-func (resolver *mutationResolver) publishSingleType(ctx context.Context, slug string, locale *string, fields []entity.FieldDefinition) (map[string]interface{}, error) {
+func (resolver *Resolver) publishSingleType(ctx context.Context, slug string, locale *string, fields []entity.FieldDefinition) (map[string]interface{}, error) {
 	localeStr := derefString(locale)
 	if err := resolver.docUC.PublishSingleType(ctx, slug, localeStr, fields, middleware.UserID(ctx)); err != nil {
 		return nil, err
@@ -154,7 +154,7 @@ func (resolver *mutationResolver) publishSingleType(ctx context.Context, slug st
 	return resolver.docToMap(ctx, doc, fields), nil
 }
 
-func (resolver *mutationResolver) unpublishSingleType(ctx context.Context, slug string, locale *string, fields []entity.FieldDefinition) (map[string]interface{}, error) {
+func (resolver *Resolver) unpublishSingleType(ctx context.Context, slug string, locale *string, fields []entity.FieldDefinition) (map[string]interface{}, error) {
 	localeStr := derefString(locale)
 	if err := resolver.docUC.UnpublishSingleType(ctx, slug, localeStr, fields); err != nil {
 		return nil, err
