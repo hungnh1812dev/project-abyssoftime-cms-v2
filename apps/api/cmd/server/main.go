@@ -231,21 +231,22 @@ func main() {
 		CORSOrigins:        cfg.CORSOrigins,
 	})
 
-	// gRPC server (optional — skipped if port unavailable)
-	grpcSrv := grpcdelivery.NewServer(authUC, ctUC, documentUC, mediaUC)
-
-	go func() {
-		grpcAddr := ":" + cfg.GRPCPort
-		lis, err := net.Listen("tcp", grpcAddr)
-		if err != nil {
-			log.Printf("gRPC disabled: %v", err)
-			return
-		}
-		log.Printf("gRPC server listening on %s", grpcAddr)
-		if err := grpcSrv.Serve(lis); err != nil {
-			log.Printf("gRPC stopped: %v", err)
-		}
-	}()
+	// gRPC server (opt-in via GRPC_ENABLED=true)
+	if cfg.GRPCEnabled {
+		grpcSrv := grpcdelivery.NewServer(authUC, ctUC, documentUC, mediaUC)
+		go func() {
+			grpcAddr := ":" + cfg.GRPCPort
+			lis, err := net.Listen("tcp", grpcAddr)
+			if err != nil {
+				log.Printf("gRPC disabled: %v", err)
+				return
+			}
+			log.Printf("gRPC server listening on %s", grpcAddr)
+			if err := grpcSrv.Serve(lis); err != nil {
+				log.Printf("gRPC stopped: %v", err)
+			}
+		}()
+	}
 
 	// Start REST + GraphQL (blocks)
 	addr := ":" + cfg.Port
