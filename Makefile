@@ -93,6 +93,6 @@ test-web:
 
 graphql-generate:
 	cd apps/api && go run ./cmd/gqlcodegen --phase=schema
-	cd apps/api && go run github.com/99designs/gqlgen generate
-	cd apps/api && rm -f graphql/resolver/*.resolvers.go
+	cd apps/api && go run github.com/99designs/gqlgen generate --config graphql/gqlgen.yml
+	rm -f apps/api/graphql/resolver/*.resolvers.go
 	cd apps/api && go run ./cmd/gqlcodegen --phase=resolvers

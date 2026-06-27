@@ -65,13 +65,13 @@ func TestBuildContentTypeSDL_Collection(t *testing.T) {
 		"input BlogPostsOrderBy {",
 		"title: SortOrder",
 		"createdAt: SortOrder",
-		"blogPosts(blogPostsId: ID!, locale: String, status: String): BlogPosts",
+		"blogPosts(documentId: ID!, locale: String, status: String): BlogPosts",
 		"blogPostsList(filters: [BlogPostsFilter!], orderBy: BlogPostsOrderBy, start: Int, size: Int, locale: String, status: String): [BlogPosts!]!",
 		"createBlogPosts(data: BlogPostsInput!): BlogPosts! @auth",
-		"updateBlogPosts(blogPostsId: ID!, data: BlogPostsInput!): BlogPosts! @auth",
-		"deleteBlogPosts(blogPostsId: ID!): Boolean! @auth",
-		"publishBlogPosts(blogPostsId: ID!, locale: String): BlogPosts! @auth",
-		"unpublishBlogPosts(blogPostsId: ID!, locale: String): BlogPosts! @auth",
+		"updateBlogPosts(documentId: ID!, data: BlogPostsInput!): BlogPosts! @auth",
+		"deleteBlogPosts(documentId: ID!): Boolean! @auth",
+		"publishBlogPosts(documentId: ID!, locale: String): BlogPosts! @auth",
+		"unpublishBlogPosts(documentId: ID!, locale: String): BlogPosts! @auth",
 	} {
 		if !strings.Contains(sdl, want) {
 			t.Errorf("collection SDL missing %q\n\nFull SDL:\n%s", want, sdl)

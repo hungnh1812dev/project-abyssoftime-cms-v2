@@ -221,16 +221,16 @@ func buildContentTypeSDL(def contenttype.ContentTypeDefinition) string {
 
 	if def.Kind == "collection" {
 		builder.WriteString("extend type Query {\n")
-		fmt.Fprintf(&builder, "  %s(%sId: ID!, locale: String, status: String): %s\n", camel, camel, typeName)
+		fmt.Fprintf(&builder, "  %s(documentId: ID!, locale: String, status: String): %s\n", camel, typeName)
 		fmt.Fprintf(&builder, "  %sList(filters: [%sFilter!], orderBy: %sOrderBy, start: Int, size: Int, locale: String, status: String): [%s!]!\n", camel, typeName, typeName, typeName)
 		builder.WriteString("}\n\n")
 
 		builder.WriteString("extend type Mutation {\n")
 		fmt.Fprintf(&builder, "  create%s(data: %sInput!): %s! @auth\n", typeName, typeName, typeName)
-		fmt.Fprintf(&builder, "  update%s(%sId: ID!, data: %sInput!): %s! @auth\n", typeName, camel, typeName, typeName)
-		fmt.Fprintf(&builder, "  delete%s(%sId: ID!): Boolean! @auth\n", typeName, camel)
-		fmt.Fprintf(&builder, "  publish%s(%sId: ID!, locale: String): %s! @auth\n", typeName, camel, typeName)
-		fmt.Fprintf(&builder, "  unpublish%s(%sId: ID!, locale: String): %s! @auth\n", typeName, camel, typeName)
+		fmt.Fprintf(&builder, "  update%s(documentId: ID!, data: %sInput!): %s! @auth\n", typeName, typeName, typeName)
+		fmt.Fprintf(&builder, "  delete%s(documentId: ID!): Boolean! @auth\n", typeName)
+		fmt.Fprintf(&builder, "  publish%s(documentId: ID!, locale: String): %s! @auth\n", typeName, typeName)
+		fmt.Fprintf(&builder, "  unpublish%s(documentId: ID!, locale: String): %s! @auth\n", typeName, typeName)
 		builder.WriteString("}\n")
 	} else {
 		builder.WriteString("extend type Query {\n")
