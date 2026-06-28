@@ -218,30 +218,72 @@ Whenever a code change, new feature, bug fix, spec update, or refactor introduce
 
 ---
 
-## 13. Pre-Commit Verification (Mandatory)
+## 13. Feature Development Workflow
+
+### 13.1 Lifecycle
+
+```
+User requests new feature
+  → Create feature spec in specs/<feature>.md
+  → User reviews and approves spec
+  → Clear tasks/ folder (archive old plans/todos)
+  → Create new plan.md and todo.md in tasks/
+  → Build incrementally (code → test → checkpoint)
+  → User feedback → iterate
+  → Feature complete
+  → Merge feature spec into module spec (specs/<module>.md)
+  → Update affected rule files (rules/<module>.md)
+  → Update README.md, docs/ if needed
+  → Delete feature spec file
+  → Commit
+```
+
+### 13.2 Spec File Rules
+- **One feature spec at a time** — only one `specs/<feature>.md` exists outside module specs
+- When user requests a new spec, **delete the previous feature spec** before starting
+- Module specs (`specs/admin.md`, `specs/core.md`, etc.) are permanent — never delete
+- Feature specs are temporary — merged into module specs after completion
+
+### 13.3 Tasks Folder Rules
+- `tasks/plan.md` — current implementation plan
+- `tasks/todo.md` — current progress tracker
+- On new feature: **clear** old plan/todo files (archive to `tasks/archive/` if needed)
+- Never leave stale plans or todos from previous features
+
+### 13.4 Post-Feature Merge Checklist
+1. Merge feature spec content into the relevant module spec (`specs/<module>.md`)
+2. Update affected rule files (`rules/<module>.md`) with new conventions
+3. Update `rules/README.md` if new rule files were added
+4. Update `docs/` or guide if user-facing behavior changed
+5. Delete the feature spec file
+6. Commit all doc changes together
+
+---
+
+## 14. Pre-Commit Verification (Mandatory)
 
 After completing all tasks in a build phase, or after any short code-editing task, **always** run the verification pipeline for each service that has code changes before considering the work done.
 
-### 13.1 Which Services to Verify
+### 14.1 Which Services to Verify
 
 Only verify services that have changed files:
 - **`apps/api/`** changed → run API checks
 - **`apps/web/`** changed → run Web checks
 - Both changed → run both
 
-### 13.2 API Checks (`apps/api/`)
+### 14.2 API Checks (`apps/api/`)
 
 1. **Lint** — `cd apps/api && go vet ./...`
 2. **Unit tests** — `make test-api`
 3. **Build** — `cd apps/api && go build ./...`
 
-### 13.3 Web Checks (`apps/web/`)
+### 14.3 Web Checks (`apps/web/`)
 
 1. **Lint** — `cd apps/web && npm run lint`
 2. **Unit tests** — `make test-web`
 3. **Build** — `cd apps/web && npm run build`
 
-### 13.4 Invariants
+### 14.4 Invariants
 
 - All steps for affected services must pass
 - If any step fails, fix the issue before committing or reporting the task as complete
