@@ -1,7 +1,6 @@
 # RULES — core Module
 
 **Scope:** Shared entities, repository interfaces, error types, configuration, JWT utilities, database clients, middleware, router, gRPC, deployment.
-**Spec:** [specs/core.md](../specs/core.md)
 
 ---
 
@@ -61,7 +60,7 @@
 ### 3.1 Config Loading
 - All env vars loaded once at boot into `internal/config/config.go`
 - **NEVER** call `os.Getenv` outside `config.go`
-- Every new env var must be documented in `specs/core.md §7`
+- Every new env var must be added to `config.go` with a `getenv` call and default value
 
 ### 3.2 Per-Entity DB Selection
 - `DB_<ENTITY>` env var overrides `DB_DRIVER` for that entity
