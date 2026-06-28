@@ -153,6 +153,23 @@ type MediaAsset {
   height: Int
 }
 
+input PaginationInput {
+  start: Int
+  limit: Int
+  page: Int
+  pageSize: Int
+}
+
+type PaginationMeta {
+  page: Int!
+  pageSize: Int!
+  total: Int!
+}
+
+type ListMeta {
+  pagination: PaginationMeta!
+}
+
 type ContentType {
   id: ID!
   name: String!
@@ -220,9 +237,14 @@ func buildContentTypeSDL(def contenttype.ContentTypeDefinition) string {
 	}
 
 	if def.Kind == "collection" {
+		fmt.Fprintf(&builder, "type %sList {\n", typeName)
+		fmt.Fprintf(&builder, "  items: [%s!]!\n", typeName)
+		builder.WriteString("  meta: ListMeta!\n")
+		builder.WriteString("}\n\n")
+
 		builder.WriteString("extend type Query {\n")
 		fmt.Fprintf(&builder, "  %s(documentId: ID!, locale: String, status: String): %s\n", camel, typeName)
-		fmt.Fprintf(&builder, "  %s(filters: [%sFilter!], orderBy: %sOrderBy, start: Int, size: Int, locale: String, status: String): [%s!]!\n", pluralize(camel), typeName, typeName, typeName)
+		fmt.Fprintf(&builder, "  %s(pagination: PaginationInput, filters: [%sFilter!], orderBy: %sOrderBy, locale: String, status: String): %sList!\n", pluralize(camel), typeName, typeName, typeName)
 		builder.WriteString("}\n\n")
 
 		builder.WriteString("extend type Mutation {\n")
@@ -296,6 +318,7 @@ func writeFilterType(builder *strings.Builder, typeName string, fields []entity.
 
 func writeOrderByType(builder *strings.Builder, typeName string, fields []entity.FieldDefinition) {
 	fmt.Fprintf(builder, "input %sOrderBy {\n", typeName)
+	builder.WriteString("  id: SortOrder\n")
 	for _, field := range fields {
 		switch field.Type {
 		case "text", "richtext", "number", "boolean":
@@ -408,8 +431,8 @@ func writeCollectionResolvers(builder *strings.Builder, def contenttype.ContentT
 	fmt.Fprintf(builder, "\treturn resolver.getDocument(ctx, %q, %sID, locale, status, %s)\n", def.Slug, camel, fieldsVar)
 	builder.WriteString("}\n\n")
 
-	fmt.Fprintf(builder, "func (resolver *queryResolver) %s(ctx context.Context, filters []*model.%sFilter, orderBy *model.%sOrderBy, start *int, size *int, locale *string, status *string) ([]map[string]interface{}, error) {\n", pluralize(pascal), pascal, pascal)
-	fmt.Fprintf(builder, "\treturn resolver.getDocumentList(ctx, %q, filters, orderBy, start, size, locale, status, %s)\n", def.Slug, fieldsVar)
+	fmt.Fprintf(builder, "func (resolver *queryResolver) %s(ctx context.Context, pagination *model.PaginationInput, filters []*model.%sFilter, orderBy *model.%sOrderBy, locale *string, status *string) (map[string]interface{}, error) {\n", pluralize(pascal), pascal, pascal)
+	fmt.Fprintf(builder, "\treturn resolver.getDocumentList(ctx, %q, pagination, filters, orderBy, locale, status, %s)\n", def.Slug, fieldsVar)
 	builder.WriteString("}\n\n")
 
 	fmt.Fprintf(builder, "func (resolver *mutationResolver) Create%s(ctx context.Context, data model.%sInput) (map[string]interface{}, error) {\n", pascal, pascal)
@@ -480,6 +503,12 @@ func writeResolverRootMethods(builder *strings.Builder, defs []contenttype.Conte
 		fmt.Fprintf(builder, "type %s struct{ *Resolver }\n", resolverType)
 		fmt.Fprintf(builder, "func (resolver *Resolver) %s() generated.%sResolver { return &%s{resolver} }\n\n", pascal, pascal, resolverType)
 
+		if def.Kind == "collection" {
+			listResolverType := lower + "ListFieldResolver"
+			fmt.Fprintf(builder, "type %s struct{ *Resolver }\n", listResolverType)
+			fmt.Fprintf(builder, "func (resolver *Resolver) %sList() generated.%sListResolver { return &%s{resolver} }\n\n", pascal, pascal, listResolverType)
+		}
+
 		writeComponentResolverRootMethods(builder, pascal, def.Fields)
 	}
 }
@@ -500,6 +529,8 @@ func writeComponentResolverRootMethods(builder *strings.Builder, parentType stri
 }
 
 func writeMapFieldResolvers(builder *strings.Builder, defs []contenttype.ContentTypeDefinition) {
+	writeSharedMetaResolvers(builder)
+
 	builder.WriteString("// ── Map field resolvers ──\n\n")
 
 	writeMapFieldResolverMethods(builder, "mediaAssetFieldResolver", []mapField{
@@ -527,6 +558,11 @@ func writeMapFieldResolvers(builder *strings.Builder, defs []contenttype.Content
 
 		docFields := buildDocumentMapFields(def.Fields)
 		writeMapFieldResolverMethods(builder, resolverType, docFields)
+
+		if def.Kind == "collection" {
+			listResolverType := lower + "ListFieldResolver"
+			writeListFieldResolverMethods(builder, listResolverType)
+		}
 
 		writeComponentFieldResolvers(builder, pascal, def.Fields)
 	}
@@ -600,6 +636,68 @@ func writeMapFieldResolverMethods(builder *strings.Builder, resolverType string,
 		writeMapFieldMethod(builder, resolverType, field)
 	}
 	builder.WriteString("\n")
+}
+
+func writeListFieldResolverMethods(builder *strings.Builder, resolverType string) {
+	fmt.Fprintf(builder, "func (resolver *%s) Items(_ context.Context, obj map[string]interface{}) ([]map[string]interface{}, error) {\n", resolverType)
+	builder.WriteString("\tswitch typed := obj[\"items\"].(type) {\n")
+	builder.WriteString("\tcase []map[string]interface{}:\n")
+	builder.WriteString("\t\treturn typed, nil\n")
+	builder.WriteString("\tcase []interface{}:\n")
+	builder.WriteString("\t\tresult := make([]map[string]interface{}, 0, len(typed))\n")
+	builder.WriteString("\t\tfor _, item := range typed {\n")
+	builder.WriteString("\t\t\tif itemMap, isMap := item.(map[string]interface{}); isMap {\n")
+	builder.WriteString("\t\t\t\tresult = append(result, itemMap)\n")
+	builder.WriteString("\t\t\t}\n")
+	builder.WriteString("\t\t}\n")
+	builder.WriteString("\t\treturn result, nil\n")
+	builder.WriteString("\tdefault:\n")
+	builder.WriteString("\t\treturn nil, nil\n")
+	builder.WriteString("\t}\n")
+	builder.WriteString("}\n\n")
+
+	fmt.Fprintf(builder, "func (resolver *%s) Meta(_ context.Context, obj map[string]interface{}) (map[string]interface{}, error) {\n", resolverType)
+	builder.WriteString("\tval, _ := obj[\"meta\"].(map[string]interface{})\n")
+	builder.WriteString("\treturn val, nil\n")
+	builder.WriteString("}\n\n")
+}
+
+func writeSharedMetaResolvers(builder *strings.Builder) {
+	builder.WriteString("// ── Shared meta field resolvers ──\n\n")
+
+	builder.WriteString("type listMetaFieldResolver struct{ *Resolver }\n")
+	builder.WriteString("type paginationMetaFieldResolver struct{ *Resolver }\n\n")
+
+	builder.WriteString("func (resolver *Resolver) ListMeta() generated.ListMetaResolver { return &listMetaFieldResolver{resolver} }\n")
+	builder.WriteString("func (resolver *Resolver) PaginationMeta() generated.PaginationMetaResolver { return &paginationMetaFieldResolver{resolver} }\n\n")
+
+	builder.WriteString("func (resolver *listMetaFieldResolver) Pagination(_ context.Context, obj map[string]interface{}) (map[string]interface{}, error) {\n")
+	builder.WriteString("\tval, _ := obj[\"pagination\"].(map[string]interface{})\n")
+	builder.WriteString("\treturn val, nil\n")
+	builder.WriteString("}\n\n")
+
+	builder.WriteString("func (resolver *paginationMetaFieldResolver) Page(_ context.Context, obj map[string]interface{}) (int, error) {\n")
+	builder.WriteString("\tval, _ := obj[\"page\"].(int)\n")
+	builder.WriteString("\treturn val, nil\n")
+	builder.WriteString("}\n\n")
+
+	builder.WriteString("func (resolver *paginationMetaFieldResolver) PageSize(_ context.Context, obj map[string]interface{}) (int, error) {\n")
+	builder.WriteString("\tval, _ := obj[\"pageSize\"].(int)\n")
+	builder.WriteString("\treturn val, nil\n")
+	builder.WriteString("}\n\n")
+
+	builder.WriteString("func (resolver *paginationMetaFieldResolver) Total(_ context.Context, obj map[string]interface{}) (int, error) {\n")
+	builder.WriteString("\tswitch val := obj[\"total\"].(type) {\n")
+	builder.WriteString("\tcase int:\n")
+	builder.WriteString("\t\treturn val, nil\n")
+	builder.WriteString("\tcase int64:\n")
+	builder.WriteString("\t\treturn int(val), nil\n")
+	builder.WriteString("\tcase float64:\n")
+	builder.WriteString("\t\treturn int(val), nil\n")
+	builder.WriteString("\tdefault:\n")
+	builder.WriteString("\t\treturn 0, nil\n")
+	builder.WriteString("\t}\n")
+	builder.WriteString("}\n\n")
 }
 
 func writeMapFieldMethod(builder *strings.Builder, resolverType string, field mapField) {
@@ -736,11 +834,20 @@ func injectModels(graphqlDir string, defs []contenttype.ContentTypeDefinition) e
 	models.WriteString("    model: \"project-abyssoftime-cms-v2/api/graphql/model.MediaAssetMap\"\n")
 	models.WriteString("  ContentType:\n")
 	models.WriteString("    model: \"project-abyssoftime-cms-v2/api/graphql/model.ContentTypeMap\"\n")
+	models.WriteString("  ListMeta:\n")
+	models.WriteString("    model: \"project-abyssoftime-cms-v2/api/graphql/model.DocumentListMap\"\n")
+	models.WriteString("  PaginationMeta:\n")
+	models.WriteString("    model: \"project-abyssoftime-cms-v2/api/graphql/model.DocumentListMap\"\n")
 
 	for _, def := range defs {
 		pascal := slugToPascalCase(def.Slug)
 		fmt.Fprintf(&models, "  %s:\n", pascal)
 		models.WriteString("    model: \"project-abyssoftime-cms-v2/api/graphql/model.DocumentMap\"\n")
+
+		if def.Kind == "collection" {
+			fmt.Fprintf(&models, "  %sList:\n", pascal)
+			models.WriteString("    model: \"project-abyssoftime-cms-v2/api/graphql/model.DocumentListMap\"\n")
+		}
 
 		collectComponentTypes(&models, pascal, def.Fields)
 	}
