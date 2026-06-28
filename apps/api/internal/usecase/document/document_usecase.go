@@ -606,12 +606,12 @@ func (uc *UseCase) GetPublished(ctx context.Context, contentTypeSlug, documentID
 	return doc, nil
 }
 
-func (uc *UseCase) GetPublishedPaginated(ctx context.Context, contentTypeSlug string, start, size int, locale string, fields []entity.FieldDefinition, filters []entity.FilterNode) ([]*entity.Document, int64, error) {
+func (uc *UseCase) GetPublishedPaginated(ctx context.Context, contentTypeSlug string, start, size int, locale string, fields []entity.FieldDefinition, orderBy string, sortDir int, filters []entity.FilterNode) ([]*entity.Document, int64, error) {
 	locale, err := uc.resolveLocale(locale)
 	if err != nil {
 		return nil, 0, err
 	}
-	docs, total, err := uc.repo.FindPublishedByContentTypePaginated(ctx, contentTypeSlug, start, size, locale, "createdAt", -1, filters)
+	docs, total, err := uc.repo.FindPublishedByContentTypePaginated(ctx, contentTypeSlug, start, size, locale, orderBy, sortDir, filters)
 	if err != nil {
 		return nil, 0, err
 	}
