@@ -12,7 +12,7 @@ import (
 
 func setupUserDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	db, err := NewClient("sqlite", ":memory:")
+	db, err := NewClient("sqlite", ":memory:", false)
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}

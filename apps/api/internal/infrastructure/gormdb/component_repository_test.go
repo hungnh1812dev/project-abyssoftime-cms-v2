@@ -15,7 +15,7 @@ var compTestFields = []entity.FieldDefinition{
 
 func setupCompDB(t *testing.T, slug, comp string) *componentRepository {
 	t.Helper()
-	db, err := NewClient("sqlite", ":memory:")
+	db, err := NewClient("sqlite", ":memory:", false)
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
@@ -27,7 +27,7 @@ func setupCompDB(t *testing.T, slug, comp string) *componentRepository {
 }
 
 func TestComponentRepository_EnsureCollection_CreatesTable(t *testing.T) {
-	db, err := NewClient("sqlite", ":memory:")
+	db, err := NewClient("sqlite", ":memory:", false)
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
@@ -49,7 +49,7 @@ func TestComponentRepository_EnsureCollection_CreatesTable(t *testing.T) {
 }
 
 func TestComponentRepository_DropCollection(t *testing.T) {
-	db, err := NewClient("sqlite", ":memory:")
+	db, err := NewClient("sqlite", ":memory:", false)
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
@@ -166,7 +166,7 @@ func TestComponentRepository_DeleteAllByContentType(t *testing.T) {
 }
 
 func TestComponentRepository_EnsureCollection_PreservesData(t *testing.T) {
-	db, err := NewClient("sqlite", ":memory:")
+	db, err := NewClient("sqlite", ":memory:", false)
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
@@ -204,7 +204,7 @@ func TestComponentRepository_EnsureCollection_PreservesData(t *testing.T) {
 }
 
 func TestComponentRepository_EnsureCollection_AddsNewColumn(t *testing.T) {
-	db, err := NewClient("sqlite", ":memory:")
+	db, err := NewClient("sqlite", ":memory:", false)
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
@@ -248,7 +248,7 @@ func TestComponentRepository_EnsureCollection_AddsNewColumn(t *testing.T) {
 }
 
 func TestComponentRepository_EnsureCollection_IgnoresRemovedField(t *testing.T) {
-	db, err := NewClient("sqlite", ":memory:")
+	db, err := NewClient("sqlite", ":memory:", false)
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
@@ -291,7 +291,7 @@ func TestComponentRepository_EnsureCollection_IgnoresRemovedField(t *testing.T) 
 }
 
 func TestComponentRepository_EnsureCollection_CreatesSortOrderColumn(t *testing.T) {
-	db, err := NewClient("sqlite", ":memory:")
+	db, err := NewClient("sqlite", ":memory:", false)
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
@@ -312,7 +312,7 @@ func TestComponentRepository_EnsureCollection_CreatesSortOrderColumn(t *testing.
 }
 
 func TestComponentRepository_EnsureCollection_AddsSortOrderToExistingTable(t *testing.T) {
-	db, err := NewClient("sqlite", ":memory:")
+	db, err := NewClient("sqlite", ":memory:", false)
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
@@ -381,7 +381,7 @@ func TestComponentRepository_SortOrder_PreservedThroughUpsert(t *testing.T) {
 
 func setupNestedCompDB(t *testing.T, slug, comp string) *componentRepository {
 	t.Helper()
-	db, err := NewClient("sqlite", ":memory:")
+	db, err := NewClient("sqlite", ":memory:", false)
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
@@ -393,7 +393,7 @@ func setupNestedCompDB(t *testing.T, slug, comp string) *componentRepository {
 }
 
 func TestComponentRepository_EnsureCollection_TopLevel_HasDocumentID(t *testing.T) {
-	db, err := NewClient("sqlite", ":memory:")
+	db, err := NewClient("sqlite", ":memory:", false)
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
@@ -417,7 +417,7 @@ func TestComponentRepository_EnsureCollection_TopLevel_HasDocumentID(t *testing.
 }
 
 func TestComponentRepository_EnsureCollection_Nested_HasParentComponentID(t *testing.T) {
-	db, err := NewClient("sqlite", ":memory:")
+	db, err := NewClient("sqlite", ":memory:", false)
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}

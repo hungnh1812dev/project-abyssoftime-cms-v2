@@ -10,14 +10,19 @@ import (
 	"project-abyssoftime-cms-v2/api/internal/domain/entity"
 )
 
-func NewClient(driver, dsn string) (*gorm.DB, error) {
+func NewClient(driver, dsn string, debug bool) (*gorm.DB, error) {
 	dialector, err := resolveDialector(driver, dsn)
 	if err != nil {
 		return nil, err
 	}
 
+	logMode := logger.Silent
+	if debug {
+		logMode = logger.Info
+	}
+
 	db, err := gorm.Open(dialector, &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Silent),
+		Logger: logger.Default.LogMode(logMode),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("gorm connect (%s): %w", driver, err)
