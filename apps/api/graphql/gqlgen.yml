@@ -23,7 +23,7 @@ directives:
 
 models:
   JSON:
-    model: "github.com/99designs/gqlgen/graphql.Map"
+    model: "github.com/99designs/gqlgen/graphql.Any"
   Time:
     model: "github.com/99designs/gqlgen/graphql.Time"
   # --- gqlcodegen models start ---
