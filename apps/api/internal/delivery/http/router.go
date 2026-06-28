@@ -23,10 +23,16 @@ type RouterConfig struct {
 	GraphQLHandler     http.Handler
 	GraphQLPath        string
 	CORSOrigins        []string
+	EnableDebug        bool
 }
 
 func SetupRouter(cfg RouterConfig) *gin.Engine {
+	if !cfg.EnableDebug {
+		gin.SetMode(gin.ReleaseMode)
+	}
+
 	r := gin.New()
+	r.SetTrustedProxies(nil)
 	r.Use(gin.Recovery())
 	r.Use(middleware.CORS(cfg.CORSOrigins))
 
