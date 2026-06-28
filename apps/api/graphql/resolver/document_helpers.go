@@ -3,8 +3,10 @@ package resolver
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"reflect"
 
+	"project-abyssoftime-cms-v2/api/graphql/model"
 	"project-abyssoftime-cms-v2/api/internal/delivery/http/middleware"
 	"project-abyssoftime-cms-v2/api/internal/domain/entity"
 )
@@ -27,14 +29,10 @@ func (resolver *Resolver) getDocument(ctx context.Context, slug, docID string, l
 	return resolver.docToMap(ctx, doc, fields), nil
 }
 
-func (resolver *Resolver) getDocumentList(ctx context.Context, slug string, filters interface{}, orderBy interface{}, start, size *int, locale, status *string, fields []entity.FieldDefinition) ([]map[string]interface{}, error) {
-	startVal := 0
-	if start != nil {
-		startVal = *start
-	}
-	sizeVal := 20
-	if size != nil {
-		sizeVal = *size
+func (resolver *Resolver) getDocumentList(ctx context.Context, slug string, pagination *model.PaginationInput, filters interface{}, orderBy interface{}, locale, status *string, fields []entity.FieldDefinition) (map[string]interface{}, error) {
+	startVal, limitVal, err := parsePagination(pagination)
+	if err != nil {
+		return nil, err
 	}
 	localeStr := derefString(locale)
 
@@ -46,18 +44,18 @@ func (resolver *Resolver) getDocumentList(ctx context.Context, slug string, filt
 	}
 
 	if derefString(status) == "draft" && middleware.UserID(ctx) != "" {
-		docs, _, _, err := resolver.docUC.GetAllPaginated(ctx, slug, startVal, sizeVal, localeStr, fields, orderField, sortDir, parsedFilters)
+		docs, _, total, err := resolver.docUC.GetAllPaginated(ctx, slug, startVal, limitVal, localeStr, fields, orderField, sortDir, parsedFilters)
 		if err != nil {
 			return nil, err
 		}
-		return resolver.docsToMaps(ctx, docs, fields), nil
+		return resolver.buildListResponse(ctx, docs, fields, total, startVal, limitVal), nil
 	}
 
-	docs, _, err := resolver.docUC.GetPublishedPaginated(ctx, slug, startVal, sizeVal, localeStr, fields, parsedFilters)
+	docs, total, err := resolver.docUC.GetPublishedPaginated(ctx, slug, startVal, limitVal, localeStr, fields, orderField, sortDir, parsedFilters)
 	if err != nil {
 		return nil, err
 	}
-	return resolver.docsToMaps(ctx, docs, fields), nil
+	return resolver.buildListResponse(ctx, docs, fields, total, startVal, limitVal), nil
 }
 
 // ── Collection-type mutation helpers ──
@@ -167,6 +165,80 @@ func (resolver *Resolver) unpublishSingleType(ctx context.Context, slug string, 
 }
 
 // ── Shared helpers ──
+
+func (resolver *Resolver) buildListResponse(ctx context.Context, docs []*entity.Document, fields []entity.FieldDefinition, total int64, start, limit int) map[string]interface{} {
+	page := 1
+	pageSize := limit
+	if limit == -1 {
+		pageSize = int(total)
+	} else if limit > 0 {
+		page = start/limit + 1
+	}
+
+	return map[string]interface{}{
+		"items": resolver.docsToMaps(ctx, docs, fields),
+		"meta": map[string]interface{}{
+			"pagination": map[string]interface{}{
+				"page":     page,
+				"pageSize": pageSize,
+				"total":    total,
+			},
+		},
+	}
+}
+
+func parsePagination(input *model.PaginationInput) (start, limit int, err error) {
+	if input == nil {
+		return 0, 10, nil
+	}
+
+	hasOffset := input.Start != nil || input.Limit != nil
+	hasPage := input.Page != nil || input.PageSize != nil
+
+	if hasOffset && hasPage {
+		return 0, 0, fmt.Errorf("cannot mix offset (start/limit) and page (page/pageSize) modes")
+	}
+
+	if hasPage {
+		if input.Page == nil || input.PageSize == nil {
+			return 0, 0, fmt.Errorf("page and pageSize must both be provided")
+		}
+		if *input.Page < 1 {
+			return 0, 0, fmt.Errorf("page must be >= 1")
+		}
+		if *input.PageSize == 0 {
+			return 0, 0, fmt.Errorf("pageSize must not be 0")
+		}
+		pageSize := *input.PageSize
+		if pageSize > 100 {
+			pageSize = 100
+		}
+		return (*input.Page - 1) * pageSize, pageSize, nil
+	}
+
+	start = 0
+	if input.Start != nil {
+		start = *input.Start
+		if start < 0 {
+			start = 0
+		}
+	}
+	limit = 10
+	if input.Limit != nil {
+		if *input.Limit == 0 {
+			return 0, 0, fmt.Errorf("limit must not be 0")
+		}
+		if *input.Limit == -1 {
+			limit = -1
+		} else {
+			limit = *input.Limit
+			if limit > 100 {
+				limit = 100
+			}
+		}
+	}
+	return start, limit, nil
+}
 
 func (resolver *Resolver) docsToMaps(ctx context.Context, docs []*entity.Document, fields []entity.FieldDefinition) []map[string]interface{} {
 	items := make([]map[string]interface{}, len(docs))

@@ -72,8 +72,13 @@ type FieldDefinition struct {
 ### 2.4 Collection-Type Rules
 - Zero or more entries, each with own `documentId`
 - List + create/edit/delete, each with independent draft/published pair
-- Pagination: `start` (offset), `size` (default 20, max 100)
-- **NEVER** allow `size` above 100
+- Pagination via `PaginationInput` supporting two modes:
+  - Offset mode: `{start: Int, limit: Int}` — both optional, defaults `start=0, limit=10`
+  - Page mode: `{page: Int!, pageSize: Int!}` — both required if one is provided
+  - `limit: -1` returns all documents; response `pageSize = total`
+  - Default (no input): `page=1, pageSize=10`
+- **NEVER** allow `limit` or `pageSize` above 100 (except `limit: -1` = no limit)
+- **NEVER** mix offset and page modes in the same request (validation error)
 - Support `orderBy` and `sortDir` query params
 
 ---
@@ -210,7 +215,11 @@ type Component struct {
 - Hand-written files: `graphql/resolver/resolver.go`, `document_helpers.go`, `media.go`, `filter.go`, `content_types.go`, `graphql/handler.go`
 
 ### 6.2 Schema Shape
-- Collection type → `Query.<slug>(Id: ID!, locale: String, status: String)` + `Query.<slugList>(filters, orderBy, start, size, locale, status)`
+- Collection type → `Query.<slug>(Id: ID!, locale: String, status: String)` + `Query.<slugList>(pagination: PaginationInput, filters, orderBy, locale, status): <Type>List!`
+- `<Type>List` wrapper: `{ items: [<Type>!]!, meta: ListMeta! }`
+- `ListMeta`: `{ pagination: PaginationMeta! }`
+- `PaginationMeta`: `{ page: Int!, pageSize: Int!, total: Int! }`
+- `PaginationInput`: `{ start, limit, page, pageSize }` — two modes, validated at resolver level
 - Single type → `Query.<slug>(locale: String, status: String)`
 - Queries default to published; `status: "draft"` opt-in for authenticated users
 - All mutations have `@auth` directive (handler-level auth enforced)

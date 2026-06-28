@@ -16,7 +16,7 @@ import (
 type mockDocUC struct {
 	getForEditFn             func(ctx context.Context, slug, docID, locale string) (*entity.Document, string, error)
 	getAllPaginatedFn         func(ctx context.Context, slug string, start, size int, locale string, orderBy string, sortDir int, filters []entity.FilterNode) ([]*entity.Document, []string, int64, error)
-	getPublishedPaginatedFn  func(ctx context.Context, slug string, start, size int, locale string, filters []entity.FilterNode) ([]*entity.Document, int64, error)
+	getPublishedPaginatedFn  func(ctx context.Context, slug string, start, size int, locale string, orderBy string, sortDir int, filters []entity.FilterNode) ([]*entity.Document, int64, error)
 	getPublishedSingleTypeFn func(ctx context.Context, slug, locale string) (*entity.Document, error)
 	getSingleTypeFn          func(ctx context.Context, slug, locale string) (*entity.Document, string, error)
 	saveSingleTypeFn         func(ctx context.Context, slug string, data map[string]any, locale, userID string) (*entity.Document, error)
@@ -62,9 +62,9 @@ func (mock *mockDocUC) UnpublishSingleType(ctx context.Context, slug, locale str
 func (mock *mockDocUC) GetAllPaginated(ctx context.Context, slug string, start, size int, locale string, _ []entity.FieldDefinition, orderBy string, sortDir int, filters []entity.FilterNode) ([]*entity.Document, []string, int64, error) {
 	return mock.getAllPaginatedFn(ctx, slug, start, size, locale, orderBy, sortDir, filters)
 }
-func (mock *mockDocUC) GetPublishedPaginated(ctx context.Context, slug string, start, size int, locale string, _ []entity.FieldDefinition, filters []entity.FilterNode) ([]*entity.Document, int64, error) {
+func (mock *mockDocUC) GetPublishedPaginated(ctx context.Context, slug string, start, size int, locale string, _ []entity.FieldDefinition, orderBy string, sortDir int, filters []entity.FilterNode) ([]*entity.Document, int64, error) {
 	if mock.getPublishedPaginatedFn != nil {
-		return mock.getPublishedPaginatedFn(ctx, slug, start, size, locale, filters)
+		return mock.getPublishedPaginatedFn(ctx, slug, start, size, locale, orderBy, sortDir, filters)
 	}
 	return nil, 0, nil
 }
@@ -163,7 +163,7 @@ func TestResolver_SingleTypeQuery(test *testing.T) {
 
 func TestResolver_CollectionListQuery(test *testing.T) {
 	docUC := &mockDocUC{
-		getPublishedPaginatedFn: func(_ context.Context, _ string, start, size int, _ string, _ []entity.FilterNode) ([]*entity.Document, int64, error) {
+		getPublishedPaginatedFn: func(_ context.Context, _ string, start, size int, _ string, _ string, _ int, _ []entity.FilterNode) ([]*entity.Document, int64, error) {
 			return []*entity.Document{
 				{DocumentID: "d1", Locale: "en", Fields: map[string]any{"position": "Engineer"}},
 			}, 5, nil
@@ -173,15 +173,21 @@ func TestResolver_CollectionListQuery(test *testing.T) {
 	emptyCTUC := &mockCTUC{findAllFn: func(_ context.Context) ([]*entity.ContentType, error) { return nil, nil }}
 	handler := buildHandler(test, docUC, emptyCTUC)
 
-	result := gqlQuery(test, handler, `{ cvPages(start: 0, size: 10, locale: "en") { documentId position } }`)
+	result := gqlQuery(test, handler, `{ cvPages(pagination: {start: 0, limit: 10}, locale: "en") { items { documentId position } meta { pagination { page pageSize total } } } }`)
 	data := result["data"].(map[string]any)
-	items := data["cvPages"].([]any)
+	listData := data["cvPages"].(map[string]any)
+	items := listData["items"].([]any)
 	if len(items) != 1 {
-		test.Fatalf("cvPages count = %d, want 1", len(items))
+		test.Fatalf("cvPages items count = %d, want 1", len(items))
 	}
 	item := items[0].(map[string]any)
 	if item["position"] != "Engineer" {
 		test.Errorf("position = %v, want Engineer", item["position"])
+	}
+	meta := listData["meta"].(map[string]any)
+	pagination := meta["pagination"].(map[string]any)
+	if total, isOk := pagination["total"].(float64); !isOk || int(total) != 5 {
+		test.Errorf("total = %v, want 5", pagination["total"])
 	}
 }
 

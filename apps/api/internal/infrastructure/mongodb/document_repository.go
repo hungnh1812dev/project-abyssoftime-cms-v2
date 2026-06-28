@@ -221,8 +221,10 @@ func (r *documentRepository) FindDraftsByContentTypePaginated(ctx context.Contex
 
 	opts := options.Find().
 		SetSort(bson.D{{Key: resolveBsonSortKey(orderBy), Value: sortDir}}).
-		SetSkip(int64(start)).
-		SetLimit(int64(size))
+		SetSkip(int64(start))
+	if size > 0 {
+		opts.SetLimit(int64(size))
+	}
 	cursor, err := col.Find(ctx, filter, opts)
 	if err != nil {
 		return nil, 0, err
@@ -252,8 +254,10 @@ func (r *documentRepository) FindPublishedByContentTypePaginated(ctx context.Con
 
 	opts := options.Find().
 		SetSort(bson.D{{Key: resolveBsonSortKey(orderBy), Value: sortDir}}).
-		SetSkip(int64(start)).
-		SetLimit(int64(size))
+		SetSkip(int64(start))
+	if size > 0 {
+		opts.SetLimit(int64(size))
+	}
 	cursor, err := col.Find(ctx, filter, opts)
 	if err != nil {
 		return nil, 0, err
