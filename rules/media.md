@@ -1,7 +1,6 @@
 # RULES — media Module
 
 **Scope:** Media asset uploads, deletions, storage provider adapters (S3/Cloudinary), media library API.
-**Spec:** [specs/media.md](../specs/media.md)
 
 ---
 

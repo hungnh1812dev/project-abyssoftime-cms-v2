@@ -1,7 +1,6 @@
 # RULES — admin Module
 
 **Scope:** User management (list/update/delete), invite system (create/accept/revoke), access token management (create/list/revoke).
-**Spec:** [specs/admin.md](../specs/admin.md)
 
 ---
 

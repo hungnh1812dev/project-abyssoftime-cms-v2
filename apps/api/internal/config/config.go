@@ -16,6 +16,7 @@ type Config struct {
 	Port             string
 	GRPCEnabled      bool
 	GRPCPort         string
+	EnableDebug      bool
 	JWTSecret        string
 	ContentTypeDir   string
 	SupportedLocales []string
@@ -177,6 +178,7 @@ func Load() (*Config, error) {
 		Port:             getenv("PORT", "8080"),
 		GRPCEnabled:      parseBoolDefault(os.Getenv("GRPC_ENABLED"), false),
 		GRPCPort:         getenv("GRPC_PORT", "9090"),
+		EnableDebug:      parseBoolDefault(os.Getenv("ENABLE_DEBUG"), false),
 		JWTSecret:        getenv("JWT_SECRET", ""),
 		ContentTypeDir:   getenv("CONTENT_TYPES_DIR", "content-types"),
 		SupportedLocales: splitCSV(getenv("SUPPORTED_LOCALES", "en,vi")),

@@ -1,6 +1,6 @@
 # Module Rules Index
 
-These rules are derived from the project's specs (`specs/*.md`) and documentation (`docs/*.md`). They apply to **every** spec, plan, code change, feature addition, and code style decision within their scope.
+These rules are the single source of truth for project conventions. They apply to **every** plan, code change, feature addition, and code style decision within their scope.
 
 ## How to Use
 
@@ -17,11 +17,17 @@ These rules are derived from the project's specs (`specs/*.md`) and documentatio
 | [GLOBAL.md](GLOBAL.md) | All | Clean Architecture, code style, testing, security, deployment |
 | [core.md](core.md) | core | Entities, repos, errors, config, middleware, router, DB clients, gRPC |
 | [auth.md](auth.md) | auth | Authentication, JWT, passwords, roles, permissions, rate limiting |
-| [content.md](content.md) | content | Content types, documents, draft/publish, schema sync, GraphQL, components |
+| [content-type.md](content-type.md) | content | Content type entity, schema-as-code, schema sync, JSON field definitions, configurable list columns |
+| [document.md](document.md) | content | Document entity, draft/publish workflow, single-type and collection-type CRUD, pagination, API contracts, duplicate documents |
+| [graphql.md](graphql.md) | content | Build-time GraphQL schema generation (gqlgen), resolvers, filters, ordering, codegen pipeline |
+| [component.md](component.md) | content | Component entity, repeatable/non-repeatable components, nested component tables, component CRUD |
 | [media.md](media.md) | media | Media assets, upload/delete, S3/Cloudinary adapters |
 | [admin.md](admin.md) | admin | User management, invites, access tokens |
 | [i18n.md](i18n.md) | i18n | Locale management, locale selector, settings page |
-| [frontend.md](frontend.md) | frontend | React, TypeScript, TanStack Query, forms, routing, UI |
+| [frontend.md](frontend.md) | frontend | Project structure, TypeScript conventions, component library (Shadcn/Tailwind), repeatable component UI |
+| [frontend-forms.md](frontend-forms.md) | frontend | FormProvider, field rendering, dot-notation deserialization, form state management |
+| [frontend-data.md](frontend-data.md) | frontend | TanStack Query, query keys, mutations, invalidation, health ping, locale switching |
+| [frontend-routing.md](frontend-routing.md) | frontend | React Router routes, content-type registry, sidebar navigation, testing |
 
 ### Infrastructure Rules (Granular)
 | File | Scope |
@@ -34,16 +40,19 @@ These rules are derived from the project's specs (`specs/*.md`) and documentatio
 
 1. **Global rules** (`GLOBAL.md`) — always apply, never overridden
 2. **Module rules** (`<module>.md`) — extend global rules for specific modules
-3. **Spec instructions** (`specs/*.md`) — implementation details within rule boundaries
-4. **If conflict** between any of the above → **ask user**
+3. **If conflict** between any of the above → **ask user**
 
 ## Cross-Module Dependencies
 
 ```
 GLOBAL ← core ← auth ← admin
-                     ← content ← media
+                     ← content-type ← document ← media
+                     ← component
+                     ← graphql
                      ← i18n
-         frontend (cross-cutting)
+         frontend ← frontend-forms
+                  ← frontend-data
+                  ← frontend-routing
 ```
 
 Every module depends on `core`. Cross-module communication goes through `domain/repository/` interfaces only.

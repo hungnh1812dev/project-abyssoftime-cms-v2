@@ -5,21 +5,21 @@ import (
 )
 
 func TestNewClient_InvalidDSN(t *testing.T) {
-	_, err := NewClient("postgres", "host=invalid port=0 dbname=nonexistent sslmode=disable connect_timeout=1")
+	_, err := NewClient("postgres", "host=invalid port=0 dbname=nonexistent sslmode=disable connect_timeout=1", false)
 	if err == nil {
 		t.Fatal("expected error for invalid DSN, got nil")
 	}
 }
 
 func TestNewClient_UnsupportedDriver(t *testing.T) {
-	_, err := NewClient("oracle", "fake-dsn")
+	_, err := NewClient("oracle", "fake-dsn", false)
 	if err == nil {
 		t.Fatal("expected error for unsupported driver, got nil")
 	}
 }
 
 func TestNewClient_SQLite(t *testing.T) {
-	db, err := NewClient("sqlite", ":memory:")
+	db, err := NewClient("sqlite", ":memory:", false)
 	if err != nil {
 		t.Fatalf("NewClient(sqlite) error: %v", err)
 	}
@@ -29,7 +29,7 @@ func TestNewClient_SQLite(t *testing.T) {
 }
 
 func TestAutoMigrate_SQLite(t *testing.T) {
-	db, err := NewClient("sqlite", ":memory:")
+	db, err := NewClient("sqlite", ":memory:", false)
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}

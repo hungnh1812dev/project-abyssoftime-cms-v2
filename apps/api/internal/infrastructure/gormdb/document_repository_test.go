@@ -21,7 +21,7 @@ var testFields = []entity.FieldDefinition{
 
 func setupDocDB(t *testing.T, slugs ...string) *gorm.DB {
 	t.Helper()
-	db, err := NewClient("sqlite", ":memory:")
+	db, err := NewClient("sqlite", ":memory:", false)
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
@@ -232,7 +232,7 @@ func TestDocumentRepository_DeleteAllByContentType(t *testing.T) {
 }
 
 func TestDocumentRepository_EnsureCollection_CreatesTable(t *testing.T) {
-	db, err := NewClient("sqlite", ":memory:")
+	db, err := NewClient("sqlite", ":memory:", false)
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
@@ -254,7 +254,7 @@ func TestDocumentRepository_EnsureCollection_CreatesTable(t *testing.T) {
 }
 
 func TestDocumentRepository_DropCollection_DropsTable(t *testing.T) {
-	db, err := NewClient("sqlite", ":memory:")
+	db, err := NewClient("sqlite", ":memory:", false)
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
@@ -313,7 +313,7 @@ func TestDocumentRepository_DeletePublishedByDocumentID(t *testing.T) {
 }
 
 func TestExistingColumns(t *testing.T) {
-	db, err := NewClient("sqlite", ":memory:")
+	db, err := NewClient("sqlite", ":memory:", false)
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
@@ -341,7 +341,7 @@ func TestExistingColumns(t *testing.T) {
 }
 
 func TestDocumentRepository_EnsureCollection_PreservesData(t *testing.T) {
-	db, err := NewClient("sqlite", ":memory:")
+	db, err := NewClient("sqlite", ":memory:", false)
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
@@ -377,7 +377,7 @@ func TestDocumentRepository_EnsureCollection_PreservesData(t *testing.T) {
 }
 
 func TestDocumentRepository_EnsureCollection_AddsNewColumn(t *testing.T) {
-	db, err := NewClient("sqlite", ":memory:")
+	db, err := NewClient("sqlite", ":memory:", false)
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
@@ -423,7 +423,7 @@ func TestDocumentRepository_EnsureCollection_AddsNewColumn(t *testing.T) {
 }
 
 func TestDocumentRepository_EnsureCollection_IgnoresRemovedField(t *testing.T) {
-	db, err := NewClient("sqlite", ":memory:")
+	db, err := NewClient("sqlite", ":memory:", false)
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
@@ -468,7 +468,7 @@ func TestDocumentRepository_EnsureCollection_IgnoresRemovedField(t *testing.T) {
 }
 
 func TestDocumentRepository_WidthFieldsRoundTrip(t *testing.T) {
-	db, err := NewClient("sqlite", ":memory:")
+	db, err := NewClient("sqlite", ":memory:", false)
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
@@ -536,7 +536,7 @@ func TestDocumentRepository_WidthFieldsRoundTrip(t *testing.T) {
 }
 
 func TestDocumentRepository_WidthFieldsMigrateExistingTable(t *testing.T) {
-	db, err := NewClient("sqlite", ":memory:")
+	db, err := NewClient("sqlite", ":memory:", false)
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
@@ -599,7 +599,7 @@ func TestDocumentRepository_WidthFieldsMigrateExistingTable(t *testing.T) {
 }
 
 func TestDocumentRepository_TableInfo(t *testing.T) {
-	db, err := NewClient("sqlite", ":memory:")
+	db, err := NewClient("sqlite", ":memory:", false)
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}

@@ -1,7 +1,6 @@
 # RULES — auth Module
 
 **Scope:** Authentication (register/login/logout), JWT token lifecycle, password/email validation, role CRUD, permission enforcement, rate limiting.
-**Spec:** [specs/auth.md](../specs/auth.md)
 
 ---
 
