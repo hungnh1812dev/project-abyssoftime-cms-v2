@@ -1,8 +1,8 @@
-# SPEC — core Module
+# SPEC — Core Module
 
 ## 1. Overview
 
-The core module provides the shared foundation for all other modules: entity type definitions, repository interfaces, error types, configuration, JWT utilities, database clients, cross-cutting middleware, and the application entry point. Every other module depends on core but core never depends on any domain module.
+The core module provides the shared foundation for all other modules: entity type definitions, repository interfaces, error types, configuration, JWT utilities, and database clients. Every other module depends on core but core never depends on any domain module. Middleware, routing, gRPC client, commands, and deployment are covered in `specs/middleware.md` and `specs/infrastructure.md`.
 
 ---
 
@@ -11,7 +11,6 @@ The core module provides the shared foundation for all other modules: entity typ
 All paths relative to `apps/api/`.
 
 ```
-cmd/server/main.go                                  # Application entry point, dependency wiring
 internal/config/config.go                            # Configuration loading from env vars
 internal/domain/entity/                              # All entity structs (shared types)
 internal/domain/repository/                          # All repository interfaces
@@ -24,26 +23,12 @@ internal/infrastructure/gormdb/client.go             # GORM client setup + AutoM
 internal/infrastructure/gormdb/client_test.go
 internal/infrastructure/gormdb/driver_cgo.go         # CGO-enabled SQLite driver (testing)
 internal/infrastructure/gormdb/driver_default.go     # Default driver selection
-internal/delivery/http/router.go                     # Gin router setup (route registration)
-internal/delivery/http/handler/response.go           # Shared response helpers (writeErr, writeJSON)
-internal/delivery/http/handler/response_test.go
-internal/delivery/http/middleware/cors.go             # CORS middleware
-internal/delivery/http/middleware/cors_test.go
-internal/delivery/http/middleware/bodylimit.go        # Request body size limit
-internal/delivery/http/middleware/bodylimit_test.go
-internal/delivery/http/middleware/security_headers.go # Security response headers
-internal/delivery/http/middleware/security_headers_test.go
-internal/delivery/grpc/server.go                     # gRPC server setup
-internal/delivery/grpc/errors.go                     # gRPC error mapping
-internal/grpcclient/client.go                        # gRPC client connection manager
-internal/grpcclient/client_test.go
 pkg/errors/errors.go                                 # Domain error types (ErrNotFound, ErrValidation, etc.)
 pkg/errors/errors_test.go
 pkg/jwt/jwt.go                                       # JWT sign/validate utilities
 pkg/jwt/jwt_test.go
 go.mod
 go.sum
-Dockerfile
 ```
 
 ---
@@ -66,9 +51,9 @@ Dockerfile
 ```
 apps/api/
 ├── cmd/server/main.go                    # Wires all protocols: Gin, gRPC, GraphQL
-├── content-types/                        # JSON schema-as-code definitions → see specs/content.md
+├── content-types/                        # JSON schema-as-code definitions → see specs/content-type.md
 ├── proto/cms/v1/                         # gRPC protocol buffer definitions
-├── graphql/dynamic/                      # Dynamic GraphQL schema builder → see specs/content.md
+├── graphql/dynamic/                      # Dynamic GraphQL schema builder → see specs/graphql.md
 ├── internal/
 │   ├── config/                           # App configuration
 │   ├── domain/
@@ -77,8 +62,8 @@ apps/api/
 │   ├── usecase/                          # Business logic (DB-agnostic)
 │   │   ├── auth/                         # → see specs/auth.md
 │   │   ├── role/                         # → see specs/auth.md
-│   │   ├── content_type/                 # → see specs/content.md
-│   │   ├── document/                     # → see specs/content.md
+│   │   ├── content_type/                 # → see specs/content-type.md
+│   │   ├── document/                     # → see specs/document.md
 │   │   ├── media/                        # → see specs/media.md
 │   │   ├── user/                         # → see specs/admin.md
 │   │   ├── invite/                       # → see specs/admin.md
@@ -91,10 +76,10 @@ apps/api/
 │   ├── delivery/
 │   │   ├── http/
 │   │   │   ├── handler/                  # Gin handler functions
-│   │   │   ├── middleware/               # Gin middleware
-│   │   │   └── router.go                 # Route registration
+│   │   │   ├── middleware/               # Gin middleware → see specs/middleware.md
+│   │   │   └── router.go                 # Route registration → see specs/infrastructure.md
 │   │   └── grpc/                         # gRPC service implementations
-│   └── grpcclient/                       # gRPC client adapters
+│   └── grpcclient/                       # gRPC client adapters → see specs/infrastructure.md
 ├── pkg/
 │   ├── errors/                           # Domain error types
 │   └── jwt/                              # JWT utilities
@@ -193,101 +178,7 @@ if isPostgres(cfg.DB.EntityDB.User) {
 
 ---
 
-## 9. Middleware (Cross-Cutting)
-
-### CORS (`middleware/cors.go`)
-- Checks `Origin` header against `CORS_ORIGINS` whitelist
-- Sets `Access-Control-Allow-Origin`, `Allow-Methods`, `Allow-Headers`, `Allow-Credentials`
-- Handles `OPTIONS` preflight with 204
-- Never uses `Access-Control-Allow-Origin: *`
-
-### Body Size Limit (`middleware/bodylimit.go`)
-- Applied globally with `BODY_LIMIT_BYTES` default (10 MB)
-- Media upload exempt (uses its own multipart limit)
-- Uses `http.MaxBytesReader`
-
-### Security Headers (`middleware/security_headers.go`)
-Sets on every response:
-- `X-Content-Type-Options: nosniff`
-- `X-Frame-Options: DENY`
-- `X-XSS-Protection: 0`
-- `Referrer-Policy: strict-origin-when-cross-origin`
-- `Content-Security-Policy: default-src 'self'`
-
----
-
-## 10. Router Setup
-
-Route registration is centralized in `internal/delivery/http/router.go`. The `SetupRouter` function accepts a `RouterConfig` struct with all handler instances and returns a configured `*gin.Engine`.
-
-```go
-type RouterConfig struct {
-    AuthHandler        *handler.AuthHandler
-    CTHandler          *handler.ContentTypeHandler
-    DocHandler         *handler.DocumentHandler
-    MediaHandler       *handler.MediaHandler
-    LocaleHandler      *handler.LocaleHandler
-    UserHandler        *handler.UserHandler
-    InviteHandler      *handler.InviteHandler
-    AccessTokenHandler *handler.AccessTokenHandler
-    RoleHandler        *handler.RoleHandler
-    RoleCache          *middleware.RoleCache
-    GraphQLHandler     http.Handler
-    GraphQLPath        string
-    CORSOrigins        []string
-}
-```
-
-Route groups and permission requirements are documented in each module's spec.
-
----
-
-## 11. gRPC Client (`internal/grpcclient/`)
-
-For calling external microservices:
-
-```go
-type ClientManager struct { conns map[string]*grpc.ClientConn }
-func NewClientManager() *ClientManager
-func (m *ClientManager) Connect(ctx, serviceName, address string, opts ...grpc.DialOption) error
-func (m *ClientManager) GetConnection(serviceName string) (*grpc.ClientConn, error)
-func (m *ClientManager) Close() error
-```
-
-Configured via `GRPC_SERVICES` env var: `name=address,name=address`.
-
----
-
-## 12. Commands
-
-### Native Development
-| Command | Description |
-|---|---|
-| `make mongo-start` | Start MongoDB container (port 27017, persistent volume) |
-| `make mongo-stop` | Stop the MongoDB container |
-| `make dev` | Start API + web in parallel |
-| `make dev-api` | Start Go API server only |
-| `make dev-web` | Start Vite dev server only |
-| `make test-api` | `go test ./...` inside `apps/api` |
-| `make test-web` | `vitest run` inside `apps/web` |
-
-### Backend Only
-| Command | Description |
-|---|---|
-| `go run ./cmd/server` | Start the API server |
-| `go test ./...` | Run all tests |
-| `go build -o bin/server ./cmd/server` | Compile production binary |
-| `go vet ./...` | Static analysis |
-
-### Docker Compose
-| Command | Description |
-|---|---|
-| `docker-compose -f docker-compose.yml -f docker-compose.dev.yml up --build` | Full stack with hot reload |
-| `docker-compose down` | Stop and remove all containers |
-
----
-
-## 13. Testing Strategy (Shared Rules)
+## 9. Testing Strategy (Shared Rules)
 
 - **Unit tests**: Every usecase tested in isolation with mock repositories (interface-based).
 - **Integration tests**: Repository implementations tested against real databases (MongoDB in Docker, PostgreSQL via GORM/SQLite in-memory for unit tests).
@@ -300,50 +191,22 @@ Module-specific testing rules are in each module's spec.
 
 ---
 
-## 14. Deployment (Render.com)
-
-Two separate Render.com services:
-- **API**: Web Service (native Go), `abyssoftime-cms-api`, port 8080
-- **Web**: Static Site, `abyssoftime-cms-web`, React/Vite SPA
-- **Database**: Supabase PostgreSQL (external)
-- **Media**: Cloudinary (external)
-
-Key deployment rules:
-- `COOKIE_SAMESITE=none` + `COOKIE_SECURE=true` for cross-origin deployment
-- `DB_SSL_MODE=require` for Supabase
-- `CORS_ORIGINS` set to the Static Site URL (explicit, never `*`)
-- `VITE_API_URL` set at build time on Static Site
-- SPA rewrite rule (`/* → /index.html`) on Static Site
-- Deploy hooks from CI (not auto-deploy)
-- Keep-alive workflow pings `/health` every 14 minutes
-
-Full deployment walkthrough: see SPEC.md §13.
-
----
-
-## 15. Boundaries
+## 10. Boundaries
 
 | Rule | Detail |
 |---|---|
-| **Always** | Keep REST endpoint paths and response shapes identical after any framework migration |
-| **Always** | Map domain errors to protocol-appropriate codes in every delivery layer |
 | **Always** | Initialize both MongoDB and SQL connections at startup when configured |
 | **Always** | Run `AutoMigrate` for GORM entities on startup |
 | **Always** | Use `gin.SetMode(gin.TestMode)` in all test files |
-| **Always** | Apply body size limit globally; media upload uses its own multipart limit |
-| **Always** | Set security headers on every response |
 | **Never** | Use MongoDB-specific logic outside `infrastructure/mongodb/` |
 | **Never** | Use GORM-specific logic outside `infrastructure/gormdb/` |
 | **Never** | Duplicate business logic across REST, GraphQL, and gRPC — all call usecase methods |
-| **Never** | Use `Access-Control-Allow-Origin: *` — always explicit origin whitelist |
 | **Never** | Hard-code SQL dialect-specific queries in GORM repositories |
 | **Ask first** | Choosing between PostgreSQL and MySQL for production |
-| **Ask first** | Adding new gRPC client service connections |
-| **Ask first** | Changing the gRPC port default |
 
 ---
 
-## 16. Changelog
+## 11. Changelog
 
 | Date | Change | Source |
 |------|--------|--------|

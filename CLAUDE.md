@@ -11,11 +11,17 @@ A lightweight, code-first Personal Headless CMS. Go backend (Clean Architecture)
 | `rules/GLOBAL.md` | **Always** — applies to every task |
 | `rules/core.md` | Touching entities, repos, errors, config, middleware, router, DB clients |
 | `rules/auth.md` | Touching auth, JWT, passwords, roles, permissions, rate limiting |
-| `rules/content.md` | Touching content types, documents, schema sync, GraphQL, components |
+| `rules/content-type.md` | Touching content type entity, schema-as-code, schema sync, field definitions, list columns |
+| `rules/document.md` | Touching documents, draft/publish workflow, single/collection CRUD, pagination, API contracts |
+| `rules/graphql.md` | Touching GraphQL schema generation, resolvers, filters, ordering, codegen pipeline |
+| `rules/component.md` | Touching component entity, repeatable/non-repeatable components, nested tables, component CRUD |
 | `rules/media.md` | Touching media assets, upload/delete, storage adapters |
 | `rules/admin.md` | Touching user management, invites, access tokens |
 | `rules/i18n.md` | Touching locales, language settings, locale selector |
-| `rules/frontend.md` | Touching any React/TypeScript code in `apps/web/` |
+| `rules/frontend.md` | Touching project structure, TypeScript conventions, Shadcn/Tailwind, repeatable component UI |
+| `rules/frontend-forms.md` | Touching FormProvider, field rendering, dot-notation, form state management |
+| `rules/frontend-data.md` | Touching TanStack Query, query keys, mutations, invalidation, locale switching |
+| `rules/frontend-routing.md` | Touching React Router routes, content-type registry, sidebar, frontend testing |
 | `rules/mongodb.md` | Touching any MongoDB repo in `infrastructure/mongodb/` |
 | `rules/postgresql.md` | Touching any GORM repo in `infrastructure/gormdb/` |
 | `rules/content-type-parsing.md` | Touching schema loader, sync engine, or content-type JSON files |
@@ -29,8 +35,7 @@ See `rules/README.md` for the full index and priority system.
 ```
 apps/api/          → Go backend (Clean Architecture)
 apps/web/          → React frontend (Vite + TypeScript)
-specs/             → Module specs (source of truth for rules)
-rules/             → Per-module rules (derived from specs + docs)
+rules/             → Per-module rules (source of truth for conventions)
 docs/              → Technical overview, guide, local dev
 content-types/     → JSON schema-as-code definitions (→ apps/api/content-types/)
 ```

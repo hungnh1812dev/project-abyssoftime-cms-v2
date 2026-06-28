@@ -160,7 +160,7 @@ These rules apply to **every module, every file, every spec, every plan** in thi
 ## 9. Environment & Configuration
 
 - **NEVER** read, edit, create, or expose `.env` files
-- All env vars documented in `specs/core.md §7`
+- All env vars documented in `rules/core.md §6`
 - `VITE_API_URL` set at build time for frontend
 - `CORS_ORIGINS` must be explicit, never wildcard
 
@@ -170,7 +170,7 @@ These rules apply to **every module, every file, every spec, every plan** in thi
 
 When a conflict arises between:
 - **Module rule vs Global rule** → Ask user
-- **Spec instruction vs Existing rule** → Ask user
+- **New requirement vs Existing rule** → Ask user
 - **Multiple valid approaches** → Present options, don't choose autonomously
 - **New feature vs Existing boundary** → Ask user before proceeding
 
@@ -178,15 +178,14 @@ When a conflict arises between:
 
 ---
 
-## 11. Spec/Plan Reference Protocol
+## 11. Rule Reference Protocol
 
-Before writing any spec, plan, or code for a module:
+Before writing any plan or code for a module:
 1. Read `rules/GLOBAL.md` (this file)
 2. Read the module-specific rule file (`rules/<module>.md`)
-3. Read the module spec (`specs/<module>.md`)
-4. Cross-check for conflicts between the three
-5. If conflict found → ask user before proceeding
-6. If no rule covers the situation → check related module rules, then ask user
+3. Cross-check for conflicts between the two
+4. If conflict found → ask user before proceeding
+5. If no rule covers the situation → check related module rules, then ask user
 
 ---
 
