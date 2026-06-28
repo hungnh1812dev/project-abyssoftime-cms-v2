@@ -620,7 +620,7 @@ func fieldToMapField(field entity.FieldDefinition) mapField {
 	case "media":
 		return mapField{Name: name, GoType: "map[string]interface{}", Nullable: true, MapKey: field.Name}
 	case "json":
-		return mapField{Name: name, GoType: "map[string]interface{}", Nullable: true, MapKey: field.Name}
+		return mapField{Name: name, GoType: "interface{}", Nullable: true, MapKey: field.Name}
 	case "component":
 		if field.Repeatable {
 			return mapField{Name: name, GoType: "[]map[string]interface{}", Nullable: true, MapKey: field.Name}
@@ -718,6 +718,8 @@ func resolveReturnType(field mapField) string {
 		return "map[string]interface{}"
 	case "[]map[string]interface{}":
 		return "[]map[string]interface{}"
+	case "interface{}":
+		return "interface{}"
 	default:
 		if field.Nullable {
 			return "*" + field.GoType
@@ -788,6 +790,8 @@ func writeFieldExtractor(builder *strings.Builder, field mapField) {
 		builder.WriteString("\tdefault:\n")
 		builder.WriteString("\t\treturn nil, nil\n")
 		builder.WriteString("\t}\n")
+	case "interface{}":
+		fmt.Fprintf(builder, "\treturn obj[%q], nil\n", field.MapKey)
 	default:
 		fmt.Fprintf(builder, "\tval, _ := obj[%q].(%s)\n", field.MapKey, field.GoType)
 		if field.Nullable {
