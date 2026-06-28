@@ -13,7 +13,7 @@ import (
 
 func setupLocaleDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	database, err := NewClient("sqlite", ":memory:")
+	database, err := NewClient("sqlite", ":memory:", false)
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}

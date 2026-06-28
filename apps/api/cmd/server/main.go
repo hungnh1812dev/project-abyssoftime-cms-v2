@@ -92,7 +92,7 @@ func main() {
 	var sqlDB *gorm.DB
 	if needsPostgres {
 		var err error
-		sqlDB, err = gormdb.NewClient("postgres", cfg.DB.PostgresDSN())
+		sqlDB, err = gormdb.NewClient("postgres", cfg.DB.PostgresDSN(), cfg.EnableDebug)
 		if err != nil {
 			log.Fatalf("postgres connect: %v", err)
 		}
