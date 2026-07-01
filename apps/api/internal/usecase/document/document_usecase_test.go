@@ -2,7 +2,9 @@ package document_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -1226,5 +1228,178 @@ func TestSave_SanitizesMediaObjectToDocumentID(t *testing.T) {
 	}
 	if upserted.Fields["avatar"] != "abc-123" {
 		t.Errorf("avatar = %v, want %q (media object should be reduced to documentId)", upserted.Fields["avatar"], "abc-123")
+	}
+}
+
+// ---- BulkCreateAndPublish -----------------------------------------------
+
+func TestBulkCreateAndPublish_AllValid_CreatesAndPublishesInOrder(t *testing.T) {
+	drafts := map[string]*entity.Document{}
+	published := map[string]*entity.Document{}
+
+	repo := &repomock.DocumentRepository{}
+	repo.FindDraftByDocumentIDFn = func(_ context.Context, _, documentID, _ string) (*entity.Document, error) {
+		doc, ok := drafts[documentID]
+		if !ok {
+			return nil, pkgerrors.ErrNotFound
+		}
+		return doc, nil
+	}
+	repo.UpsertDraftFn = func(_ context.Context, _ string, doc *entity.Document) error {
+		drafts[doc.DocumentID] = doc
+		return nil
+	}
+	repo.UpsertPublishedFn = func(_ context.Context, _ string, doc *entity.Document) error {
+		published[doc.DocumentID] = doc
+		return nil
+	}
+	repo.DeleteByDocumentIDFn = func(_ context.Context, _, documentID, _ string) error {
+		delete(drafts, documentID)
+		delete(published, documentID)
+		return nil
+	}
+
+	uc := docuc.New(repo, nil, &repomock.MediaAssetRepository{}, supportedLocales)
+
+	items := []map[string]any{
+		{"title": "one"},
+		{"title": "two"},
+		{"title": "three"},
+	}
+	docs, err := uc.BulkCreateAndPublish(ctx, testSlug, items, "en", nil, "user-1")
+	if err != nil {
+		t.Fatalf("BulkCreateAndPublish() error = %v", err)
+	}
+	if len(docs) != len(items) {
+		t.Fatalf("BulkCreateAndPublish() returned %d docs, want %d", len(docs), len(items))
+	}
+	for idx, doc := range docs {
+		if doc.Fields["title"] != items[idx]["title"] {
+			t.Errorf("docs[%d].Fields[title] = %v, want %v", idx, doc.Fields["title"], items[idx]["title"])
+		}
+		if _, ok := published[doc.DocumentID]; !ok {
+			t.Errorf("docs[%d] documentId %q was not published", idx, doc.DocumentID)
+		}
+	}
+}
+
+func TestBulkCreateAndPublish_SaveFailureMidBatch_RollsBackPriorItems(t *testing.T) {
+	drafts := map[string]*entity.Document{}
+	published := map[string]*entity.Document{}
+	findCalls := 0
+
+	repo := &repomock.DocumentRepository{}
+	repo.FindDraftByDocumentIDFn = func(_ context.Context, _, documentID, _ string) (*entity.Document, error) {
+		findCalls++
+		if findCalls == 3 {
+			return nil, errors.New("boom")
+		}
+		doc, ok := drafts[documentID]
+		if !ok {
+			return nil, pkgerrors.ErrNotFound
+		}
+		return doc, nil
+	}
+	repo.UpsertDraftFn = func(_ context.Context, _ string, doc *entity.Document) error {
+		drafts[doc.DocumentID] = doc
+		return nil
+	}
+	repo.UpsertPublishedFn = func(_ context.Context, _ string, doc *entity.Document) error {
+		published[doc.DocumentID] = doc
+		return nil
+	}
+	repo.DeleteByDocumentIDFn = func(_ context.Context, _, documentID, _ string) error {
+		delete(drafts, documentID)
+		delete(published, documentID)
+		return nil
+	}
+
+	uc := docuc.New(repo, nil, &repomock.MediaAssetRepository{}, supportedLocales)
+
+	items := []map[string]any{
+		{"title": "one"},
+		{"title": "two"},
+		{"title": "three"},
+	}
+	docs, err := uc.BulkCreateAndPublish(ctx, testSlug, items, "en", nil, "user-1")
+	if docs != nil {
+		t.Errorf("BulkCreateAndPublish() docs = %v, want nil on failure", docs)
+	}
+	if err == nil || !strings.Contains(err.Error(), "item[1]") {
+		t.Fatalf("BulkCreateAndPublish() error = %v, want to mention item[1]", err)
+	}
+	if len(drafts) != 0 {
+		t.Errorf("BulkCreateAndPublish() left drafts=%v, want all rolled back", drafts)
+	}
+	if len(published) != 0 {
+		t.Errorf("BulkCreateAndPublish() left published=%v, want all rolled back", published)
+	}
+	if findCalls != 3 {
+		t.Errorf("BulkCreateAndPublish() called FindDraftByDocumentID %d times, want 3 (stopped after item[1] failed, never attempted item[2])", findCalls)
+	}
+}
+
+func TestBulkCreateAndPublish_PublishFailure_RollsBackCurrentAndPriorItems(t *testing.T) {
+	drafts := map[string]*entity.Document{}
+	published := map[string]*entity.Document{}
+
+	repo := &repomock.DocumentRepository{}
+	repo.FindDraftByDocumentIDFn = func(_ context.Context, _, documentID, _ string) (*entity.Document, error) {
+		doc, ok := drafts[documentID]
+		if !ok {
+			return nil, pkgerrors.ErrNotFound
+		}
+		return doc, nil
+	}
+	repo.UpsertDraftFn = func(_ context.Context, _ string, doc *entity.Document) error {
+		drafts[doc.DocumentID] = doc
+		return nil
+	}
+	repo.UpsertPublishedFn = func(_ context.Context, _ string, doc *entity.Document) error {
+		if doc.Fields["title"] == "two" {
+			return errors.New("publish boom")
+		}
+		published[doc.DocumentID] = doc
+		return nil
+	}
+	repo.DeleteByDocumentIDFn = func(_ context.Context, _, documentID, _ string) error {
+		delete(drafts, documentID)
+		delete(published, documentID)
+		return nil
+	}
+
+	uc := docuc.New(repo, nil, &repomock.MediaAssetRepository{}, supportedLocales)
+
+	items := []map[string]any{
+		{"title": "one"},
+		{"title": "two"},
+		{"title": "three"},
+	}
+	docs, err := uc.BulkCreateAndPublish(ctx, testSlug, items, "en", nil, "user-1")
+	if docs != nil {
+		t.Errorf("BulkCreateAndPublish() docs = %v, want nil on failure", docs)
+	}
+	if err == nil || !strings.Contains(err.Error(), "item[1]") {
+		t.Fatalf("BulkCreateAndPublish() error = %v, want to mention item[1]", err)
+	}
+	if len(drafts) != 0 {
+		t.Errorf("BulkCreateAndPublish() left drafts=%v, want all rolled back (including the item whose Publish failed)", drafts)
+	}
+	if len(published) != 0 {
+		t.Errorf("BulkCreateAndPublish() left published=%v, want all rolled back", published)
+	}
+}
+
+func TestBulkCreateAndPublish_RejectsUnsupportedLocale(t *testing.T) {
+	repo := &repomock.DocumentRepository{}
+	repo.FindDraftByDocumentIDFn = func(_ context.Context, _, _, _ string) (*entity.Document, error) {
+		t.Fatal("BulkCreateAndPublish() must not query the repository for an unsupported locale")
+		return nil, nil
+	}
+	uc := docuc.New(repo, nil, &repomock.MediaAssetRepository{}, supportedLocales)
+
+	items := []map[string]any{{"title": "one"}}
+	if _, err := uc.BulkCreateAndPublish(ctx, testSlug, items, "fr", nil, "user-1"); !pkgerrors.Is(err, pkgerrors.ErrValidation) {
+		t.Errorf("BulkCreateAndPublish() error = %v, want ErrValidation", err)
 	}
 }

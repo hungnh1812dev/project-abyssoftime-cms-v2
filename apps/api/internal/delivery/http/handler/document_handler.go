@@ -20,6 +20,7 @@ type documentUseCase interface {
 	Unpublish(ctx context.Context, contentTypeSlug, documentID, locale string, fields []entity.FieldDefinition) error
 	Delete(ctx context.Context, contentTypeSlug, documentID string, fields []entity.FieldDefinition) error
 	Duplicate(ctx context.Context, contentTypeSlug, sourceDocumentID, locale string, fields []entity.FieldDefinition, userID string) (*entity.Document, error)
+	BulkCreateAndPublish(ctx context.Context, contentTypeSlug string, itemsData []map[string]any, locale string, fields []entity.FieldDefinition, userID string) ([]*entity.Document, error)
 
 	GetSingleType(ctx context.Context, contentTypeSlug, locale string, fields []entity.FieldDefinition) (*entity.Document, string, error)
 	SaveSingleType(ctx context.Context, contentTypeSlug string, data map[string]any, locale string, fields []entity.FieldDefinition, userID string) (*entity.Document, error)
@@ -74,6 +75,16 @@ func ginSortParams(c *gin.Context) (orderBy string, sortDir int, ok bool) {
 type documentRequest struct {
 	Data map[string]any `json:"data"`
 }
+
+type bulkCreateRequest struct {
+	Items []documentRequest `json:"items"`
+}
+
+type bulkCreateResponse struct {
+	Items []documentResponse `json:"items"`
+}
+
+const maxBulkItems = 100
 
 type documentResponse struct {
 	Data   map[string]any `json:"data"`
@@ -346,6 +357,34 @@ func (h *DocumentHandler) CreateCollection(ginCtx *gin.Context) {
 		return
 	}
 	ginCtx.JSON(http.StatusCreated, toDocResponse(saved, "draft"))
+}
+
+func (h *DocumentHandler) BulkCreateCollection(ginCtx *gin.Context) {
+	var req bulkCreateRequest
+	if err := ginCtx.ShouldBindJSON(&req); err != nil {
+		ginWriteError(ginCtx, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if len(req.Items) == 0 || len(req.Items) > maxBulkItems {
+		ginWriteError(ginCtx, http.StatusBadRequest, "items must contain 1-100 entries")
+		return
+	}
+	slug := ginCtx.Param("slug")
+	fields := h.resolveFields(ginCtx, slug)
+	itemsData := make([]map[string]any, len(req.Items))
+	for idx, item := range req.Items {
+		itemsData[idx] = item.Data
+	}
+	saved, err := h.usecase.BulkCreateAndPublish(ginCtx.Request.Context(), slug, itemsData, ginCtx.Query("locale"), fields, middleware.UserID(ginCtx.Request.Context()))
+	if err != nil {
+		ginWriteErr(ginCtx, err)
+		return
+	}
+	items := make([]documentResponse, len(saved))
+	for idx, doc := range saved {
+		items[idx] = toDocResponse(doc, "published")
+	}
+	ginCtx.JSON(http.StatusCreated, bulkCreateResponse{Items: items})
 }
 
 func (h *DocumentHandler) UpdateCollection(ginCtx *gin.Context) {

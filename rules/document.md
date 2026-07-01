@@ -45,6 +45,9 @@
 - **NEVER** allow `limit` or `pageSize` above 100 (except `limit: -1` = no limit)
 - **NEVER** mix offset and page modes in the same request (validation error)
 - Support `orderBy` and `sortDir` query params
+- **Bulk create + publish** (`POST .../:slug/bulk`): accepts `{ "items": [{ "data": {...} }, ...] }`, 1–100 items, one `?locale=` for the whole request (no per-item locale). Each item is created as a draft and immediately published, in submission order.
+  - **All-or-nothing via rollback, not a DB transaction**: items are processed sequentially through the existing `Save`/`Publish` flow. If any item fails, every document already committed earlier in that batch is deleted (via the existing `Delete` usecase method, which removes draft + published + components for all locales) before the error is returned. This is a compensating rollback, not an atomic multi-document transaction — MongoDB standalone deployments (the assumed default here) don't support that, and this codebase has no transaction abstraction for either DB backend.
+  - Requires **both** `content:create` and `content:publish` (two chained `GinRequirePermission` calls on the route)
 
 ---
 
@@ -76,6 +79,7 @@
 | `GET` | `/api/document-manager/collection-type/:slug` | `content:read` |
 | `GET` | `/api/document-manager/collection-type/:slug/:documentId` | `content:read` |
 | `POST` | `/api/document-manager/collection-type/:slug` | `content:create` |
+| `POST` | `/api/document-manager/collection-type/:slug/bulk` | `content:create` **and** `content:publish` |
 | `PUT` | `/api/document-manager/collection-type/:slug/:documentId` | `content:update` |
 | `DELETE` | `/api/document-manager/collection-type/:slug/:documentId` | `content:delete` |
 | `POST` | `.../:documentId/publish` | `content:publish` |

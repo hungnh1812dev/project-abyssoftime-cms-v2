@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -28,6 +29,7 @@ type mockDocumentUC struct {
 	unpublishSingleTypeFn func(ctx context.Context, contentTypeSlug, locale string) error
 	getAllPaginatedFn      func(ctx context.Context, contentTypeSlug string, start, size int, locale string, orderBy string, sortDir int) ([]*entity.Document, []string, int64, error)
 	duplicateFn            func(ctx context.Context, contentTypeSlug, sourceDocumentID, locale, userID string) (*entity.Document, error)
+	bulkCreateAndPublishFn func(ctx context.Context, contentTypeSlug string, itemsData []map[string]any, locale, userID string) ([]*entity.Document, error)
 }
 
 func (m *mockDocumentUC) Save(ctx context.Context, s string, d *entity.Document, _ []entity.FieldDefinition, u string) (*entity.Document, error) {
@@ -65,6 +67,9 @@ func (m *mockDocumentUC) GetAllPaginated(ctx context.Context, s string, start, s
 }
 func (m *mockDocumentUC) Duplicate(ctx context.Context, s, d, l string, _ []entity.FieldDefinition, u string) (*entity.Document, error) {
 	return m.duplicateFn(ctx, s, d, l, u)
+}
+func (m *mockDocumentUC) BulkCreateAndPublish(ctx context.Context, s string, itemsData []map[string]any, l string, _ []entity.FieldDefinition, u string) ([]*entity.Document, error) {
+	return m.bulkCreateAndPublishFn(ctx, s, itemsData, l, u)
 }
 
 type mockUserResolver struct{}
@@ -543,6 +548,133 @@ func TestDocumentHandler_DuplicateCollection(t *testing.T) {
 
 		if w.Code != http.StatusNotFound {
 			t.Errorf("status = %d, want 404", w.Code)
+		}
+	})
+}
+
+func TestDocumentHandler_BulkCreateCollection(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	newRouter := func(h *handler.DocumentHandler) (*httptest.ResponseRecorder, *gin.Engine) {
+		w := httptest.NewRecorder()
+		_, r := gin.CreateTestContext(w)
+		r.POST("/api/document-manager/collection-type/:slug/bulk", h.BulkCreateCollection)
+		return w, r
+	}
+
+	t.Run("201 success", func(t *testing.T) {
+		uc := &mockDocumentUC{}
+		uc.bulkCreateAndPublishFn = func(_ context.Context, _ string, itemsData []map[string]any, _, _ string) ([]*entity.Document, error) {
+			docs := make([]*entity.Document, len(itemsData))
+			for idx, data := range itemsData {
+				docs[idx] = &entity.Document{DocumentID: "doc-" + data["title"].(string), Fields: data}
+			}
+			return docs, nil
+		}
+		h := newHandler(uc)
+
+		body, _ := json.Marshal(map[string]any{"items": []map[string]any{
+			{"data": map[string]any{"title": "one"}},
+			{"data": map[string]any{"title": "two"}},
+		}})
+		w, r := newRouter(h)
+		req := httptest.NewRequest(http.MethodPost, "/api/document-manager/collection-type/articles/bulk", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusCreated {
+			t.Fatalf("status = %d, want 201", w.Code)
+		}
+		var resp struct {
+			Items []map[string]any `json:"items"`
+		}
+		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+		if len(resp.Items) != 2 {
+			t.Fatalf("items length = %d, want 2", len(resp.Items))
+		}
+		for _, item := range resp.Items {
+			if item["status"] != "published" {
+				t.Errorf("item status = %v, want published", item["status"])
+			}
+		}
+	})
+
+	t.Run("400 empty items", func(t *testing.T) {
+		uc := &mockDocumentUC{}
+		uc.bulkCreateAndPublishFn = func(_ context.Context, _ string, _ []map[string]any, _, _ string) ([]*entity.Document, error) {
+			t.Fatal("usecase must not be called for an empty batch")
+			return nil, nil
+		}
+		h := newHandler(uc)
+
+		body, _ := json.Marshal(map[string]any{"items": []map[string]any{}})
+		w, r := newRouter(h)
+		req := httptest.NewRequest(http.MethodPost, "/api/document-manager/collection-type/articles/bulk", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("status = %d, want 400", w.Code)
+		}
+	})
+
+	t.Run("400 too many items", func(t *testing.T) {
+		uc := &mockDocumentUC{}
+		uc.bulkCreateAndPublishFn = func(_ context.Context, _ string, _ []map[string]any, _, _ string) ([]*entity.Document, error) {
+			t.Fatal("usecase must not be called for a batch over the size cap")
+			return nil, nil
+		}
+		h := newHandler(uc)
+
+		items := make([]map[string]any, 101)
+		for idx := range items {
+			items[idx] = map[string]any{"data": map[string]any{"title": "x"}}
+		}
+		body, _ := json.Marshal(map[string]any{"items": items})
+		w, r := newRouter(h)
+		req := httptest.NewRequest(http.MethodPost, "/api/document-manager/collection-type/articles/bulk", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("status = %d, want 400", w.Code)
+		}
+	})
+
+	t.Run("400 invalid body", func(t *testing.T) {
+		uc := &mockDocumentUC{}
+		h := newHandler(uc)
+
+		w, r := newRouter(h)
+		req := httptest.NewRequest(http.MethodPost, "/api/document-manager/collection-type/articles/bulk", bytes.NewReader([]byte("not json")))
+		req.Header.Set("Content-Type", "application/json")
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("status = %d, want 400", w.Code)
+		}
+	})
+
+	t.Run("422 usecase validation error rolls back and reports the failing item", func(t *testing.T) {
+		uc := &mockDocumentUC{}
+		uc.bulkCreateAndPublishFn = func(_ context.Context, _ string, _ []map[string]any, _, _ string) ([]*entity.Document, error) {
+			return nil, fmt.Errorf("item[1]: %w", pkgerrors.ErrValidation)
+		}
+		h := newHandler(uc)
+
+		body, _ := json.Marshal(map[string]any{"items": []map[string]any{
+			{"data": map[string]any{"title": "one"}},
+			{"data": map[string]any{"title": "two"}},
+		}})
+		w, r := newRouter(h)
+		req := httptest.NewRequest(http.MethodPost, "/api/document-manager/collection-type/articles/bulk", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusUnprocessableEntity {
+			t.Errorf("status = %d, want 422", w.Code)
 		}
 	})
 }

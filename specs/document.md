@@ -130,6 +130,8 @@ type DocumentRepository interface {
 | `PublishSingleType` | `(ctx, slug, locale, userID) → err` | Publish single-type |
 | `UnpublishSingleType` | `(ctx, slug, locale) → err` | Unpublish single-type |
 | `GetAllPaginated` | `(ctx, slug, start, size, locale) → (docs, statuses, total, err)` | Paginated collection list |
+| `Duplicate` | `(ctx, slug, sourceDocumentID, locale, userID) → (*Document, err)` | Copy a document into a new draft (fresh `documentId`, media refs shared) |
+| `BulkCreateAndPublish` | `(ctx, slug, itemsData []map[string]any, locale, userID) → ([]*Document, err)` | Create + publish up to 100 collection-type documents in one call; sequential Save→Publish per item, rollback via `Delete` on the first failure (all-or-nothing) |
 
 ---
 
@@ -156,10 +158,30 @@ Query param: `?locale=` (defaults to first supported locale).
 | `GET` | `/api/document-manager/collection-type/:slug` | `content:read` | `PaginatedList` |
 | `GET` | `/api/document-manager/collection-type/:slug/:documentId` | `content:read` | `Document` |
 | `POST` | `/api/document-manager/collection-type/:slug` | `content:create` | `Document` (201) |
+| `POST` | `/api/document-manager/collection-type/:slug/bulk` | `content:create` **and** `content:publish` | `{"items":[Document, ...]}` (201) |
 | `PUT` | `/api/document-manager/collection-type/:slug/:documentId` | `content:update` | `Document` |
 | `DELETE` | `/api/document-manager/collection-type/:slug/:documentId` | `content:delete` | `204` |
 | `POST` | `/api/document-manager/collection-type/:slug/:documentId/publish` | `content:publish` | `{"status":"published"}` |
 | `POST` | `/api/document-manager/collection-type/:slug/:documentId/unpublish` | `content:unpublish` | `{"status":"draft"}` |
+| `POST` | `/api/document-manager/collection-type/:slug/:documentId/duplicate` | `content:create` | `Document` (201) |
+
+### Bulk Create + Publish (Collection-Type Only)
+
+`POST /api/document-manager/collection-type/:slug/bulk?locale=` — creates and immediately publishes multiple documents in one request. Added to support bulk content import (e.g. seeding vocabulary entries) without N create + N publish round trips.
+
+**Request:**
+```json
+{ "items": [ { "data": { "...": "same field shape as single-item create" } }, ... ] }
+```
+- `items`: required, 1–100 entries. Each item's `data` follows the same contract as the single-item `documentRequest` — it is **not** optional; an item with no `data` key is *not* rejected by extra validation today (see boundary note below) and will create a document with empty fields if sent that way.
+- One `?locale=` for the entire request — no per-item locale.
+
+**Response (all succeeded):**
+```json
+{ "items": [ { "data": { "documentId": "...", "...": "..." }, "status": "published" }, ... ] }
+```
+
+**Semantics — all-or-nothing via rollback, not a DB transaction:** items are processed sequentially through the existing `Save` → `Publish` methods, unchanged. If any item fails, every document already committed earlier in the batch is deleted (via the existing `Delete` usecase method, which removes draft + published + components for every locale) before the error is returned. This is a compensating rollback rather than an atomic multi-document transaction — MongoDB standalone deployments don't support that, and this codebase has no transaction abstraction for either DB backend (Mongo or GORM). Requires both `content:create` and `content:publish` permissions (enforced via two chained `GinRequirePermission` middleware calls on the route).
 
 **Pagination parameters:**
 
@@ -258,11 +280,13 @@ service DocumentService {
 - Status computation: draft / modified / published
 - Single-type: GetSingleType returns 404 when empty, SaveSingleType creates on first save
 - GetAllPaginated: correct pagination, batch status computation
+- BulkCreateAndPublish: all-valid batch creates+publishes in order; a mid-batch `Save` failure rolls back all prior items and reports the failing index; a `Publish` failure rolls back the current item too (not just prior ones); rejects unsupported locale before any repo call
 
 **Document handler (`document_handler_test.go`):**
 - Single-type: GET 200/404, PUT create/update, Publish, Unpublish
 - Collection: List paginated with projected fields, CRUD, Publish, Unpublish
 - Slug/documentID validation → 400
+- BulkCreateCollection: 201 on valid batch; 400 on empty/over-100-item batch or malformed body (checked before the usecase is called); usecase errors map through the existing error mapping (e.g. `ErrValidation` → 422)
 
 ---
 
@@ -282,7 +306,10 @@ service DocumentService {
 | **Never** | Return draft data through public read API |
 | **Never** | Include `documentId` in single-type URLs |
 | **Never** | Restrict create/update/delete/save/publish on content data (documents) |
+| **Never** | Allow more than 100 items in a single bulk create+publish request |
+| **Never** | Accept per-item locale on bulk create+publish — one `?locale=` for the whole request |
 | **Ask first** | Changing default `size` from 20 or max from 100 |
+| **Known gap** | Bulk create+publish does not reject items with a missing/empty `data` field — it will silently create a document with empty fields rather than erroring (confirmed and intentionally left as-is on 2026-07-01; revisit if it causes repeated confusion) |
 
 ---
 
@@ -295,3 +322,4 @@ service DocumentService {
 | v1.8 | Document entity: removed `ContentTypeID`, renamed `Data` → `Fields` (gorm:"-"), `PublishedAt` → `*time.Time`, added `GormID` for ordering | sync-table-fields |
 | v1.11 | Document list supports `orderBy`/`sortDir` query params; responses include `updatedByName` | collection-list-enhancements |
 | v1.12 | REST responses wrap content in `{ data: { ...systemFields, ...contentFields } }`; `contentTypeId`/`status` removed from public responses | bugfix-v1.8 |
+| v1.13 | Bulk create+publish for collection-type documents: `POST /:slug/bulk`, up to 100 items, all-or-nothing via rollback (not a DB transaction) | bulk-document-create-publish |
