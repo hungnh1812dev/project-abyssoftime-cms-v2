@@ -3,7 +3,7 @@ package gormdb
 import "strings"
 
 func sanitizeSlug(slug string) string {
-	return strings.ReplaceAll(slug, "-", "_")
+	return toSnakeCase(strings.ReplaceAll(slug, "-", "_"))
 }
 
 func documentTableName(slug string) string {

@@ -834,6 +834,43 @@ func (uc *UseCase) Duplicate(ctx context.Context, contentTypeSlug, sourceDocumen
 	return uc.Save(ctx, contentTypeSlug, newDoc, fields, userID)
 }
 
+// BulkCreateAndPublish creates and publishes multiple documents in one call.
+// Items are processed sequentially through the existing Save/Publish flow; on
+// the first failure, every document already committed in this batch is rolled
+// back via Delete before the error is returned. There is no separate
+// pre-validation pass because component-shape validation is interleaved with
+// the component writes in Save — reusing Save/Publish as-is avoids duplicating
+// that logic.
+func (uc *UseCase) BulkCreateAndPublish(ctx context.Context, contentTypeSlug string, itemsData []map[string]any, locale string, fields []entity.FieldDefinition, userID string) ([]*entity.Document, error) {
+	locale, err := uc.resolveLocale(locale)
+	if err != nil {
+		return nil, err
+	}
+
+	saved := make([]*entity.Document, 0, len(itemsData))
+	for idx, data := range itemsData {
+		doc := &entity.Document{Fields: data, Locale: locale}
+		result, err := uc.Save(ctx, contentTypeSlug, doc, fields, userID)
+		if err != nil {
+			uc.rollbackBulkCreate(ctx, contentTypeSlug, saved, fields)
+			return nil, fmt.Errorf("item[%d]: %w", idx, err)
+		}
+		if err := uc.Publish(ctx, contentTypeSlug, result.DocumentID, locale, fields, userID); err != nil {
+			saved = append(saved, result)
+			uc.rollbackBulkCreate(ctx, contentTypeSlug, saved, fields)
+			return nil, fmt.Errorf("item[%d]: %w", idx, err)
+		}
+		saved = append(saved, result)
+	}
+	return saved, nil
+}
+
+func (uc *UseCase) rollbackBulkCreate(ctx context.Context, contentTypeSlug string, docs []*entity.Document, fields []entity.FieldDefinition) {
+	for _, doc := range docs {
+		_ = uc.Delete(ctx, contentTypeSlug, doc.DocumentID, fields)
+	}
+}
+
 func (uc *UseCase) Delete(ctx context.Context, contentTypeSlug, documentID string, fields []entity.FieldDefinition) error {
 	if uc.compRepo != nil {
 		if err := uc.deleteComponents(ctx, contentTypeSlug, documentID, fields); err != nil {

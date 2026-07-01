@@ -23,10 +23,16 @@ type RouterConfig struct {
 	GraphQLHandler     http.Handler
 	GraphQLPath        string
 	CORSOrigins        []string
+	EnableDebug        bool
 }
 
 func SetupRouter(cfg RouterConfig) *gin.Engine {
+	if !cfg.EnableDebug {
+		gin.SetMode(gin.ReleaseMode)
+	}
+
 	r := gin.New()
+	r.SetTrustedProxies(nil)
 	r.Use(gin.Recovery())
 	r.Use(middleware.CORS(cfg.CORSOrigins))
 
@@ -69,6 +75,7 @@ func SetupRouter(cfg RouterConfig) *gin.Engine {
 		colGroup.GET("/:slug", middleware.GinRequirePermission(cache, "content:read"), cfg.DocHandler.ListCollection)
 		colGroup.GET("/:slug/:documentId", middleware.GinRequirePermission(cache, "content:read"), cfg.DocHandler.GetCollection)
 		colGroup.POST("/:slug", middleware.GinRequirePermission(cache, "content:create"), cfg.DocHandler.CreateCollection)
+		colGroup.POST("/:slug/bulk", middleware.GinRequirePermission(cache, "content:create"), middleware.GinRequirePermission(cache, "content:publish"), cfg.DocHandler.BulkCreateCollection)
 		colGroup.PUT("/:slug/:documentId", middleware.GinRequirePermission(cache, "content:update"), cfg.DocHandler.UpdateCollection)
 		colGroup.DELETE("/:slug/:documentId", middleware.GinRequirePermission(cache, "content:delete"), cfg.DocHandler.DeleteCollection)
 		colGroup.POST("/:slug/:documentId/publish", middleware.GinRequirePermission(cache, "content:publish"), cfg.DocHandler.PublishCollection)

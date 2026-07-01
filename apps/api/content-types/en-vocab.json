@@ -1,0 +1,64 @@
+{
+  "slug": "en-vocab",
+  "name": "English Vocabulary",
+  "kind": "collection",
+  "fields": [
+    { "name": "wordGroup", "type": "text", "width": "50%" },
+    { "name": "word", "type": "text", "width": "50%" },
+    { "name": "partsOfSpeech", "type": "text", "width": "50%" },
+    { "name": "searchKeywords", "type": "text", "width": "50%" },
+    {
+      "name": "phonetics",
+      "type": "component",
+      "component": "phonetic",
+      "repeatable": false,
+      "fields": [
+        { "name": "ipa", "type": "text" },
+        {
+          "name": "syllableParts",
+          "type": "component",
+          "component": "syllablePart",
+          "repeatable": true,
+          "fields": [
+            { "name": "text", "type": "text", "width": "50%" },
+            { "name": "stressed", "type": "boolean", "width": "50%" }
+          ]
+        }
+      ]
+    },
+
+    {
+      "name": "meanings",
+      "type": "component",
+      "component": "meaning",
+      "repeatable": true,
+      "fields": [
+        { "name": "posLabel", "type": "text" },
+        { "name": "en", "type": "text" },
+        { "name": "vi", "type": "text" }
+      ]
+    },
+    {
+      "name": "examples",
+      "type": "component",
+      "component": "example",
+      "repeatable": true,
+      "fields": [
+        { "name": "en", "type": "text" },
+        { "name": "vi", "type": "text" }
+      ]
+    },
+    {
+      "name": "phrases",
+      "type": "component",
+      "component": "phrase",
+      "repeatable": true,
+      "fields": [
+        { "name": "en", "type": "text" },
+        { "name": "vi", "type": "text" }
+      ]
+    },
+    { "name": "synonyms", "type": "text", "width": "50%" },
+    { "name": "antonyms", "type": "text", "width": "50%" }
+  ]
+}

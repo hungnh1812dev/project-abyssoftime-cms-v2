@@ -229,6 +229,7 @@ func main() {
 		GraphQLHandler:     gqlHandler,
 		GraphQLPath:        cfg.GraphQL.Path,
 		CORSOrigins:        cfg.CORSOrigins,
+		EnableDebug:        cfg.EnableDebug,
 	})
 
 	// gRPC server (opt-in via GRPC_ENABLED=true)
