@@ -61,4 +61,18 @@ models:
     model: "project-abyssoftime-cms-v2/api/graphql/model.DocumentMap"
   EnVocabPackList:
     model: "project-abyssoftime-cms-v2/api/graphql/model.DocumentListMap"
+  EnVocab:
+    model: "project-abyssoftime-cms-v2/api/graphql/model.DocumentMap"
+  EnVocabList:
+    model: "project-abyssoftime-cms-v2/api/graphql/model.DocumentListMap"
+  EnVocabPhonetics:
+    model: "project-abyssoftime-cms-v2/api/graphql/model.DocumentMap"
+  EnVocabPhoneticsSyllableParts:
+    model: "project-abyssoftime-cms-v2/api/graphql/model.DocumentMap"
+  EnVocabMeanings:
+    model: "project-abyssoftime-cms-v2/api/graphql/model.DocumentMap"
+  EnVocabExamples:
+    model: "project-abyssoftime-cms-v2/api/graphql/model.DocumentMap"
+  EnVocabPhrases:
+    model: "project-abyssoftime-cms-v2/api/graphql/model.DocumentMap"
   # --- gqlcodegen models end ---

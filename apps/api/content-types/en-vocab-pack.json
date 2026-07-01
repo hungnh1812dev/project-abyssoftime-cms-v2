@@ -1,6 +1,6 @@
 {
   "slug": "en-vocab-pack",
-  "name": "English Vocabulary",
+  "name": "English Vocabulary Pack",
   "kind": "collection",
   "fields": [
     { "name": "packName", "type": "text", "width": "50%" },
